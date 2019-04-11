@@ -27,8 +27,21 @@ AUTH_ALGORITHM_MAP = {
     'sha256': vpn_ipsec.DigestAlgorithmTypes.DIGEST_ALGORITHM_SHA256,
 }
 
+AUTH_ALGORITHM_MAP_P = {
+    'sha1': vpn_ipsec.DigestAlgorithmTypes.DIGEST_ALGORITHM_SHA1,
+    'sha256': vpn_ipsec.DigestAlgorithmTypes.DIGEST_ALGORITHM_SHA256,
+    'sha384': vpn_ipsec.DigestAlgorithmTypes.DIGEST_ALGORITHM_SHA2_384,
+    'sha512': vpn_ipsec.DigestAlgorithmTypes.DIGEST_ALGORITHM_SHA2_512,
+}
+
 PFS_MAP = {
     'group14': vpn_ipsec.DHGroupTypes.DH_GROUP_14
+}
+
+PFS_MAP_P = {
+    'group2': vpn_ipsec.DHGroupTypes.DH_GROUP_2,
+    'group5': vpn_ipsec.DHGroupTypes.DH_GROUP_5,
+    'group14': vpn_ipsec.DHGroupTypes.DH_GROUP_14,
 }
 
 IKE_VERSION_MAP = {

@@ -255,7 +255,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         return translated_rules
 
     def _get_port_translated_rules(self, project_id, router_id, neutron_net_id,
-                                   firewall_group):
+                                   firewall_group, plugin_rules):
         """Return the list of translated FWaaS rules per port
         Add the egress/ingress rules of this port +
         default drop rules in each direction for this port.
@@ -271,6 +271,10 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
             port_rules.extend(self._translate_rules(
                 project_id, router_id, net_group_id,
                 firewall_group['egress_rule_list'], is_ingress=False))
+
+        # Add the per-port plugin rules
+        if plugin_rules and isinstance(plugin_rules, list):
+            port_rules.extend(plugin_rules)
 
         # Add ingress/egress block rules for this port
         port_rules.extend([
@@ -323,10 +327,16 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
             fwg = self.get_port_fwg(context, port['id'])
             if fwg:
                 router_with_fw = True
+
+                # Add plugin additional allow rules
+                plugin_rules = self.core_plugin.get_extra_fw_rules(
+                    context, router_id, port['id'])
+
                 # Add the FWaaS rules for this port:ingress/egress firewall
                 # rules + default ingress/egress drop rule for this port
                 fw_rules.extend(self._get_port_translated_rules(
-                    project_id, router_id, port['network_id'], fwg))
+                    project_id, router_id, port['network_id'], fwg,
+                    plugin_rules))
 
         # Add a default allow-all rule to all other traffic & ports
         fw_rules.append(self._get_default_backend_rule(router_id))

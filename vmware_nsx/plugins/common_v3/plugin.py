@@ -86,7 +86,7 @@ from vmware_nsx.extensions import providersecuritygroup as provider_sg
 from vmware_nsx.extensions import secgroup_rule_local_ip_prefix as sg_prefix
 from vmware_nsx.plugins.common import plugin
 from vmware_nsx.services.qos.common import utils as qos_com_utils
-from vmware_nsx.services.vpnaas.nsxv3 import ipsec_utils
+from vmware_nsx.services.vpnaas.common_v3 import ipsec_utils
 
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
