@@ -37,29 +37,45 @@ from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as utils
 from vmware_nsx.shell import resources as shell
 
 
+INTERNAL_SUBNET = '169.254.128.0/17'
+
 NSXV_MD_RULES = [
-    {'name': 'MDServiceIP',
-     'destination': {'ipAddress': ['169.254.169.254']},
-     'enabled': True,
-     'application': {'service': [{'protocol': 'tcp',
-                                  'port': [80, 443, 8775]}]},
-     'action': 'accept',
-     'ruleTag': None},
-    {'name': 'MDInterEdgeNet',
-     'destination': {'ipAddress': ['169.254.128.0/17']},
-     'enabled': True,
-     'action': 'deny',
-     'ruleTag': None}]
+    {
+        'name': 'VSERule',
+        'enabled': True,
+        'action': 'accept',
+        'source_vnic_groups': ['vse'],
+        'destination_vnic_groups': ['external']},
+    {
+        'name': 'MDServiceIP',
+        'destination': {'ipAddress': ['169.254.169.254']},
+        'enabled': True,
+        'application': {'service': [{'protocol': 'tcp',
+                                     'port': [80, 443, 8775]}]},
+        'action': 'accept',
+        'ruleTag': None},
+    {
+        'name': 'VSEMDInterEdgeNet',
+        'enabled': True,
+        'action': 'accept',
+        'source_vnic_groups': ['vse'],
+        'destination_ip_address': [INTERNAL_SUBNET]},
+    {
+        'name': 'MDInterEdgeNet',
+        'destination': {'ipAddress': ['169.254.128.0/17']},
+        'enabled': True,
+        'action': 'deny',
+        'ruleTag': None}]
 
 LOG = logging.getLogger(__name__)
 nsxv = utils.get_nsxv_client()
 
 
 def _append_md_fw_rules(fw_rules):
+    fw_rules = NSXV_MD_RULES + fw_rules
     # Set FW rules tags
-    NSXV_MD_RULES[0]['ruleTag'] = len(fw_rules) + 1
-    NSXV_MD_RULES[1]['ruleTag'] = len(fw_rules) + 2
-    fw_rules += NSXV_MD_RULES
+    for i in range(len(fw_rules)):
+        fw_rules[i]['ruleTag'] = i + 1
     return fw_rules
 
 
@@ -70,15 +86,21 @@ def _handle_edge_firewall_rules(edge_id):
         fw_cfg = {}
         LOG.error("Failed to retrieve firewall config for edge %(edge)s "
                   "with exception %(e)s", {'edge': edge_id, 'e': e})
-    do_update = True
     fw_rules = fw_cfg.get('firewallRules', {}).get('firewallRules', [])
+    md_rule_names = ['MDInterEdgeNet',
+                     'MDServiceIP',
+                     'VSEMDInterEdgeNet',
+                     'VSERule']
+    new_rules = []
     for rule in fw_rules:
-        if rule['name'] in ['MDInterEdgeNet', 'MDServiceIP']:
-            do_update = False
-            break
-    if do_update:
-        fw_rules = _append_md_fw_rules(fw_rules)
-        fw_cfg['firewallRules']['firewallRules'] = fw_rules
+        if rule['name'] in md_rule_names:
+            md_rule_names.remove(rule['name'])
+        else:
+            new_rules.append(rule)
+
+    if md_rule_names:
+        new_rules = _append_md_fw_rules(new_rules)
+        fw_cfg['firewallRules']['firewallRules'] = new_rules
         try:
             nsxv.update_firewall(edge_id, fw_cfg)
             LOG.info('Added missing firewall rules for edge %s', edge_id)
@@ -102,6 +124,9 @@ def _recreate_rtr_metadata_cfg(context, plugin, az_name, edge_id):
             LOG.error('Recreation of metadata components for edge '
                       '%(edge)s failed with error %(e)s',
                       {'edge': edge_id, 'e': e})
+    else:
+        LOG.error('Could not find a metadata handler for availability zone %s',
+                  az_name)
 
 
 def _update_md_lb_members(edge_id, edge_internal_ips, lb, pool):
