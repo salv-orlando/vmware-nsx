@@ -14,11 +14,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py27:
             timeout: 5400
@@ -27,11 +27,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py35:
             timeout: 5400
@@ -40,11 +40,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py36:
             timeout: 5400
@@ -53,11 +53,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
     gate:
       queue: vmware-nsx
@@ -69,11 +69,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py27:
             timeout: 5400
@@ -82,11 +82,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py35:
             timeout: 5400
@@ -95,11 +95,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py36:
             timeout: 5400
@@ -108,11 +108,11 @@
               - openstack/networking-l2gw
               - openstack/networking-sfc
               - openstack/neutron-lbaas
-              - openstack/vmware-nsxlib
+              - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - openstack/tap-as-a-service
+              - x/tap-as-a-service
               - openstack/octavia
 
 - job:
@@ -124,9 +124,9 @@
       - openstack/networking-l2gw
       - openstack/networking-sfc
       - openstack/neutron-lbaas
-      - openstack/vmware-nsxlib
+      - x/vmware-nsxlib
       - openstack/neutron-fwaas
       - openstack/neutron-dynamic-routing
       - openstack/neutron-vpnaas
-      - openstack/tap-as-a-service
+      - x/tap-as-a-service
       - openstack/octavia
