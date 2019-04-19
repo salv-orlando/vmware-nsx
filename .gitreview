@@ -1,5 +1,5 @@
 [gerrit]
-host=review.openstack.org
+host=review.opendev.org
 port=29418
 branch=stable/rocky
-project=openstack/vmware-nsx.git
+project=x/vmware-nsx.git
