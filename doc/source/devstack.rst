@@ -151,7 +151,7 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     topic=vmwarensxv_edge_lb
 
     [controller_worker]
-    network_driver = network_noop_driver
+    network_driver = allowed_address_pairs_driver
 
 NSX-T
 -----
@@ -274,7 +274,7 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     topic=vmwarensxv_edge_lb
 
     [controller_worker]
-    network_driver = network_noop_driver
+    network_driver = allowed_address_pairs_driver
 
 
 NSX-P
@@ -355,7 +355,7 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     topic=vmwarensxv_edge_lb
 
     [controller_worker]
-    network_driver = network_noop_driver
+    network_driver = allowed_address_pairs_driver
 
 
 NSX-TVD
