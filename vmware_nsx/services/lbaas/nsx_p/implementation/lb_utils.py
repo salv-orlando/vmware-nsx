@@ -118,7 +118,7 @@ def update_rule_in_policy(rule):
 
 @log_helpers.log_method_call
 def update_router_lb_vip_advertisement(context, core_plugin, router_id):
-    router = core_plugin.get_router(context, router_id)
+    router = core_plugin.get_router(context.elevated(), router_id)
 
     # Add a rule to advertise external vips on the router
     external_subnets = core_plugin._find_router_gw_subnets(

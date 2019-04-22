@@ -56,9 +56,9 @@ def get_router_from_network(context, plugin, subnet_id):
     network_id = subnet['network_id']
     port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
                     'network_id': [network_id]}
-    ports = plugin.get_ports(context, filters=port_filters)
+    ports = plugin.get_ports(context.elevated(), filters=port_filters)
     if ports:
-        router = plugin.get_router(context, ports[0]['device_id'])
+        router = plugin.get_router(context.elevated(), ports[0]['device_id'])
         if router.get('external_gateway_info'):
             return router['id']
 
