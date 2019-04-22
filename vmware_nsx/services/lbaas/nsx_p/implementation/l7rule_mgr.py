@@ -35,7 +35,8 @@ class EdgeL7RuleManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             lb_utils.remove_rule_from_policy(rule)
         else:
             lb_utils.update_rule_in_policy(rule)
-        rule_body = lb_utils.convert_l7policy_to_lb_rule(rule['policy'])
+        rule_body = lb_utils.convert_l7policy_to_lb_rule(
+            self.core_plugin.nsxpolicy, rule['policy'])
         try:
             vs_client.update_lb_rule(policy['listener_id'],
                                      name=policy_name,

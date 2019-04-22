@@ -69,12 +69,13 @@ def get_rule_match_conditions(policy):
 
 
 @log_helpers.log_method_call
-def get_rule_actions(l7policy):
+def get_rule_actions(nsxpolicy, l7policy):
     if l7policy['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_POOL:
         if l7policy['redirect_pool_id']:
             lb_pool_id = l7policy['redirect_pool_id']
+            lb_pool_path = nsxpolicy.load_balancer.lb_pool.get_path(lb_pool_id)
             actions = [{'type': p_const.LB_SELECT_POOL_ACTION,
-                        'pool_id': lb_pool_id}]
+                        'pool_id': lb_pool_path}]
         else:
             msg = _('Failed to get LB pool binding from nsx db')
             raise n_exc.BadRequest(resource='lbaas-l7rule-create',
@@ -95,10 +96,10 @@ def get_rule_actions(l7policy):
 
 
 @log_helpers.log_method_call
-def convert_l7policy_to_lb_rule(policy):
+def convert_l7policy_to_lb_rule(nsxpolicy, policy):
     return {
         'match_conditions': get_rule_match_conditions(policy),
-        'actions': get_rule_actions(policy),
+        'actions': get_rule_actions(nsxpolicy, policy),
         'phase': lb_const.LB_RULE_HTTP_FORWARDING,
         'match_strategy': 'ALL'
     }

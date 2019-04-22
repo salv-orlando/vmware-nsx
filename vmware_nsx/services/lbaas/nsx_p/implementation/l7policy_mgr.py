@@ -34,12 +34,13 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         policy_name = utils.get_name_and_uuid(policy['name'] or 'policy',
                                               policy['id'])
-        rule_body = lb_utils.convert_l7policy_to_lb_rule(policy)
+        rule_body = lb_utils.convert_l7policy_to_lb_rule(
+            self.core_plugin.nsxpolicy, policy)
         try:
-
+            position = policy.get('position', 0) - 1
             vs_client.add_lb_rule(policy['listener_id'],
                                   name=policy_name,
-                                  position=policy.get('position', 0) - 1,
+                                  position=position,
                                   **rule_body)
         except nsxlib_exc.ManagerError:
             with excutils.save_and_reraise_exception():
@@ -55,7 +56,8 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         policy_name = utils.get_name_and_uuid(old_policy['name'] or 'policy',
                                               old_policy['id'])
-        rule_body = lb_utils.convert_l7policy_to_lb_rule(context, new_policy)
+        rule_body = lb_utils.convert_l7policy_to_lb_rule(
+            self.core_plugin.nsxpolicy, new_policy)
         try:
             vs_client.update_lb_rule(
                 new_policy['listener_id'],

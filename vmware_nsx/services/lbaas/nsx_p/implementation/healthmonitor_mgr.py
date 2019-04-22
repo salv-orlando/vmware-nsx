@@ -108,10 +108,7 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         monitor_client = self._get_monitor_policy_client(new_hm)
         try:
             monitor_body = self._build_monitor_args(new_hm)
-            monitor_name = utils.get_name_and_uuid(new_hm['name'] or 'monitor',
-                                                   new_hm['id'])
-            monitor_client.update(new_hm['id'], name=monitor_name,
-                                  **monitor_body)
+            monitor_client.update(new_hm['id'], **monitor_body)
         except nsxlib_exc.ManagerError as exc:
             completor(success=False)
             msg = _('Failed to update monitor %(monitor)s with exception'

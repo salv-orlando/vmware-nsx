@@ -167,12 +167,10 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             tags = self._get_listener_tags(context, new_listener)
 
         try:
-            vs_id = new_listener['id']
             app_profile_id = new_listener['id']
             updated_kwargs = self._get_virtual_server_kwargs(
-                context, new_listener, vs_name, tags, app_profile_id,
-                certificate)
-            vs_client.update(vs_id, **updated_kwargs)
+                context, new_listener, vs_name, tags, certificate)
+            vs_client.update(**updated_kwargs)
             if vs_name:
                 app_client.update(app_profile_id, display_name=vs_name,
                                   tags=tags)

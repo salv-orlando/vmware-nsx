@@ -1461,7 +1461,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if update_firewall:
             self.update_router_firewall(context, router_id)
 
-    def delete_service_router(self, project_id, router_id):
+    def delete_service_router(self, router_id):
         try:
             # Disable standby relocation on this router
             self.nsxpolicy.tier1.set_standby_relocation(
@@ -1574,7 +1574,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                                 router_subnets,
                                                 advertise_ipv6_subnets)
         if actions['remove_service_router']:
-            self.delete_service_router(router['project_id'], router_id)
+            self.delete_service_router(router_id)
 
     def _update_router_advertisement_rules(self, router_id, subnets,
                                            advertise_ipv6):

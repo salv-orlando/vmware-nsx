@@ -159,7 +159,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         vs_list = self._get_lb_virtual_servers(context, lb)
         try:
-            rsp = service_client.get_stats(lb['id'])
+            rsp = service_client.get_usage(lb['id'])
             if rsp:
                 for vs in rsp.get('virtual_servers', []):
                     # Skip the virtual server that doesn't belong
