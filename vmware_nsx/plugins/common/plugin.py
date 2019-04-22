@@ -458,6 +458,10 @@ def _delete_sg_group_related_rules(resource, event, trigger, **kwargs):
     filters = {'remote_group_id': [sg_id]}
     rules = core_plugin.get_security_group_rules(context, filters=filters)
     for rule in rules:
+        if rule['security_group_id'] == sg_id:
+            continue
+        LOG.info("Deleting SG rule %s because of remote group %s deletion",
+                 rule['id'], sg_id)
         core_plugin.delete_security_group_rule(context, rule["id"])
 
 
