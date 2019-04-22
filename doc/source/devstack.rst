@@ -50,7 +50,7 @@ Add neutron-fwaas repo as an external repository and configure following flags i
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,firewall_v2
 
-    [[post-config|$NEUTRON_CONF]]
+    [[post-config|$NEUTRON_FWAAS_CONF]]
     [fwaas]
     enabled = True
     driver = vmware_nsxv_edge_v2
@@ -209,7 +209,7 @@ Add neutron-fwaas repo as an external repository and configure following flags i
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,firewall_v2
 
-    [[post-config|$NEUTRON_CONF]]
+    [[post-config|$NEUTRON_FWAAS_CONF]]
     [fwaas]
     enabled = True
     driver = vmware_nsxv3_edge_v2
@@ -303,7 +303,7 @@ Add neutron-fwaas repo as an external repository and configure following flags i
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,firewall_v2
 
-    [[post-config|$NEUTRON_CONF]]
+    [[post-config|$NEUTRON_FWAAS_CONF]]
     [fwaas]
     enabled = True
     driver = vmware_nsxp_edge_v2
@@ -388,17 +388,17 @@ Add neutron-fwaas repo as an external repository and configure following flags i
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsxtvd_fwaasv2
 
-    [[post-config|$NEUTRON_CONF]]
+    [DEFAULT]
+    api_extensions_path = $DEST/neutron-fwaas/neutron_fwaas/extensions
+
+    [[post-config|$NEUTRON_FWAAS_CONF]]
     [fwaas]
     enabled = True
     driver = vmware_nsxtvd_edge_v2
-    [DEFAULT]
-    api_extensions_path = $DEST/neutron-fwaas/neutron_fwaas/extensions
 
     [service_providers]
     service_provider = FIREWALL_V2:fwaas_db:neutron_fwaas.services.firewall.service_drivers.agents.agents.FirewallAgentDriver:default
 
-Note - if devstack fails due to ml2_conf.ini being missing, please copy neutron/plugins/ml2/ml2_conf.ini.sample to /etc/neutron/plugins/ml2/ml2_conf.ini and stack again.
 
 L2GW Driver
 ~~~~~~~~~~~
