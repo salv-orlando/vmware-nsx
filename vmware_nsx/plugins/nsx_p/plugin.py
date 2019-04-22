@@ -820,7 +820,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # to have an accurate picture of existing subnets.
         profile_id = None
 
-        slaac_subnet = (subnet['ipv6_address_mode'] == 'slaac')
+        slaac_subnet = (subnet.get('ipv6_address_mode') == 'slaac')
 
         if slaac_subnet and not delete:
             # slaac subnet connected - verify slaac is set on router
@@ -834,8 +834,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # advertising (vlan advertising is attached on interface level)
             slaac_subnets = [s for s in rtr_subnets
                              if s['id'] != subnet['id'] and
-                             s['ipv6_address_mode'] == 'slaac' and
-                             self._is_overlay_network(s['network_id'])]
+                             s.get('ipv6_address_mode') == 'slaac' and
+                             self._is_overlay_network(context,
+                                                      s['network_id'])]
 
             if not slaac_subnets and slaac_subnet:
                 # this was the last slaac subnet connected -
@@ -1561,25 +1562,27 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             for subnet in router_subnets:
                 self._add_subnet_no_dnat_rule(context, router_id, subnet)
 
-        # always advertise ipv6 subnets if gateway is set
-        actions['advertise_ipv6_subnets'] = True if info else False
-
-        self._update_router_advertisement(router_id, actions, router_subnets)
-
-        if actions['remove_service_router']:
-            self.delete_service_router(router['project_id'], router_id)
-
-    def _update_router_advertisement(self, router_id, actions, subnets):
-
         self.nsxpolicy.tier1.update_route_advertisement(
             router_id,
             nat=actions['advertise_route_nat_flag'],
             subnets=actions['advertise_route_connected_flag'])
 
+        # always advertise ipv6 subnets if gateway is set
+        advertise_ipv6_subnets = True if info else False
+
+        self._update_router_advertisement_rules(router_id,
+                                                router_subnets,
+                                                advertise_ipv6_subnets)
+        if actions['remove_service_router']:
+            self.delete_service_router(router['project_id'], router_id)
+
+    def _update_router_advertisement_rules(self, router_id, subnets,
+                                           advertise_ipv6):
+
         # There is no NAT for ipv6 - all connected ipv6 segments should be
         # advertised
         ipv6_cidrs = [s['cidr'] for s in subnets if s.get('ip_version') == 6]
-        if ipv6_cidrs and actions['advertise_ipv6_subnets']:
+        if ipv6_cidrs and advertise_ipv6:
             self.nsxpolicy.tier1.add_advertisement_rule(
                 router_id,
                 IPV6_ROUTER_ADV_RULE_NAME,
@@ -1853,6 +1856,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                         subnet, gw_address_scope, gw_ip)
                 self._add_subnet_no_dnat_rule(context, router_id, subnet)
 
+            if subnet.get('ip_version') == 6 and gw_network_id:
+                # if this is an ipv6 subnet and router has GW,
+                # we need to add advertisement rule
+                self._update_router_advertisement_rules(
+                    router_id, subnets, True)
+
             # update firewall rules
             self.update_router_firewall(context, router_id, router_db)
 
@@ -1939,6 +1948,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 subnet['ip_version'] == 4):
                 self._del_subnet_snat_rule(router_id, subnet)
                 self._del_subnet_no_dnat_rule(router_id, subnet)
+
+            if subnet and subnet.get('ip_version') == 6 and router_db.gw_port:
+                # if this is an ipv6 subnet and router has GW,
+                # we need to remove advertisement rule
+                self._update_router_advertisement_rules(
+                    router_id, subnets, True)
 
             # update firewall rules
             self.update_router_firewall(context, router_id, router_db)
