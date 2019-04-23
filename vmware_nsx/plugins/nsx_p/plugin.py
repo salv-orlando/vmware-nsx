@@ -468,6 +468,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # Init the FWaaS support with RPC listeners for the original process
         self._init_fwaas(with_rpc=True)
 
+        self._init_octavia()
         self.octavia_stats_collector = (
             octavia_listener.NSXOctaviaStatisticsCollector(
                 self,

@@ -24,6 +24,7 @@ from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils as p_utils
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
+from vmware_nsxlib.v3.policy import utils as lib_p_utils
 from vmware_nsxlib.v3 import utils
 
 LOG = logging.getLogger(__name__)
@@ -159,12 +160,13 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         vs_list = self._get_lb_virtual_servers(context, lb)
         try:
-            rsp = service_client.get_usage(lb['id'])
-            if rsp:
-                for vs in rsp.get('virtual_servers', []):
+            rsp = service_client.get_statistics(lb['id'])
+            for result in rsp.get('results', []):
+                for vs in result.get('virtual_servers', []):
                     # Skip the virtual server that doesn't belong
                     # to this loadbalancer
-                    if vs['virtual_server_id'] not in vs_list:
+                    vs_id = lib_p_utils.path_to_id(vs['virtual_server_path'])
+                    if vs_id not in vs_list:
                         continue
                     vs_stats = vs.get('statistics', {})
                     for stat in lb_const.LB_STATS_MAP:
