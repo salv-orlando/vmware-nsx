@@ -27,6 +27,10 @@ from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 LOG = logging.getLogger(__name__)
 
 
+def _translate_member_state(state):
+    return lb_const.ENABLED if state else lb_const.DISABLED
+
+
 class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     @log_helpers.log_method_call
     def _get_info_from_fip(self, context, fip):
@@ -107,7 +111,8 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 port=member['protocol_port'],
                 display_name=member['name'][:218] + '_' + member['id'],
                 weight=member['weight'],
-                backup_member=member.get('backup', False))
+                backup_member=member.get('backup', False),
+                admin_state=_translate_member_state(member['admin_state_up']))
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 completor(success=False)
@@ -125,14 +130,16 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             fixed_ip = self._get_info_from_fip(context, new_member['address'])
         else:
             fixed_ip = new_member['address']
-        pool_id = new_member['pool']['id']
+        pool_id = old_member['pool']['id']
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
         try:
             pool_client.update_pool_member(
                 pool_id, fixed_ip, port=new_member['protocol_port'],
                 display_name=new_member['name'][:219] + '_' + new_member['id'],
                 weight=new_member['weight'],
-                backup_member=new_member.get('backup', False))
+                backup_member=new_member.get('backup', False),
+                admin_state=_translate_member_state(
+                    new_member['admin_state_up']))
 
         except Exception as e:
             with excutils.save_and_reraise_exception():
