@@ -68,7 +68,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             raise n_exc.BadRequest(resource='lbaas-subnet', msg=msg)
 
         if router_id and not self.core_plugin.service_router_has_services(
-                context, router_id):
+                context.elevated(), router_id):
             self.core_plugin.create_service_router(context, router_id)
 
         lb_name = utils.get_name_and_uuid(lb['name'] or 'lb',
@@ -118,8 +118,8 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             try:
                 service_client.delete(lb['id'])
 
-                if not self.core_plugin.service_router_has_services(context,
-                                                                    router_id):
+                if not self.core_plugin.service_router_has_services(
+                        context.elevated(), router_id):
                     self.core_plugin.delete_service_router(router_id)
             except Exception as e:
                 with excutils.save_and_reraise_exception():
