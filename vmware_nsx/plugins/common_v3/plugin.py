@@ -158,7 +158,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         Exceptions specific to the NSX Plugin are mapped to standard
         HTTP Exceptions.
         """
-        faults.FAULT_MAP.update({nsx_lib_exc.ManagerError:
+        faults.FAULT_MAP.update({nsx_lib_exc.InvalidInput:
                                  webob.exc.HTTPBadRequest,
                                  nsx_lib_exc.ServiceClusterUnavailable:
                                  webob.exc.HTTPServiceUnavailable,
