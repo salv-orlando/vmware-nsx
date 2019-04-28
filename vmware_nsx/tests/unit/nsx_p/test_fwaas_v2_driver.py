@@ -250,7 +250,8 @@ class NsxpFwaasTestCase(test_p_plugin.NsxPPluginTestCaseMixin):
             expected_rules = (self._block_interface_rules(0) +
                               [self._default_rule(2)])
             update_fw.assert_called_once_with(
-                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY)
+                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY,
+                category=policy_constants.CATEGORY_LOCAL_GW)
             # compare rules one by one
             actual_rules = update_fw.call_args[0][2]
             self.assertEqual(len(expected_rules), len(actual_rules))
@@ -279,7 +280,8 @@ class NsxpFwaasTestCase(test_p_plugin.NsxPPluginTestCaseMixin):
             expected_default_rules = self._block_interface_rules(
                 len(rule_list)) + [self._default_rule(len(rule_list) + 2)]
             update_fw.assert_called_once_with(
-                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY)
+                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY,
+                category=policy_constants.CATEGORY_LOCAL_GW)
 
             # compare rules one by one
             actual_rules = update_fw.call_args[0][2]
@@ -341,7 +343,8 @@ class NsxpFwaasTestCase(test_p_plugin.NsxPPluginTestCaseMixin):
             # expecting only the default allow-all rule
             expected_rules = [self._default_rule(0)]
             update_fw.assert_called_once_with(
-                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY)
+                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY,
+                category=policy_constants.CATEGORY_LOCAL_GW)
             # compare rules one by one
             actual_rules = update_fw.call_args[0][2]
             self.assertEqual(len(expected_rules), len(actual_rules))
@@ -363,7 +366,8 @@ class NsxpFwaasTestCase(test_p_plugin.NsxPPluginTestCaseMixin):
             # expecting only the default allow-all rule
             expected_rules = [self._default_rule(0)]
             update_fw.assert_called_once_with(
-                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY)
+                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY,
+                category=policy_constants.CATEGORY_LOCAL_GW)
             # compare rules one by one
             actual_rules = update_fw.call_args[0][2]
             self.assertEqual(len(expected_rules), len(actual_rules))
