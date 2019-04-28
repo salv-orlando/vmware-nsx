@@ -1989,16 +1989,28 @@ class TestSubnetsV2(NsxVPluginV2TestCase,
     def test_create_subnet_dhcpv6_stateless_with_ip_already_allocated(self):
         self.skipTest('No DHCP v6 Support yet')
 
+    def test_create_subnets_bulk_native_ipv6(self):
+        self.skipTest('No DHCP v6 Support yet')
+
     def _create_subnet_bulk(self, fmt, number, net_id, name,
                             ip_version=4, **kwargs):
         base_data = {'subnet': {'network_id': net_id,
                                 'ip_version': ip_version,
                                 'enable_dhcp': False,
                                 'tenant_id': self._tenant_id}}
+
+        if 'ipv6_mode' in kwargs:
+            base_data['subnet']['ipv6_ra_mode'] = kwargs['ipv6_mode']
+            base_data['subnet']['ipv6_address_mode'] = kwargs['ipv6_mode']
+        # auto-generate cidrs as they should not overlap
+        base_cidr = "10.0.%s.0/24"
+        if ip_version == constants.IP_VERSION_6:
+            base_cidr = "fd%s::/64"
+
         # auto-generate cidrs as they should not overlap
         overrides = dict((k, v)
                          for (k, v) in zip(range(number),
-                                           [{'cidr': "10.0.%s.0/24" % num}
+                                           [{'cidr': base_cidr % num}
                                             for num in range(number)]))
         kwargs.update({'override': overrides})
         return self._create_bulk(fmt, number, 'subnet', base_data, **kwargs)
@@ -2123,6 +2135,9 @@ class TestSubnetsV2(NsxVPluginV2TestCase,
     def test_create_subnet_ipv6_slaac_with_port_not_found(self):
         self.skipTest('Currently not supported')
 
+    def test_bulk_create_subnet_ipv6_auto_addr_with_port_on_network(self):
+        self.skipTest('Currently not supported')
+
     def test_create_subnet_ipv6_gw_values(self):
         # This test should fail with response code 400 as IPv6 subnets with
         # DHCP are not supported by this plugin
@@ -2212,6 +2227,9 @@ class TestSubnetPoolsV2(NsxVPluginV2TestCase, test_plugin.TestSubnetsV2):
     def test_create_subnet_ipv6_slaac_with_port_not_found(self):
         self.skipTest('Not supported')
 
+    def test_bulk_create_subnet_ipv6_auto_addr_with_port_on_network(self):
+        self.skipTest('Currently not supported')
+
     def test_create_subnet_ipv6_slaac_with_dhcp_port_on_network(self):
         self.skipTest('Not supported')
 
@@ -2262,6 +2280,9 @@ class TestSubnetPoolsV2(NsxVPluginV2TestCase, test_plugin.TestSubnetsV2):
 
     def test_create_subnet_only_ip_version_v6_old(self):
         self.skipTest('Currently not supported')
+
+    def test_create_subnets_bulk_native_ipv6(self):
+        self.skipTest('No DHCP v6 Support yet')
 
 
 class TestBasicGet(test_plugin.TestBasicGet, NsxVPluginV2TestCase):

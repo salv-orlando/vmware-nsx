@@ -2104,7 +2104,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     context, subnet)
 
         def _rollback(subnet):
-            if subnet['enable_dhcp'] and subnet['id'] in _subnet_dhcp_info:
+            if (subnet and subnet['enable_dhcp'] and
+                subnet['id'] in _subnet_dhcp_info):
                 self._rollback_subnet(subnet, _subnet_dhcp_info[subnet['id']])
                 del _subnet_dhcp_info[subnet['id']]
 

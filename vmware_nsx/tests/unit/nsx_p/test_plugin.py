@@ -1059,10 +1059,18 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                                 'ip_version': ip_version,
                                 'enable_dhcp': False,
                                 'tenant_id': self._tenant_id}}
+        if 'ipv6_mode' in kwargs:
+            base_data['subnet']['ipv6_ra_mode'] = kwargs['ipv6_mode']
+            base_data['subnet']['ipv6_address_mode'] = kwargs['ipv6_mode']
+        # auto-generate cidrs as they should not overlap
+        base_cidr = "10.0.%s.0/24"
+        if ip_version == constants.IP_VERSION_6:
+            base_cidr = "fd%s::/64"
+
         # auto-generate cidrs as they should not overlap
         overrides = dict((k, v)
                          for (k, v) in zip(range(number),
-                                           [{'cidr': "10.0.%s.0/24" % num}
+                                           [{'cidr': base_cidr % num}
                                             for num in range(number)]))
         kwargs.update({'override': overrides})
         return self._create_bulk(fmt, number, 'subnet', base_data, **kwargs)

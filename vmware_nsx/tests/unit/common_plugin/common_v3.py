@@ -297,6 +297,12 @@ class NsxV3TestSubnets(NsxV3SubnetMixin,
     def test_create_subnet_ipv6_slaac_with_port_not_found(self):
         self.skipTest('No DHCP v6 Support yet')
 
+    def test_bulk_create_subnet_ipv6_auto_addr_with_port_on_network(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnets_bulk_native_ipv6(self):
+        self.skipTest('Multiple IPv6 subnets on one network is not supported')
+
     @with_disable_dhcp
     def test_update_subnet_inconsistent_ipv6_hostroute_dst_v4(self):
         super(NsxV3TestSubnets,
