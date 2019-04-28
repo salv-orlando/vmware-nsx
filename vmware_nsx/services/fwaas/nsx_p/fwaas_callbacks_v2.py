@@ -133,7 +133,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
 
     def _is_empty_cidr(self, cidr, fwaas_rule_id):
         net = netaddr.IPNetwork(cidr)
-        if ((net.version == 4 and cidr.startswith('0.0.0.0/')) or
+        if ((net.version == 4 and cidr.startswith('0.0.0.0')) or
             (net.version == 6 and str(net.ip) == "::")):
             LOG.warning("Unsupported FWaaS cidr %(cidr)s for rule %(id)s",
                         {'cidr': cidr, 'id': fwaas_rule_id})
