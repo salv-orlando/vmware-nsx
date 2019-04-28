@@ -59,7 +59,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             context, self.core_plugin, lb['vip_subnet_id'])
 
         router_id = self._validate_lb_network(context, lb)
-        if not router_id and not network.get('router:external'):
+        if not router_id and network and not network.get('router:external'):
             completor(success=False)
             msg = (_('Cannot create a loadbalancer %(lb_id)s on subnet. '
                      '%(subnet)s is neither public nor connected to the LB '
@@ -83,7 +83,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         try:
-            if network.get('router:external'):
+            if network and network.get('router:external'):
                 connectivity_path = None
             else:
                 connectivity_path = self.core_plugin.nsxpolicy.tier1.get_path(

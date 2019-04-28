@@ -52,7 +52,7 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, subnet_id)
 
-        if not network.get('router:external'):
+        if network and not network.get('router:external'):
             return
 
         # If VIP is attached to an external network, loadbalancer_mgr might not
@@ -91,12 +91,10 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     @log_helpers.log_method_call
     def create(self, context, member, completor):
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
+        self._validate_member_lb_connectivity(context, member, completor)
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, member['subnet_id'])
-
-        self._validate_member_lb_connectivity(context, member, completor)
-
-        if network.get('router:external'):
+        if network and network.get('router:external'):
             fixed_ip = self._get_info_from_fip(context, member['address'])
         else:
             fixed_ip = member['address']
@@ -120,7 +118,7 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     def update(self, context, old_member, new_member, completor):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, new_member['subnet_id'])
-        if network.get('router:external'):
+        if network and network.get('router:external'):
             fixed_ip = self._get_info_from_fip(context, new_member['address'])
         else:
             fixed_ip = new_member['address']
@@ -145,7 +143,7 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     def delete(self, context, member, completor):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, member['subnet_id'])
-        if network.get('router:external'):
+        if network and network.get('router:external'):
             fixed_ip = self._get_info_from_fip(context, member['address'])
         else:
             fixed_ip = member['address']
