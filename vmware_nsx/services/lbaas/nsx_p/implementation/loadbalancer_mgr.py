@@ -185,28 +185,25 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             if not isinstance(service_status, dict):
                 service_status = {}
 
-            vs_statuses = service_client.get_status(id)
-            if not isinstance(vs_statuses, dict):
-                vs_statuses = {}
         except nsxlib_exc.ManagerError:
             LOG.warning("LB service %(lbs)s is not found",
                         {'lbs': id})
             return {}
 
         # get the loadbalancer status from the LB service
-        lb_status = self._nsx_status_to_lb_status(
-            service_status.get('service_status'))
+        lb_status = lb_const.ONLINE
+        lb_status_results = service_status.get('results')
+        if lb_status_results:
+            lb_status = self._nsx_status_to_lb_status(
+                lb_status_results[0].get('service_status'))
         statuses = {lb_const.LOADBALANCERS: [{'id': id, 'status': lb_status}],
                     lb_const.LISTENERS: [],
                     lb_const.POOLS: [],
                     lb_const.MEMBERS: []}
 
-        # Add the listeners statuses from the virtual servers statuses
-        for vs in vs_statuses.get('results', []):
-            vs_status = self._nsx_status_to_lb_status(vs.get('status'))
-            vs_id = vs.get('virtual_server_id')
-            statuses[lb_const.LISTENERS].append(
-                {'id': vs_id, 'status': vs_status})
+        # TODO(asarfaty): Go over all VS of this loadbalancer by tags
+        # to add the listeners statuses from the virtual servers statuses
+        return statuses
 
     @log_helpers.log_method_call
     def _nsx_status_to_lb_status(self, nsx_status):
