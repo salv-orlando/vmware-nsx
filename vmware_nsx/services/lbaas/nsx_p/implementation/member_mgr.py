@@ -106,7 +106,8 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 pool_id, fixed_ip,
                 port=member['protocol_port'],
                 display_name=member['name'][:218] + '_' + member['id'],
-                weight=member['weight'])
+                weight=member['weight'],
+                backup_member=member.get('backup', False))
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 completor(success=False)
@@ -130,7 +131,8 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             pool_client.update_pool_member(
                 pool_id, fixed_ip, port=new_member['protocol_port'],
                 display_name=new_member['name'][:219] + '_' + new_member['id'],
-                weight=new_member['weight'])
+                weight=new_member['weight'],
+                backup_member=new_member.get('backup', False))
 
         except Exception as e:
             with excutils.save_and_reraise_exception():

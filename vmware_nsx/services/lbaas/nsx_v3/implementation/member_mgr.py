@@ -57,6 +57,7 @@ class EdgeMemberManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             if m['ip_address'] == fixed_ip:
                 m['display_name'] = member['name'][:219] + '_' + member['id']
                 m['weight'] = member['weight']
+                m['backup_member'] = member.get('backup', False)
         return lb_pool['members']
 
     @log_helpers.log_method_call
@@ -147,7 +148,8 @@ class EdgeMemberManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                     'display_name': member['name'][:219] + '_' + member['id'],
                     'ip_address': fixed_ip,
                     'port': member['protocol_port'],
-                    'weight': member['weight']}]
+                    'weight': member['weight'],
+                    'backup_member': member.get('backup', False)}]
                 members = (old_m + new_m) if old_m else new_m
                 pool_client.update_pool_with_members(lb_pool_id, members)
 

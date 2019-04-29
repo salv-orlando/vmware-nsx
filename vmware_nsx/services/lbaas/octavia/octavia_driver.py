@@ -47,7 +47,7 @@ unsupported_keys = {'Loadbalancer': ['vip_qos_policy_id'],
                                  'timeout_member_data',
                                  'timeout_tcp_inspect'],
                     'HealthMonitor': ['max_retries_down'],
-                    'Member': ['monitor_address', 'monitor_port', 'backup']}
+                    'Member': ['monitor_address', 'monitor_port']}
 
 
 class NSXOctaviaDriver(driver_base.ProviderDriver):
