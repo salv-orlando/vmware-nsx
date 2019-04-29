@@ -1910,14 +1910,16 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 LOG.error(msg)
                 raise n_exc.InvalidInput(error_message=msg)
 
-    def _subnet_with_native_dhcp(self, subnet):
+    def _subnet_with_native_dhcp(self, subnet, orig_subnet=None):
         native_metadata = self._has_native_dhcp_metadata()
+        default_enable_dhcp = (orig_subnet.get('enable_dhcp', False)
+                               if orig_subnet else False)
         # DHCPv6 is not yet supported, but slaac is
         # When configuring slaac, neutron requires the user
         # to enable dhcp, however plugin code does not consider
         # slaac as dhcp.
         return (native_metadata and
-                subnet.get('enable_dhcp', False) and
+                subnet.get('enable_dhcp', default_enable_dhcp) and
                 subnet.get('ipv6_address_mode') != 'slaac')
 
     def _validate_subnet_ip_version(self, subnet):
@@ -2189,10 +2191,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 context, network, subnet['subnet'])
 
         if self._has_native_dhcp_metadata():
-            enable_dhcp = self._subnet_with_native_dhcp(subnet['subnet'])
+            enable_dhcp = self._subnet_with_native_dhcp(
+                subnet['subnet'], orig_subnet=orig_subnet)
             orig_enable_dhcp = self._subnet_with_native_dhcp(orig_subnet)
-            if (enable_dhcp is not None and
-                enable_dhcp != orig_enable_dhcp):
+            if enable_dhcp != orig_enable_dhcp:
                 self._ensure_native_dhcp()
                 lock = 'nsxv3_network_' + orig_subnet['network_id']
                 with locking.LockManager.get_lock(lock):
