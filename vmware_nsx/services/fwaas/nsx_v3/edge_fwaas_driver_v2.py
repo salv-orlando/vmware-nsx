@@ -85,7 +85,7 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
                      'cidr': cidr, 'id': fwaas_rule_id})
         net = netaddr.IPNetwork(cidr)
         if net.version == 4:
-            if cidr.startswith('0.0.0.0/'):
+            if cidr.startswith('0.0.0.0'):
                 # Treat as ANY and just log warning
                 LOG.warning(error_msg)
                 return
@@ -165,7 +165,7 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
                 raise self.driver_exception(driver=self.driver_name)
 
             if (rule.get('destination_ip_address') and
-                not rule['destination_ip_address'].startswith('0.0.0.0/')):
+                not rule['destination_ip_address'].startswith('0.0.0.0')):
                 nsx_rule['destinations'] = self.translate_addresses_to_target(
                     [rule['destination_ip_address']], rule['id'])
             elif replace_dest:
@@ -174,7 +174,7 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
                 nsx_rule['destinations'] = [{'target_type': 'LogicalSwitch',
                                              'target_id': replace_dest}]
             if (rule.get('source_ip_address') and
-                not rule['source_ip_address'].startswith('0.0.0.0/')):
+                not rule['source_ip_address'].startswith('0.0.0.0')):
                 nsx_rule['sources'] = self.translate_addresses_to_target(
                     [rule['source_ip_address']], rule['id'])
             elif replace_src:

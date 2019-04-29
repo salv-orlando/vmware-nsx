@@ -75,14 +75,14 @@ class EdgeFwaasDriverBaseV2(fwaas_base.FwaasDriverBase):
         """Validate the rules in the firewall group"""
         for rule in firewall_group['egress_rule_list']:
             if (rule.get('source_ip_address') and
-                not rule['source_ip_address'].startswith('0.0.0.0/')):
+                not rule['source_ip_address'].startswith('0.0.0.0')):
                 # Ignoring interface port as we cannot set it with the ip
                 LOG.info("Rule %(id)s with source ips used in an egress "
                          "policy: interface port will be ignored in the NSX "
                          "rule", {'id': rule['id']})
         for rule in firewall_group['ingress_rule_list']:
             if (rule.get('destination_ip_address') and
-                not rule['destination_ip_address'].startswith('0.0.0.0/')):
+                not rule['destination_ip_address'].startswith('0.0.0.0')):
                 # Ignoring interface port as we cannot set it with the ip
                 LOG.info("Rule %(id)s with destination ips used in an "
                          "ingress policy: interface port will be ignored "
