@@ -80,7 +80,8 @@ POOL_BINDING = nsx_models.NsxLbaasPool(loadbalancer_id=LB_ID,
 MEMBER_ID = 'mmm-mmm'
 MEMBER_ADDRESS = '10.0.0.200'
 LB_MEMBER = {'display_name': 'member1_' + MEMBER_ID,
-             'weight': 1, 'ip_address': MEMBER_ADDRESS, 'port': 80}
+             'weight': 1, 'ip_address': MEMBER_ADDRESS, 'port': 80,
+             'backup_member': False}
 LB_POOL_WITH_MEMBER = {
     "display_name": "httppool1",
     "description": "my http pool",
