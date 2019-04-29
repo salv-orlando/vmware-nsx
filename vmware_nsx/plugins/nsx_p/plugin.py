@@ -1462,18 +1462,17 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.update_router_firewall(context, router_id)
 
     def delete_service_router(self, router_id):
-        try:
-            # Disable standby relocation on this router
-            self.nsxpolicy.tier1.set_standby_relocation(
-                router_id, enable_standby_relocation=False)
-        except Exception as ex:
-            LOG.warning("Failed to disable standby relocation for router "
-                        "%s: %s", router_id, ex)
-
-        # remove the edge firewall
+        """Delete the Tier1 service router by removing its edge cluster
+        Before that - disable all the features that require the service
+        router to exist.
+        """
+        # remove the gateway firewall policy
         if self.fwaas_callbacks and self.fwaas_callbacks.fwaas_enabled:
             self.fwaas_callbacks.delete_router_gateway_policy(router_id)
-        self.nsxpolicy.tier1.update(router_id, disable_firewall=True)
+
+        # Disable gateway firewall and standby relocation
+        self.nsxpolicy.tier1.update(
+            router_id, disable_firewall=True, enable_standby_relocation=False)
 
         # remove the edge cluster from the tier1 router
         self.nsxpolicy.tier1.remove_edge_cluster(router_id)
@@ -1569,7 +1568,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         # always advertise ipv6 subnets if gateway is set
         advertise_ipv6_subnets = True if info else False
-
         self._update_router_advertisement_rules(router_id,
                                                 router_subnets,
                                                 advertise_ipv6_subnets)
@@ -2713,11 +2711,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         When FWaaS is disabled, there is no need to update the NSX router FW,
         as the default rule is allow-all.
         """
-        if not router_db:
-            router_db = self._get_router(context, router_id)
-
         if (self.fwaas_callbacks and
             self.fwaas_callbacks.fwaas_enabled):
+
+            if not router_db:
+                router_db = self._get_router(context, router_id)
+
             # find all the relevant ports of the router for FWaaS v2
             # TODO(asarfaty): Add vm ports as well
             ports = self._get_router_interfaces(context, router_id)
