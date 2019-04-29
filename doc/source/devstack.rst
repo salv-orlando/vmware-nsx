@@ -83,7 +83,7 @@ Flow Classifier
 Update the ``local.conf`` file::
 
     [[local|localrc]]
-    enable_plugin networking-sfc https://git.openstack.org/openstack/networking-sfc master
+    enable_plugin networking-sfc https://opendev.org/openstack/networking-sfc master
     Q_SERVICE_PLUGIN_CLASSES+=,networking_sfc.services.flowclassifier.plugin.FlowClassifierPlugin
 
     [[post-config|$NEUTRON_CONF]]
@@ -107,7 +107,7 @@ Neutron dynamic routing plugin (bgp)
 Add neutron-dynamic-routing repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
-    enable_plugin neutron-dynamic-routing https://git.openstack.org/openstack/neutron-dynamic-routing
+    enable_plugin neutron-dynamic-routing https://opendev.org/openstack/neutron-dynamic-routing
     DR_MODE=dr_plugin
     BGP_PLUGIN=vmware_nsx.services.dynamic_routing.bgp_plugin.NSXvBgpPlugin
 
@@ -121,7 +121,7 @@ Neutron VPNaaS
 Add neutron-vpnaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
-    enable_plugin neutron-vpnaas https://git.openstack.org/openstack/neutron-vpnaas
+    enable_plugin neutron-vpnaas https://opendev.org/openstack/neutron-vpnaas
     NEUTRON_VPNAAS_SERVICE_PROVIDER=VPN:vmware:vmware_nsx.services.vpnaas.nsxv.ipsec_driver.NSXvIPsecVpnDriver:default
 
 Octavia
@@ -133,8 +133,8 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     OCTAVIA_NODE=api
     DISABLE_AMP_IMAGE_BUILD=True
     LIBS_FROM_GIT=python-openstackclient,python-octaviaclient
-    enable_plugin octavia https://git.openstack.org/openstack/octavia.git
-    enable_plugin octavia-dashboard https://git.openstack.org/openstack/octavia-dashboard
+    enable_plugin octavia https://opendev.org/openstack/octavia.git
+    enable_plugin octavia-dashboard https://opendev.org/openstack/octavia-dashboard
     enable_service octavia
     enable_service o-api,o-da
 
@@ -256,8 +256,8 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     OCTAVIA_NODE=api
     DISABLE_AMP_IMAGE_BUILD=True
     LIBS_FROM_GIT=python-openstackclient,python-octaviaclient
-    enable_plugin octavia https://git.openstack.org/openstack/octavia.git
-    enable_plugin octavia-dashboard https://git.openstack.org/openstack/octavia-dashboard
+    enable_plugin octavia https://opendev.org/openstack/octavia.git
+    enable_plugin octavia-dashboard https://opendev.org/openstack/octavia-dashboard
     enable_service octavia
     enable_service o-api,o-da
 
@@ -337,8 +337,8 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     OCTAVIA_NODE=api
     DISABLE_AMP_IMAGE_BUILD=True
     LIBS_FROM_GIT=python-openstackclient,python-octaviaclient
-    enable_plugin octavia https://git.openstack.org/openstack/octavia.git
-    enable_plugin octavia-dashboard https://git.openstack.org/openstack/octavia-dashboard
+    enable_plugin octavia https://opendev.org/openstack/octavia.git
+    enable_plugin octavia-dashboard https://opendev.org/openstack/octavia-dashboard
     enable_service octavia
     enable_service o-api,o-da
 
@@ -431,7 +431,7 @@ Neutron dynamic routing plugin (bgp)
 Add neutron-dynamic-routing repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
-    enable_plugin neutron-dynamic-routing https://git.openstack.org/openstack/neutron-dynamic-routing
+    enable_plugin neutron-dynamic-routing https://opendev.org/openstack/neutron-dynamic-routing
     DR_MODE=dr_plugin
     BGP_PLUGIN=vmware_nsx.services.dynamic_routing.bgp_plugin.NSXBgpPlugin
 
@@ -445,7 +445,7 @@ Neutron VPNaaS
 Add neutron-vpnaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
-    enable_plugin neutron-vpnaas https://git.openstack.org/openstack/neutron-vpnaas
+    enable_plugin neutron-vpnaas https://opendev.org/openstack/neutron-vpnaas
     NEUTRON_VPNAAS_SERVICE_PROVIDER=VPN:vmware:vmware_nsx.services.vpnaas.nsx_tvd.ipsec_driver.NSXIPsecVpnDriver:default
     Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsxtvd_vpnaas
 
