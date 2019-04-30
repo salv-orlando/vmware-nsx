@@ -27,6 +27,7 @@ from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import load_balancer as nsxlib_lb
+from vmware_nsxlib.v3.policy import utils as pol_utils
 from vmware_nsxlib.v3 import utils
 
 LOG = logging.getLogger(__name__)
@@ -165,7 +166,8 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 pp_kwargs['cookie_name'] = cookie_name
                 pp_kwargs['cookie_mode'] = cookie_mode
 
-        persistence_profile_id = vs_data.get('persistence_profile_id')
+        persistence_profile_id = pol_utils.path_to_id(
+            vs_data.get('lb_persistence_profile_path', ''))
         if persistence_profile_id:
             # NOTE: removal of the persistence profile must be executed
             # after the virtual server has been updated
@@ -181,7 +183,7 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             else:
                 # Prepare removal of persistence profile
                 return (None, functools.partial(self._remove_persistence,
-                                                vs_data))
+                                                pool, vs_data))
         elif pers_type:
             # Create persistence profile
             pp_id = pp_client.create_or_overwrite(**pp_kwargs)
