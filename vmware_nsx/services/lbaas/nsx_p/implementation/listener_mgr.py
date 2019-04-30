@@ -214,7 +214,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
 
         # Delete imported NSX cert if there is any
-        if listener['default_tls_container_id']:
+        if listener.get('default_tls_container_id'):
             cert_client = self.core_plugin.nsxpolicy.certificate
             try:
                 cert_client.delete(listener['id'])

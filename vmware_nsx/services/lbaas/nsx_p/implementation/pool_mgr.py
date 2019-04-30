@@ -284,7 +284,7 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         # NOTE(salv-orlando): Guard against accidental compat breakages
         try:
-            listener = pool['listener'] or pool['listeners'][0]
+            listener = pool.get('listener') or pool.get('listeners', [])[0]
         except IndexError:
             # If listeners is an empty list we hit this exception
             listener = None
