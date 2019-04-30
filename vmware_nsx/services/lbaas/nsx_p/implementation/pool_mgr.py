@@ -24,6 +24,7 @@ from vmware_nsx._i18n import _
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_common
 from vmware_nsx.services.lbaas import lb_const
+from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils as p_utils
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import load_balancer as nsxlib_lb
@@ -307,6 +308,23 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             msg = (_('Failed to delete lb pool from nsx: %(pool)s') %
                    {'pool': pool['id']})
             raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
+
+        # Delete the attached health monitor as well
+        if pool.get('healthmonitor'):
+            hm = pool['healthmonitor']
+            monitor_client = p_utils.get_monitor_policy_client(
+                self.core_plugin.nsxpolicy.load_balancer, hm)
+
+            try:
+                monitor_client.delete(hm['id'])
+            except nsxlib_exc.ResourceNotFound:
+                pass
+            except nsxlib_exc.ManagerError as exc:
+                completor(success=False)
+                msg = _('Failed to delete monitor %(monitor)s from backend '
+                        'with exception %(exc)s') % {'monitor': hm['id'],
+                                                     'exc': exc}
+                raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
 
         completor(success=True)
 
