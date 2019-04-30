@@ -45,9 +45,9 @@ def get_tags(plugin, resource_id, resource_type, project_id, project_name):
 
 @log_helpers.log_method_call
 def get_network_from_subnet(context, plugin, subnet_id):
-    subnet = plugin.get_subnet(context, subnet_id)
+    subnet = plugin.get_subnet(context.elevated(), subnet_id)
     if subnet:
-        return plugin.get_network(context, subnet['network_id'])
+        return plugin.get_network(context.elevated(), subnet['network_id'])
 
 
 @log_helpers.log_method_call
