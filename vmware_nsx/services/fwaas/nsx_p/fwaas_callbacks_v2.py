@@ -375,7 +375,8 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         else:
             # only update the rules of this policy
             self.nsxpolicy.gateway_policy.update_entries(
-                policy_constants.DEFAULT_DOMAIN, router_id, fw_rules)
+                policy_constants.DEFAULT_DOMAIN, router_id, fw_rules,
+                category=policy_constants.CATEGORY_LOCAL_GW)
             return
 
         tags = self.nsxpolicy.build_v3_tags_payload(
