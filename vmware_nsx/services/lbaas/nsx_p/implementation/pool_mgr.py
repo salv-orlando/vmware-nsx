@@ -116,13 +116,13 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         lb_data = listener.get('loadbalancer')
         if lb_data:
             tags.append({
-                'scope': 'os-lbaas-lb-name',
+                'scope': lb_const.LB_LB_NAME,
                 'tag': lb_data['name'][:utils.MAX_TAG_LEN]})
         tags.append({
-            'scope': 'os-lbaas-lb-id',
+            'scope': lb_const.LB_LB_TYPE,
             'tag': listener['loadbalancer_id']})
         tags.append({
-            'scope': 'os-lbaas-listener-id',
+            'scope': lb_const.LB_LISTENER_TYPE,
             'tag': listener['id']})
         return tags
 
