@@ -1529,17 +1529,133 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
     def test_router_add_interface_ipv6_subnet(self):
         self.skipTest('DHCPv6 not supported')
 
-    def test_router_add_dual_stack_subnets(self):
-        """Add dual stack subnets to router interface"""
+    def test_slaac_profile_single_subnet(self):
+        with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                        "NsxPolicyTier1Api.update") as t1_update:
 
-        with self.router() as r, self.network() as n:
-            with self.subnet(network=n, cidr='fd00::0/64',
-                             gateway_ip='fd00::1', ip_version=6,
-                             enable_dhcp=False) as s6, \
-                self.subnet(network=n, cidr='2.0.0.0/24',
-                            gateway_ip='2.0.0.1') as s4:
-                    self._test_router_add_interface_subnet(r, s6)
-                    self._test_router_add_interface_subnet(r, s4)
+            with self.router() as r, self.network() as n:
+                with self.subnet(network=n, cidr='fd00::0/64',
+                                 gateway_ip='fd00::1', ip_version=6,
+                                 ipv6_address_mode='slaac',
+                                 ipv6_ra_mode='slaac') as s:
+
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s['subnet']['id'],
+                                                  None)
+                    # Validate T1 was updated with slaac profile
+                    t1_update.assert_called_with(
+                        r['router']['id'],
+                        ipv6_ndra_profile_id='neutron-slaac-profile')
+
+                    self._router_interface_action('remove',
+                                                  r['router']['id'],
+                                                  s['subnet']['id'],
+                                                  None)
+                    # Validate T1 was updated with default profile
+                    t1_update.assert_called_with(
+                        r['router']['id'],
+                        ipv6_ndra_profile_id='default')
+
+    def test_slaac_profile_multi_net(self):
+        with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                        "NsxPolicyTier1Api.update") as t1_update:
+
+            with self.router() as r,\
+                self.network() as n1, self.network() as n2:
+                with self.subnet(network=n1, cidr='fd00::0/64',
+                                 gateway_ip='fd00::1', ip_version=6,
+                                 enable_dhcp=False) as s1,\
+                    self.subnet(network=n2, cidr='fd10::0/64',
+                                gateway_ip='fd10::1', ip_version=6,
+                                ipv6_address_mode='slaac',
+                                ipv6_ra_mode='slaac') as s2,\
+                    self.subnet(network=n2, cidr='2.3.3.0/24',
+                                gateway_ip='2.3.3.1') as s3:
+
+                    # Add three subnets to the router, with slaac-enabled one
+                    # in the middle
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s1['subnet']['id'],
+                                                  None)
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s2['subnet']['id'],
+                                                  None)
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s3['subnet']['id'],
+                                                  None)
+                    # Validate T1 was updated with slaac profile
+                    t1_update.assert_called_with(
+                        r['router']['id'],
+                        ipv6_ndra_profile_id='neutron-slaac-profile')
+
+                    # Remove non-slaac subnets first
+                    self._router_interface_action('remove',
+                                                  r['router']['id'],
+                                                  s1['subnet']['id'],
+                                                  None)
+                    self._router_interface_action('remove',
+                                                  r['router']['id'],
+                                                  s3['subnet']['id'],
+                                                  None)
+                    self._router_interface_action('remove',
+                                                  r['router']['id'],
+                                                  s2['subnet']['id'],
+                                                  None)
+                    # Validate T1 was updated with default profile
+                    t1_update.assert_called_with(
+                        r['router']['id'],
+                        ipv6_ndra_profile_id='default')
+
+    def _test_router_add_dual_stack_subnets(self, s6_first=False):
+        """Add dual stack subnets to router"""
+
+        with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                        "NsxPolicySegmentApi.update") as seg_update:
+
+            with self.router() as r, self.network() as n:
+                with self.subnet(network=n, cidr='fd00::0/64',
+                                 gateway_ip='fd00::1', ip_version=6,
+                                 enable_dhcp=False) as s6, \
+                    self.subnet(network=n, cidr='2.0.0.0/24',
+                                gateway_ip='2.0.0.1') as s4:
+
+                        subnets = []
+                        if s6_first:
+                            self._router_interface_action('add',
+                                                          r['router']['id'],
+                                                          s6['subnet']['id'],
+                                                          None)
+                            subnets.append(s6['subnet']['cidr'])
+
+                        self._router_interface_action('add',
+                                                      r['router']['id'],
+                                                      s4['subnet']['id'],
+                                                      None)
+                        subnets.append(s4['subnet']['cidr'])
+
+                        if not s6_first:
+                            self._router_interface_action('add',
+                                                          r['router']['id'],
+                                                          s6['subnet']['id'],
+                                                          None)
+                            subnets.append(s6['subnet']['cidr'])
+
+                        # We expect two subnet objects on segment
+                        seg_update.assert_called_with(
+                            n['network']['id'],
+                            name=mock.ANY,
+                            subnets=[mock.ANY, mock.ANY],
+                            tier1_id=r['router']['id'])
+
+    def test_router_add_v4_v6_subnets(self):
+        self._test_router_add_dual_stack_subnets()
+
+    def test_router_add_v6_4_subnets(self):
+        self._test_router_add_dual_stack_subnets(s6_first=True)
 
     def test_router_remove_dual_stack_subnets(self):
         """Delete dual stack subnets from router interface"""
