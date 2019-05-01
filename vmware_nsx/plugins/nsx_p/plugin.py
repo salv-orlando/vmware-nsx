@@ -1506,8 +1506,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         new_enable_snat = router.enable_snat
         newaddr, newmask, _newnexthop = self._get_external_attachment_info(
             context, router)
-        router_name = utils.get_name_and_uuid(router['name'] or 'router',
-                                              router['id'])
         router_subnets = self._find_router_subnets(
             context.elevated(), router_id)
         sr_currently_exists = self.verify_sr_at_backend(router_id)
@@ -1531,10 +1529,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if (actions['remove_router_link_port'] or
             actions['add_router_link_port']):
             # GW was changed
-            #TODO(asarfaty): adding the router name even though it was not
-            # changed because otherwise the NSX will set it to default.
-            # This code should be removed once NSX supports it.
-            self.nsxpolicy.tier1.update(router_id, name=router_name,
+            self.nsxpolicy.tier1.update(router_id,
                                         tier0=new_tier0_uuid)
 
             # Set/Unset the router TZ to allow vlan switches traffic
@@ -1804,12 +1799,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             subnet = self.get_subnet(context, info['subnet_ids'][0])
             if overlay_net:
                 # overlay interface
-                #TODO(asarfaty): adding the segment name even though it was not
-                # changed because otherwise the NSX will set it to default.
-                # This code should be removed once NSX supports it.
-                net = self._get_network(context, network_id)
-                net_name = utils.get_name_and_uuid(
-                    net['name'] or 'network', network_id)
                 pol_subnets = []
                 for rtr_subnet in subnets:
                     # For dual stack, we allow one v4 and one v6
@@ -1821,7 +1810,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                             policy_defs.Subnet(gateway_address=gw_addr))
 
                 self.nsxpolicy.segment.update(segment_id,
-                                              name=net_name,
                                               tier1_id=router_id,
                                               subnets=pol_subnets)
 

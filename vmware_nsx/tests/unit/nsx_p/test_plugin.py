@@ -1647,14 +1647,13 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                         # We expect two subnet objects on segment
                         seg_update.assert_called_with(
                             n['network']['id'],
-                            name=mock.ANY,
                             subnets=[mock.ANY, mock.ANY],
                             tier1_id=r['router']['id'])
 
     def test_router_add_v4_v6_subnets(self):
         self._test_router_add_dual_stack_subnets()
 
-    def test_router_add_v6_4_subnets(self):
+    def test_router_add_v6_v4_subnets(self):
         self._test_router_add_dual_stack_subnets(s6_first=True)
 
     def test_router_remove_dual_stack_subnets(self):
