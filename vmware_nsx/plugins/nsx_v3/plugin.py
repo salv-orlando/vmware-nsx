@@ -118,6 +118,7 @@ from vmware_nsxlib.v3 import utils as nsxlib_utils
 LOG = log.getLogger(__name__)
 NSX_V3_NO_PSEC_PROFILE_NAME = 'nsx-default-spoof-guard-vif-profile'
 NSX_V3_MAC_LEARNING_PROFILE_NAME = 'neutron_port_mac_learning_profile'
+NSX_V3_MAC_DISABLED_PROFILE_NAME = 'neutron_port_mac_learning_disabled_profile'
 NSX_V3_FW_DEFAULT_SECTION = 'OS Default Section for Neutron Security-Groups'
 NSX_V3_FW_DEFAULT_NS_GROUP = 'os_default_section_ns_group'
 NSX_V3_DEFAULT_SECTION = 'OS-Default-Section'
@@ -512,16 +513,17 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             raise nsx_exc.NsxPluginException(err_msg=msg)
 
         self._mac_learning_profile = None
+        self._mac_learning_disabled_profile = None
         # Only create MAC Learning profile when nsxv3 version >= 1.1.0
         if self.nsxlib.feature_supported(nsxlib_consts.FEATURE_MAC_LEARNING):
-            LOG.debug("Initializing NSX v3 Mac Learning switching profile")
+            LOG.debug("Initializing NSX v3 Mac Learning switching profiles")
             try:
-                self._init_mac_learning_profile()
+                self._init_mac_learning_profiles()
                 # Only expose the extension if it is supported
                 self.supported_extension_aliases.append(mac_ext.ALIAS)
             except Exception as e:
                 LOG.warning("Unable to initialize NSX v3 MAC Learning "
-                            "profile: %(name)s. Reason: %(reason)s",
+                            "profiles: %(name)s. Reason: %(reason)s",
                             {'name': NSX_V3_MAC_LEARNING_PROFILE_NAME,
                              'reason': e})
 
@@ -669,14 +671,22 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             profile_id=profile[0]['id']) if profile else None
         return self._dhcp_profile
 
-    def _init_mac_learning_profile(self):
+    def _init_mac_learning_profiles(self):
         with locking.LockManager.get_lock('nsxv3_mac_learning_profile_init'):
             if not self._get_mac_learning_profile():
                 self.nsxlib.switching_profile.create_mac_learning_profile(
                     NSX_V3_MAC_LEARNING_PROFILE_NAME,
                     'Neutron MAC Learning Profile',
+                    mac_learning_enabled=True,
                     tags=self.nsxlib.build_v3_api_version_tag())
-            return self._get_mac_learning_profile()
+            self._get_mac_learning_profile()
+            if not self._get_mac_learning_disabled_profile():
+                self.nsxlib.switching_profile.create_mac_learning_profile(
+                    NSX_V3_MAC_DISABLED_PROFILE_NAME,
+                    'Neutron MAC Learning Disabled Profile',
+                    mac_learning_enabled=False,
+                    tags=self.nsxlib.build_v3_api_version_tag())
+            self._get_mac_learning_disabled_profile()
 
     def _get_mac_learning_profile(self):
         if (hasattr(self, '_mac_learning_profile') and
@@ -689,6 +699,19 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                           MAC_LEARNING),
             profile_id=profile[0]['id']) if profile else None
         return self._mac_learning_profile
+
+    def _get_mac_learning_disabled_profile(self):
+        if (hasattr(self, '_mac_learning_disabled_profile') and
+            self._mac_learning_disabled_profile):
+            return self._mac_learning_disabled_profile
+        profile = self.nsxlib.switching_profile.find_by_display_name(
+            NSX_V3_MAC_DISABLED_PROFILE_NAME)
+        self._mac_learning_disabled_profile = (
+            nsx_resources.SwitchingProfileTypeId(
+                profile_type=(nsx_resources.SwitchingProfileTypes.
+                              MAC_LEARNING),
+                profile_id=profile[0]['id']) if profile else None)
+        return self._mac_learning_disabled_profile
 
     def _init_lb_profiles(self):
         with locking.LockManager.get_lock('nsxv3_lb_profiles_init'):
@@ -1352,11 +1375,12 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if port_az.switching_profiles_objs:
             profiles.extend(port_az.switching_profiles_objs)
 
-        mac_learning_profile_set = False
+        force_mac_learning = False
         if psec_is_on:
             address_pairs = port_data.get(addr_apidef.ADDRESS_PAIRS)
             if validators.is_attr_set(address_pairs) and address_pairs:
-                mac_learning_profile_set = True
+                # Force mac learning profile to allow address pairs to work
+                force_mac_learning = True
             profiles.append(self._get_port_security_profile_id())
         else:
             if is_ens_tz_port:
@@ -1376,18 +1400,21 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             profiles.append(qos_profile_id)
 
         # Add mac_learning profile if it exists and is configured
+        port_mac_learning = (
+            validators.is_attr_set(port_data.get(mac_ext.MAC_LEARNING)) and
+            port_data.get(mac_ext.MAC_LEARNING) is True)
         if ((not is_ens_tz_port or self._ens_psec_supported()) and
-            self._mac_learning_profile and
-            (mac_learning_profile_set or
-             (validators.is_attr_set(port_data.get(mac_ext.MAC_LEARNING)) and
-              port_data.get(mac_ext.MAC_LEARNING) is True))):
-            profiles.append(self._mac_learning_profile)
-            if is_ens_tz_port:
-                if self._no_switch_security_ens not in profiles:
-                    profiles.append(self._no_switch_security_ens)
+            self._mac_learning_profile):
+            if force_mac_learning or port_mac_learning:
+                profiles.append(self._mac_learning_profile)
+                if is_ens_tz_port:
+                    if self._no_switch_security_ens not in profiles:
+                        profiles.append(self._no_switch_security_ens)
+                else:
+                    if self._no_switch_security not in profiles:
+                        profiles.append(self._no_switch_security)
             else:
-                if self._no_switch_security not in profiles:
-                    profiles.append(self._no_switch_security)
+                profiles.append(self._mac_learning_disabled_profile)
 
         name = self._build_port_name(context, port_data)
         nsx_net_id = self._get_network_nsx_id(context, port_data['network_id'])
@@ -1844,21 +1871,23 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         psec_is_on = self._get_port_security_profile_id() in switch_profile_ids
 
         address_pairs = updated_port.get(addr_apidef.ADDRESS_PAIRS)
-        mac_learning_profile_set = (
+        force_mac_learning = (
             validators.is_attr_set(address_pairs) and address_pairs and
             psec_is_on)
+        port_mac_learning = updated_port.get(mac_ext.MAC_LEARNING) is True
         # Add mac_learning profile if it exists and is configured
         if ((not is_ens_tz_port or self._ens_psec_supported()) and
-            self._mac_learning_profile and
-            (mac_learning_profile_set or
-             updated_port.get(mac_ext.MAC_LEARNING) is True)):
-            switch_profile_ids.append(self._mac_learning_profile)
-            if is_ens_tz_port:
-                if self._no_switch_security_ens not in switch_profile_ids:
-                    switch_profile_ids.append(self._no_switch_security_ens)
+            self._mac_learning_profile):
+            if force_mac_learning or port_mac_learning:
+                switch_profile_ids.append(self._mac_learning_profile)
+                if is_ens_tz_port:
+                    if self._no_switch_security_ens not in switch_profile_ids:
+                        switch_profile_ids.append(self._no_switch_security_ens)
+                else:
+                    if self._no_switch_security not in switch_profile_ids:
+                        switch_profile_ids.append(self._no_switch_security)
             else:
-                if self._no_switch_security not in switch_profile_ids:
-                    switch_profile_ids.append(self._no_switch_security)
+                switch_profile_ids.append(self._mac_learning_disabled_profile)
 
         try:
             self.nsxlib.logical_port.update(
