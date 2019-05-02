@@ -24,6 +24,7 @@ from vmware_nsx._i18n import _
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.services.lbaas import base_mgr
+from vmware_nsx.services.lbaas import lb_common
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
@@ -127,7 +128,7 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             old_pool = None
             if old_listener:
                 old_pool = old_listener.get('default_pool')
-            lb_utils.validate_session_persistence(
+            lb_common.validate_session_persistence(
                 listener.get('default_pool'), listener, completor,
                 old_pool=old_pool)
 
