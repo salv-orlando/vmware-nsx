@@ -194,8 +194,18 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         lb_status = lb_const.ONLINE
         lb_status_results = service_status.get('results')
         if lb_status_results:
-            lb_status = self._nsx_status_to_lb_status(
-                lb_status_results[0].get('service_status'))
+            result = lb_status_results[0]
+            if result.get('service_status'):
+                # Use backend service_status
+                lb_status = self._nsx_status_to_lb_status(
+                    result['service_status'])
+            elif result.get('alarm'):
+                # No status, but has alarms -> ERROR
+                lb_status = lb_const.OFFLINE
+            else:
+                # Unknown - assume it is ok
+                lb_status = lb_const.ONLINE
+
         statuses = {lb_const.LOADBALANCERS: [{'id': id, 'status': lb_status}],
                     lb_const.LISTENERS: [],
                     lb_const.POOLS: [],
