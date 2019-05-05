@@ -39,7 +39,7 @@ class EdgeL7RuleManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             self.core_plugin.nsxpolicy, rule['policy'])
         try:
             vs_client.update_lb_rule(policy['listener_id'],
-                                     name=policy_name,
+                                     policy_name,
                                      position=policy.get('position', 0) - 1,
                                      **rule_body)
         except Exception as e:
