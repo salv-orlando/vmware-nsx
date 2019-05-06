@@ -189,6 +189,11 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                 pool_dict['loadbalancer_id'])
         if 'listener' not in pool_dict:
             self._get_listener_in_pool_dict(pool_dict, is_update)
+        # make sure this pool has a project id
+        if 'project_id' not in pool_dict:
+            project_id = self.get_obj_project_id('Pool', pool_dict)
+            pool_dict['tenant_id'] = pool_dict['project_id'] = project_id
+
         return pool_dict
 
     def _get_hm_dict(self, hm_id, is_update):
@@ -292,6 +297,10 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                 # Generate a loadbalancer object
                 obj_dict['loadbalancer'] = self._get_load_balancer_dict(
                     obj_dict['loadbalancer_id'])
+            if obj_dict.get('default_pool_id'):
+                # Generate the default pool object
+                obj_dict['default_pool'] = self._get_pool_dict(
+                    obj_dict['default_pool_id'], is_update)
             # TODO(asarfaty): add default_tls_container_id
 
         elif obj_type == 'Pool':
