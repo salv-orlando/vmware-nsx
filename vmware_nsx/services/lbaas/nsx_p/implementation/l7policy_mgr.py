@@ -61,7 +61,7 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         try:
             vs_client.update_lb_rule(
                 new_policy['listener_id'],
-                name=policy_name,
+                policy_name,
                 position=new_policy.get('position', 0) - 1,
                 **rule_body)
 
