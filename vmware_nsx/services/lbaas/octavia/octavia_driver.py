@@ -297,6 +297,9 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
         elif obj_type == 'Pool':
             if 'listener' not in obj_dict:
                 self._get_listener_in_pool_dict(obj_dict, is_update)
+            if obj_dict.get('healthmonitor'):
+                obj_dict['healthmonitor']['id'] = obj_dict[
+                    'healthmonitor']['healthmonitor_id']
 
         elif obj_type == 'Member':
             # Get the pool object

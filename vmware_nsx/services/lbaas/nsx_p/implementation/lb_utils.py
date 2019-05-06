@@ -133,3 +133,20 @@ def update_router_lb_vip_advertisement(context, core_plugin, router_id):
             p_constants.ADV_RULE_OPERATOR_GE,
             [p_constants.ADV_RULE_TIER1_LB_VIP],
             external_cidrs)
+
+
+@log_helpers.log_method_call
+def get_monitor_policy_client(lb_client, hm):
+    if hm['type'] == lb_const.LB_HEALTH_MONITOR_TCP:
+        return lb_client.lb_monitor_profile_tcp
+    elif hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTP:
+        return lb_client.lb_monitor_profile_http
+    elif hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTPS:
+        return lb_client.lb_monitor_profile_https
+    elif hm['type'] == lb_const.LB_HEALTH_MONITOR_PING:
+        return lb_client.lb_monitor_profile_icmp
+    else:
+        msg = (_('Cannot create health monitor %(monitor)s with '
+                 'type %(type)s') % {'monitor': hm['id'],
+                                     'type': hm['type']})
+        raise n_exc.InvalidInput(error_message=msg)

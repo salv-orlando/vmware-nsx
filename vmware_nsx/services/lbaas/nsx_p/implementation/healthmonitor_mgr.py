@@ -21,6 +21,7 @@ from oslo_utils import excutils
 from vmware_nsx._i18n import _
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_const
+from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils as p_utils
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import utils
@@ -29,22 +30,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
-
-    def _get_monitor_policy_client(self, hm):
-        lb_client = self.core_plugin.nsxpolicy.load_balancer
-        if hm['type'] == lb_const.LB_HEALTH_MONITOR_TCP:
-            return lb_client.lb_monitor_profile_tcp
-        elif hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTP:
-            return lb_client.lb_monitor_profile_http
-        elif hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTPS:
-            return lb_client.lb_monitor_profile_https
-        elif hm['type'] == lb_const.LB_HEALTH_MONITOR_PING:
-            return lb_client.lb_monitor_profile_icmp
-        else:
-            msg = (_('Cannot create health monitor %(monitor)s with '
-                     'type %(type)s') % {'monitor': hm['id'],
-                                         'type': hm['type']})
-            raise n_exc.InvalidInput(error_message=msg)
 
     def _build_monitor_args(self, hm):
         body = {
@@ -69,7 +54,8 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     def create(self, context, hm, completor):
         pool_id = hm['pool']['id']
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
-        monitor_client = self._get_monitor_policy_client(hm)
+        monitor_client = p_utils.get_monitor_policy_client(
+            self.core_plugin.nsxpolicy.load_balancer, hm)
         tags = lb_utils.get_tags(self.core_plugin, hm['id'],
                                  lb_const.LB_HM_TYPE,
                                  hm['tenant_id'], context.project_name)
@@ -105,7 +91,8 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     @log_helpers.log_method_call
     def update(self, context, old_hm, new_hm, completor):
-        monitor_client = self._get_monitor_policy_client(new_hm)
+        monitor_client = p_utils.get_monitor_policy_client(
+            self.core_plugin.nsxpolicy.load_balancer, new_hm)
         try:
             monitor_body = self._build_monitor_args(new_hm)
             monitor_client.update(new_hm['id'], **monitor_body)
@@ -121,7 +108,8 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     def delete(self, context, hm, completor):
         pool_id = hm['pool']['id']
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
-        monitor_client = self._get_monitor_policy_client(hm)
+        monitor_client = p_utils.get_monitor_policy_client(
+            self.core_plugin.nsxpolicy.load_balancer, hm)
 
         try:
             hm_path = monitor_client.get_path(hm['id'])
