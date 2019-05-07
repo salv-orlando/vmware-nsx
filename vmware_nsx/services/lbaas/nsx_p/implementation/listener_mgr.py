@@ -52,8 +52,9 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     @log_helpers.log_method_call
     def _upload_certificate(self, listener_id, cert_href, tags,
                             certificate=None):
-        cert_client = self.core_plugin.nsxpolicy.certificate
-
+        nsxpolicy = self.core_plugin.nsxpolicy
+        cert_client = nsxpolicy.certificate
+        ssl_client = nsxpolicy.load_balancer.client_ssl_profile
         passphrase = certificate.get_private_key_passphrase()
         if not passphrase:
             passphrase = core_resources.IGNORE
@@ -66,8 +67,9 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         return {
             'client_ssl_profile_binding': {
-                'ssl_profile_id': self.core_plugin.client_ssl_profile,
-                'default_certificate_id': listener_id
+                'ssl_profile_path': ssl_client.get_path(
+                    self.core_plugin.client_ssl_profile),
+                'default_certificate_path': cert_client.get_path(listener_id)
             }
         }
 

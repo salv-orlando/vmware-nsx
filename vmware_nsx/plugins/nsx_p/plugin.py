@@ -131,6 +131,8 @@ IPV6_ROUTER_ADV_RULE_NAME = 'all-ipv6'
 NAT_RULE_PRIORITY_FIP = 2000
 NAT_RULE_PRIORITY_GW = 3000
 
+NSX_P_CLIENT_SSL_PROFILE = 'neutron-client-ssl-profile'
+
 
 @resource_extend.has_resource_extenders
 class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
@@ -436,6 +438,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                    DEFAULT_NDRA_PROFILE_ID)
             raise nsx_exc.NsxPluginException(err_msg=msg)
 
+        self.client_ssl_profile = None
+
+        LOG.debug("Initializing NSX-P Load Balancer default profiles")
+        try:
+            self._init_lb_profiles()
+        except Exception as e:
+            msg = (_("Unable to initialize NSX-P lb profiles: "
+                     "Reason: %(reason)s") % {'reason': str(e)})
+            raise nsx_exc.NsxPluginException(err_msg=msg)
+
     @staticmethod
     def plugin_type():
         return projectpluginmap.NsxPlugins.NSX_P
@@ -463,6 +475,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def _get_octavia_stats_getter(self):
         return listener_mgr.stats_getter
+
+    def _init_lb_profiles(self):
+        ssl_profile_client = self.nsxpolicy.load_balancer.client_ssl_profile
+        with locking.LockManager.get_lock('nsxp_lb_profiles_init'):
+            try:
+                ssl_profile_client.get(NSX_P_CLIENT_SSL_PROFILE)
+            except nsx_lib_exc.ResourceNotFound:
+                ssl_profile_client.create_or_overwrite(
+                    NSX_P_CLIENT_SSL_PROFILE,
+                    client_ssl_profile_id=NSX_P_CLIENT_SSL_PROFILE,
+                    description='Neutron LB Client SSL Profile',
+                    tags=self.nsxlib.build_v3_api_version_tag())
+            self.client_ssl_profile = NSX_P_CLIENT_SSL_PROFILE
 
     def spawn_complete(self, resource, event, trigger, payload=None):
         # Init the FWaaS support with RPC listeners for the original process
