@@ -58,8 +58,13 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         sp = pool.get('session_persistence')
         lb_client = self.core_plugin.nsxpolicy.load_balancer
         pp_client = None
+        # TODO(asarfaty): the delete action is the same for all types,
+        # so it is better to add a generic resource that will work for all
         if not sp:
             LOG.debug("No session persistence info for pool %s", pool['id'])
+            # Set the pp_client to a default one, as the delete action is
+            # the same
+            pp_client = lb_client.lb_source_ip_persistence_profile
         elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_HTTP_COOKIE:
             pp_client = lb_client.lb_cookie_persistence_profile
         elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_APP_COOKIE:
@@ -67,7 +72,8 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         else:
             pp_client = lb_client.lb_source_ip_persistence_profile
 
-        persistence_profile_id = vs_data.get('persistence_profile_id')
+        persistence_profile_id = pol_utils.path_to_id(
+            vs_data.get('lb_persistence_profile_path', ''))
         if persistence_profile_id:
             pp_client.delete(persistence_profile_id)
 
