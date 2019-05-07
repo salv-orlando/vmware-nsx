@@ -369,7 +369,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         # Check if the gateway policy already exists
         try:
             self.nsxpolicy.gateway_policy.get(policy_constants.DEFAULT_DOMAIN,
-                                              map_id=router_id)
+                                              map_id=router_id, silent=True)
         except nsx_lib_exc.ResourceNotFound:
             LOG.info("Going to create gateway policy for router %s", router_id)
         else:
@@ -397,7 +397,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         """
         try:
             self.nsxpolicy.gateway_policy.get(policy_constants.DEFAULT_DOMAIN,
-                                              map_id=router_id)
+                                              map_id=router_id, silent=True)
         except nsx_lib_exc.ResourceNotFound:
             return
         self.nsxpolicy.gateway_policy.delete(policy_constants.DEFAULT_DOMAIN,
