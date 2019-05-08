@@ -3875,12 +3875,22 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                               'addr_scope': gw_address_scope})
                     continue
 
-                snat.append({
-                    'src': subnet['cidr'],
-                    'translated': snat_ip,
-                    'vnic_index': vcns_const.EXTERNAL_VNIC_INDEX,
-                })
+                snat.append(self._get_default_nat_rule(
+                    context, router['id'], subnet, snat_ip))
         return (snat, dnat)
+
+    def _get_default_nat_rule(self, context, router_id, subnet, snat_ip):
+        binding = nsxv_db.get_nsxv_router_binding(context.session, router_id)
+        bind_to_all = False
+        if binding:
+            azs = nsx_az.NsxVAvailabilityZones()
+            az = azs.get_availability_zone(binding['availability_zone'])
+            bind_to_all = az.bind_floatingip_to_all_interfaces
+        rule = {'src': subnet['cidr'],
+                'translated': snat_ip}
+        if not bind_to_all:
+            rule['vnic_index'] = vcns_const.EXTERNAL_VNIC_INDEX
+        return rule
 
     def _get_nosnat_subnets_fw_rules(self, context, router):
         """Open edge firewall holes for nosnat subnets to do static routes."""
