@@ -786,14 +786,14 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
             # Fail the backend update
             with mock.patch("vmware_nsxlib.v3.core_resources."
                             "NsxLibLogicalSwitch.update",
-                            side_effect=nsxlib_exc.ManagerError):
+                            side_effect=nsxlib_exc.InvalidInput):
                 args = {'network': {'description': 'test rollback'}}
                 req = self.new_update_request('networks', args,
                                               net['network']['id'], fmt='json')
                 res = self.deserialize('json', req.get_response(self.api))
                 # should fail with the nsxlib error (meaning that the rollback
                 # did not fail)
-                self.assertEqual('ManagerError',
+                self.assertEqual('InvalidInput',
                                  res['NeutronError']['type'])
 
 
