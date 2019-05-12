@@ -171,8 +171,10 @@ class EdgeFwaasDriver(fwaas_base.FwaasDriverBase):
             # catch known library exceptions and raise Fwaas generic exception
             LOG.error("Failed to update firewall %(fw)s on edge %(edge_id)s: "
                       "%(e)s", {'e': e, 'fw': fw_id, 'edge_id': edge_id})
-            raise exceptions.FirewallInternalDriverError(
-                driver=self.driver_name)
+            if not delete_fw:
+                # FirewallInternalDriverError is ignored in PENDING_DELETE
+                raise exceptions.FirewallInternalDriverError(
+                    driver=self.driver_name)
 
     def _create_or_update_firewall(self, agent_mode, apply_list, firewall):
         # admin state down means default block rule firewall
