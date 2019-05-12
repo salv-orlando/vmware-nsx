@@ -247,10 +247,10 @@ def stats_getter(context, core_plugin, ignore_list=None):
     lb_services = lb_service_client.list()
     # Go over all the loadbalancers & services
     for lb_service in lb_services:
-        if ignore_list and lb_service['lb_service_id'] in ignore_list:
+        if ignore_list and lb_service['id'] in ignore_list:
             continue
 
-        lb_service_id = lb_service.get('lb_service_id')
+        lb_service_id = lb_service.get('id')
         try:
             # get the NSX statistics for this LB service
             rsp = lb_service_client.get_statistics(lb_service_id)
