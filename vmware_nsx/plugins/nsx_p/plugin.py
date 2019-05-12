@@ -213,6 +213,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         nsxlib_utils.set_inject_headers_callback(v3_utils.inject_headers)
         self._validate_nsx_policy_version()
+        self._validate_config()
 
         self._init_default_config()
         self._prepare_default_rules()
@@ -233,6 +234,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         registry.subscribe(self.init_complete,
                            resources.PROCESS,
                            events.AFTER_INIT)
+
+    def _validate_config(self):
+        if cfg.CONF.ipam_driver != 'internal':
+            msg = _("External IPAM drivers not supported with nsxp plugin")
+            LOG.error(msg)
+            raise n_exc.InvalidInput(error_message=msg)
 
     def _init_default_config(self):
 
