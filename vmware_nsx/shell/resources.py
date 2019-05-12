@@ -69,6 +69,7 @@ class Operations(enum.Enum):
     IMPORT = 'import'
     SHOW = 'show'
     VALIDATE = 'validate'
+    REUSE = 'reuse'
 
 ops = [op.value for op in Operations]
 
@@ -87,7 +88,8 @@ nsxv3_resources = {
                                          Operations.UPDATE_LOGGING.value]),
     constants.FIREWALL_SECTIONS: Resource(constants.FIREWALL_SECTIONS,
                                           [Operations.LIST.value,
-                                           Operations.LIST_MISMATCHES.value]),
+                                           Operations.LIST_MISMATCHES.value,
+                                           Operations.REUSE.value]),
     constants.FIREWALL_NSX_GROUPS: Resource(
         constants.FIREWALL_NSX_GROUPS, [
             Operations.LIST.value,
