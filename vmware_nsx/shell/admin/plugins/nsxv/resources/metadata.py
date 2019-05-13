@@ -254,6 +254,12 @@ def nsx_redo_metadata_cfg_for_edge(context, plugin, edge_id):
         edge_internal_ips, md_rtr_ids = _get_internal_edge_ips(context,
                                                                az_name)
 
+        if not edge_internal_ips and not md_rtr_ids:
+            LOG.error("Metadata infrastructure is missing or broken. "
+                      "It is recommended to restart neutron service before "
+                      "proceeding with configuration restoration")
+            return
+
         if binding['router_id'] in md_rtr_ids:
             LOG.error('Edge %s is a metadata proxy', edge_id)
             return
