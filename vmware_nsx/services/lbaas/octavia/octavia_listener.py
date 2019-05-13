@@ -18,7 +18,12 @@ import time
 
 import eventlet
 
+from neutron_lib.callbacks import events
+from neutron_lib.callbacks import registry
+from neutron_lib.callbacks import resources
+from neutron_lib import constants as n_consts
 from neutron_lib import context as neutron_context
+from neutron_lib import exceptions as n_exc
 from oslo_config import cfg
 from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
@@ -26,12 +31,6 @@ import oslo_messaging as messaging
 from oslo_messaging.rpc import dispatcher
 
 from vmware_nsx.services.lbaas.octavia import constants
-
-try:
-    from neutron_lbaas.db.loadbalancer import models
-except ImportError:
-    # LBaaS project not found.
-    from vmware_nsx.services.lbaas import lbaas_mocks as models
 
 LOG = logging.getLogger(__name__)
 
@@ -86,6 +85,80 @@ class NSXOctaviaListenerEndpoint(object):
         self.healthmonitor = healthmonitor
         self.l7policy = l7policy
         self.l7rule = l7rule
+
+        self._subscribe_router_delete_callback()
+
+    def _subscribe_router_delete_callback(self):
+        # Check if there is any LB attachment for the NSX router.
+        # This callback is subscribed here to prevent router/GW/interface
+        # deletion if it still has LB service attached to it.
+
+        #Note(asarfaty): Those callbacks are used by Octavia as well even
+        # though they are bound only here
+        registry.subscribe(self._check_lb_service_on_router,
+                           resources.ROUTER, events.BEFORE_DELETE)
+        registry.subscribe(self._check_lb_service_on_router,
+                           resources.ROUTER_GATEWAY, events.BEFORE_DELETE)
+        registry.subscribe(self._check_lb_service_on_router_interface,
+                           resources.ROUTER_INTERFACE, events.BEFORE_DELETE)
+
+    def _unsubscribe_router_delete_callback(self):
+        registry.unsubscribe(self._check_lb_service_on_router,
+                             resources.ROUTER, events.BEFORE_DELETE)
+        registry.unsubscribe(self._check_lb_service_on_router,
+                             resources.ROUTER_GATEWAY, events.BEFORE_DELETE)
+        registry.unsubscribe(self._check_lb_service_on_router_interface,
+                             resources.ROUTER_INTERFACE, events.BEFORE_DELETE)
+
+    def _get_core_plugin(self, context, project_id=None):
+        core_plugin = self.loadbalancer.core_plugin
+        if core_plugin.is_tvd_plugin():
+            # get the right plugin for this project
+            # (if project_id is None, the default one will be returned)
+            core_plugin = core_plugin._get_plugin_from_project(
+                context, project_id)
+        return core_plugin
+
+    def _get_default_core_plugin(self, context):
+        return self._get_core_plugin(context, project_id=None)
+
+    def _get_lb_ports(self, context, subnet_ids):
+        dev_owner_v2 = n_consts.DEVICE_OWNER_LOADBALANCERV2
+        dev_owner_oct = constants.DEVICE_OWNER_OCTAVIA
+        filters = {'device_owner': [dev_owner_v2, dev_owner_oct],
+                   'fixed_ips': {'subnet_id': subnet_ids}}
+        core_plugin = self._get_default_core_plugin(context)
+        return core_plugin.get_ports(context, filters=filters)
+
+    def _check_lb_service_on_router(self, resource, event, trigger,
+                                    payload=None):
+        """Prevent removing a router GW or deleting a router used by LB"""
+        router_id = payload.resource_id
+        # get the default core plugin so we can get the router project
+        default_core_plugin = self._get_default_core_plugin(payload.context)
+        router = default_core_plugin.get_router(payload.context, router_id)
+        # get the real core plugin
+        core_plugin = self._get_core_plugin(
+            payload.context, router['project_id'])
+        if core_plugin.service_router_has_loadbalancers(
+            payload.context, router_id):
+            msg = _('Cannot delete a %s as it still has lb service '
+                    'attachment') % resource
+            raise n_exc.BadRequest(resource='lbaas-lb', msg=msg)
+
+    def _check_lb_service_on_router_interface(
+            self, resource, event, trigger, payload=None):
+        # Prevent removing the interface of an LB subnet from a router
+        router_id = payload.resource_id
+        subnet_id = payload.metadata.get('subnet_id')
+        if not router_id or not subnet_id:
+            return
+
+        # get LB ports and check if any loadbalancer is using this subnet
+        if self._get_lb_ports(payload.context.elevated(), [subnet_id]):
+            msg = _('Cannot delete a router interface as it used by a '
+                    'loadbalancer')
+            raise n_exc.BadRequest(resource='lbaas-lb', msg=msg)
 
     def get_completor_func(self, obj_type, obj, delete=False, cascade=False):
         # return a method that will be called on success/failure completion
@@ -509,20 +582,6 @@ class NSXOctaviaStatisticsCollector(object):
             time.sleep(interval)
             self.collect()
 
-    def _get_nl_loadbalancers(self, context):
-        """Getting the list of neutron-lbaas loadbalancers
-
-        This is done directly from the neutron-lbaas DB to also support the
-        case that the plugin is currently unavailable, but entries already
-        exist on the DB.
-        """
-        if not hasattr(models.LoadBalancer, '__tablename__'):
-            # No neutron-lbaas on this deployment
-            return []
-
-        nl_loadbalancers = context.session.query(models.LoadBalancer).all()
-        return [lb.id for lb in nl_loadbalancers]
-
     def collect(self):
         if not self.core_plugin.octavia_listener:
             return
@@ -530,14 +589,8 @@ class NSXOctaviaStatisticsCollector(object):
         endpoint = self.core_plugin.octavia_listener.endpoints[0]
         context = neutron_context.get_admin_context()
 
-        # get the statistics of all the Octavia loadbalancers/listeners while
-        # ignoring the neutron-lbaas loadbalancers.
-        # Note(asarfaty): The Octavia plugin/DB is unavailable from the
-        # neutron context, so there is no option to query the Octavia DB for
-        # the relevant loadbalancers.
-        nl_loadbalancers = self._get_nl_loadbalancers(context)
         listeners_stats = self.listener_stats_getter(
-            context, self.core_plugin, ignore_list=nl_loadbalancers)
+            context, self.core_plugin)
         if not listeners_stats:
             # Avoid sending empty stats
             return

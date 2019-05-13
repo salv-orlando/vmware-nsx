@@ -85,7 +85,6 @@ from vmware_nsx.services.lbaas.nsx_p.implementation import listener_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import loadbalancer_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import member_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import pool_mgr
-from vmware_nsx.services.lbaas.nsx_p.v2 import lb_driver_v2
 from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.services.qos.common import utils as qos_com_utils
 from vmware_nsx.services.qos.nsx_v3 import driver as qos_driver
@@ -220,7 +219,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self._init_profiles()
         self._prepare_exclude_list()
         self._init_dhcp_metadata()
-        self.lbv2_driver = self._init_lbv2_driver()
 
         # Init QoS
         qos_driver.register(qos_utils.PolicyQosNotificationsHandler())
@@ -458,13 +456,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     @staticmethod
     def plugin_type():
         return projectpluginmap.NsxPlugins.NSX_P
-
-    def _init_lbv2_driver(self):
-        # Get LBaaSv2 driver during plugin initialization. If the platform
-        # has a version that doesn't support native loadbalancing, the driver
-        # will return a NotImplementedManager class.
-        LOG.debug("Initializing LBaaSv2.0 nsxp driver")
-        return lb_driver_v2.EdgeLoadbalancerDriverV2()
 
     @staticmethod
     def is_tvd_plugin():
@@ -1446,10 +1437,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         fw_exist = self._router_has_edge_fw_rules(context, router)
         lb_exist = False
         if not (fw_exist or snat_exist):
-            lb_exist = self.service_router_has_loadbalancers(router_id)
+            lb_exist = self.service_router_has_loadbalancers(
+                context, router_id)
         return snat_exist or lb_exist or fw_exist
 
-    def service_router_has_loadbalancers(self, router_id):
+    def service_router_has_loadbalancers(self, context, router_id):
         tags_to_search = [{'scope': lb_const.LR_ROUTER_TYPE, 'tag': router_id}]
         router_lb_services = self.nsxpolicy.search_by_tags(
             tags_to_search,

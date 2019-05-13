@@ -5053,3 +5053,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
     def _get_appservice_id(self, name):
         return self.nsx_v.vcns.get_application_id(name)
+
+    def service_router_has_loadbalancers(self, context, router_id):
+        # This api is used by Octavia to verify that a router can be deleted
+        # Currently the V plugin does not support this
+        return False

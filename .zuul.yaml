@@ -12,7 +12,6 @@
               - openstack/neutron
               - openstack/networking-l2gw
               - openstack/networking-sfc
-              - openstack/neutron-lbaas
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
@@ -25,7 +24,6 @@
               - openstack/neutron
               - openstack/networking-l2gw
               - openstack/networking-sfc
-              - openstack/neutron-lbaas
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
@@ -38,7 +36,6 @@
               - openstack/neutron
               - openstack/networking-l2gw
               - openstack/networking-sfc
-              - openstack/neutron-lbaas
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
@@ -54,7 +51,6 @@
               - openstack/neutron
               - openstack/networking-l2gw
               - openstack/networking-sfc
-              - openstack/neutron-lbaas
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
@@ -67,7 +63,6 @@
               - openstack/neutron
               - openstack/networking-l2gw
               - openstack/networking-sfc
-              - openstack/neutron-lbaas
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
@@ -80,7 +75,6 @@
               - openstack/neutron
               - openstack/networking-l2gw
               - openstack/networking-sfc
-              - openstack/neutron-lbaas
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
@@ -96,7 +90,6 @@
       - openstack/neutron
       - openstack/networking-l2gw
       - openstack/networking-sfc
-      - openstack/neutron-lbaas
       - x/vmware-nsxlib
       - openstack/neutron-fwaas
       - openstack/neutron-dynamic-routing

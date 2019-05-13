@@ -8,24 +8,6 @@ configuration file(s) run ./stack.sh
 NSX-V
 -----
 
-LBaaS v2 Driver
-~~~~~~~~~~~~~~~
-
-Add lbaas repo as an external repository and configure following flags in ``local.conf``::
-
-    [[local]|[localrc]]
-    enable_service q-lbaasv2
-    Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsx_lbaasv2
-
-Configure the service provider::
-    [[post-config|$NEUTRON_CONF]]
-    [service_providers]
-    service_provider = LOADBALANCERV2:VMWareEdge:neutron_lbaas.drivers.vmware.edge_driver_v2.EdgeLoadBalancerDriverV2:default
-
-    [[post-config|$NEUTRON_CONF]]
-    [DEFAULT]
-    api_extensions_path = $DEST/neutron-lbaas/neutron_lbaas/extensions
-
 QoS Driver
 ~~~~~~~~~~
 
@@ -217,23 +199,6 @@ Add neutron-fwaas repo as an external repository and configure following flags i
     [service_providers]
     service_provider = FIREWALL_V2:fwaas_db:neutron_fwaas.services.firewall.service_drivers.agents.agents.FirewallAgentDriver:default
 
-LBaaS v2 Driver
-~~~~~~~~~~~~~~~
-
-Add lbaas repo as an external repository and configure following flags in ``local.conf``::
-
-    [[local]|[localrc]]
-    enable_service q-lbaasv2
-    Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsx_lbaasv2
-
-Configure the service provider::
-    [[post-config|$NEUTRON_CONF]]
-    [service_providers]
-    service_provider = LOADBALANCERV2:VMWareEdge:neutron_lbaas.drivers.vmware.edge_driver_v2.EdgeLoadBalancerDriverV2:default
-
-    [DEFAULT]
-    api_extensions_path = $DEST/neutron-lbaas/neutron_lbaas/extensions
-
 Neutron VPNaaS
 ~~~~~~~~~~~~~~
 
@@ -311,23 +276,6 @@ Add neutron-fwaas repo as an external repository and configure following flags i
     [service_providers]
     service_provider = FIREWALL_V2:fwaas_db:neutron_fwaas.services.firewall.service_drivers.agents.agents.FirewallAgentDriver:default
 
-LBaaS v2 Driver
-~~~~~~~~~~~~~~~
-
-Add lbaas repo as an external repository and configure following flags in ``local.conf``::
-
-    [[local]|[localrc]]
-    enable_service q-lbaasv2
-    Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsx_lbaasv2
-
-Configure the service provider::
-    [[post-config|$NEUTRON_CONF]]
-    [service_providers]
-    service_provider = LOADBALANCERV2:VMWareEdge:neutron_lbaas.drivers.vmware.edge_driver_v2.EdgeLoadBalancerDriverV2:default
-
-    [DEFAULT]
-    api_extensions_path = $DEST/neutron-lbaas/neutron_lbaas/extensions
-
 Octavia
 ~~~~~~~
 
@@ -360,24 +308,6 @@ Add octavia and python-octaviaclient repos as external repositories and configur
 
 NSX-TVD
 -------
-
-LBaaS v2 Driver
-~~~~~~~~~~~~~~~
-
-Add lbaas repo as an external repository and configure following flags in ``local.conf``::
-
-    [[local]|[localrc]]
-    enable_service q-lbaasv2
-    Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsxtvd_lbaasv2
-
-Configure the service provider::
-    [[post-config|$NEUTRON_LBAAS_CONF]]
-    [service_providers]
-    service_provider = LOADBALANCERV2:VMWareEdge:neutron_lbaas.drivers.vmware.edge_driver_v2.EdgeLoadBalancerDriverV2:default
-
-    [[post-config|$NEUTRON_CONF]]
-    [DEFAULT]
-    api_extensions_path = $DEST/neutron-lbaas/neutron_lbaas/extensions
 
 FWaaS (V2) Driver
 ~~~~~~~~~~~~~~~~~

@@ -100,7 +100,6 @@ from vmware_nsx.services.lbaas.nsx_v3.implementation import listener_mgr
 from vmware_nsx.services.lbaas.nsx_v3.implementation import loadbalancer_mgr
 from vmware_nsx.services.lbaas.nsx_v3.implementation import member_mgr
 from vmware_nsx.services.lbaas.nsx_v3.implementation import pool_mgr
-from vmware_nsx.services.lbaas.nsx_v3.v2 import lb_driver_v2
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.services.qos.common import utils as qos_com_utils
@@ -202,7 +201,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         else:
             nsxlib_utils.set_inject_headers_callback(
                 v3_utils.inject_requestid_header)
-        self.lbv2_driver = self._init_lbv2_driver()
 
         registry.subscribe(
             self.on_subnetpool_address_scope_updated,
@@ -473,18 +471,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             LOG.info("NSXv3 FWaaS v2 plugin enabled")
             self.fwaas_callbacks = fwaas_callbacks_v2.Nsxv3FwaasCallbacksV2(
                 with_rpc)
-
-    def _init_lbv2_driver(self):
-        # Get LBaaSv2 driver during plugin initialization. If the platform
-        # has a version that doesn't support native loadbalancing, the driver
-        # will return a NotImplementedManager class.
-        LOG.debug("Initializing LBaaSv2.0 nsxv3 driver")
-        if self.nsxlib.feature_supported(nsxlib_consts.FEATURE_LOAD_BALANCER):
-            return lb_driver_v2.EdgeLoadbalancerDriverV2()
-        else:
-            LOG.warning("Current NSX version %(ver)s doesn't support LBaaS",
-                        {'ver': self.nsxlib.get_version()})
-            return lb_driver_v2.DummyLoadbalancerDriverV2()
 
     def init_availability_zones(self):
         self._availability_zones_data = nsx_az.NsxV3AvailabilityZones(
@@ -2103,16 +2089,19 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         return self.nsxlib.router.has_service_router(nsx_router_id)
 
     def service_router_has_services(self, context, router_id):
-        nsx_router_id = nsx_db.get_nsx_router_id(context.session,
-                                                 router_id)
         router = self._get_router(context, router_id)
         snat_exist = router.enable_snat
-        lb_exist = nsx_db.has_nsx_lbaas_loadbalancer_binding_by_router(
-            context.session, nsx_router_id)
+        lb_exist = self.service_router_has_loadbalancers(context, router_id)
         fw_exist = self._router_has_edge_fw_rules(context, router)
         if snat_exist or lb_exist or fw_exist:
             return True
         return snat_exist or lb_exist or fw_exist
+
+    def service_router_has_loadbalancers(self, context, router_id):
+        nsx_router_id = nsx_db.get_nsx_router_id(context.session,
+                                                 router_id)
+        return nsx_db.has_nsx_lbaas_loadbalancer_binding_by_router(
+            context.session, nsx_router_id)
 
     def create_service_router(self, context, router_id, router=None,
                               update_firewall=True):

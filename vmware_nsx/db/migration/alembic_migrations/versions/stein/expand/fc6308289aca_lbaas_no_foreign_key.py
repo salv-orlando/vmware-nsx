@@ -46,6 +46,8 @@ def upgrade():
 
         if migration.schema_has_table(table_name):
             inspector = reflection.Inspector.from_engine(op.get_bind())
-            fk_constraint = inspector.get_foreign_keys(table_name)[0]
-            op.drop_constraint(fk_constraint.get('name'), table_name,
-                               type_='foreignkey')
+            fks = inspector.get_foreign_keys(table_name)
+            if fks:
+                fk_constraint = fks[0]
+                op.drop_constraint(fk_constraint.get('name'), table_name,
+                                   type_='foreignkey')

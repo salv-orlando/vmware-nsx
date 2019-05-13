@@ -54,8 +54,10 @@ from webob import exc
 
 from vmware_nsx.api_client import exception as api_exc
 from vmware_nsx.common import utils
+from vmware_nsx.db import db as nsx_db
 from vmware_nsx.plugins.nsx_v3 import plugin as nsx_plugin
-from vmware_nsx.services.lbaas.nsx_v3.v2 import lb_driver_v2
+from vmware_nsx.services.lbaas.nsx_v3.implementation import loadbalancer_mgr
+from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.tests import unit as vmware
 from vmware_nsx.tests.unit.common_plugin import common_v3
 from vmware_nsx.tests.unit.extensions import test_metadata
@@ -1913,12 +1915,12 @@ class L3NatTest(test_l3_plugin.L3BaseForIntTests,
         mock_nsx_version.start()
         # Make sure the LB callback is not called on router deletion
         self.lb_mock1 = mock.patch(
-            "vmware_nsx.services.lbaas.nsx_v3.v2.lb_driver_v2."
-            "EdgeLoadbalancerDriverV2._check_lb_service_on_router")
+            "vmware_nsx.services.lbaas.octavia.octavia_listener."
+            "NSXOctaviaListenerEndpoint._check_lb_service_on_router")
         self.lb_mock1.start()
         self.lb_mock2 = mock.patch(
-            "vmware_nsx.services.lbaas.nsx_v3.v2.lb_driver_v2."
-            "EdgeLoadbalancerDriverV2._check_lb_service_on_router_interface")
+            "vmware_nsx.services.lbaas.octavia.octavia_listener."
+            "NSXOctaviaListenerEndpoint._check_lb_service_on_router_interface")
         self.lb_mock2.start()
 
         super(L3NatTest, self).setUp(
@@ -2313,18 +2315,24 @@ class TestL3NatTestCase(L3NatTest,
         self.lb_mock1.stop()
         self.lb_mock2.stop()
         # Create the LB object - here the delete callback is registered
-        lb_driver = lb_driver_v2.EdgeLoadbalancerDriverV2()
+        loadbalancer = loadbalancer_mgr.EdgeLoadBalancerManagerFromDict()
+        oct_listener = octavia_listener.NSXOctaviaListenerEndpoint(
+            loadbalancer=loadbalancer)
         with self.router() as router:
             with mock.patch('vmware_nsxlib.v3.load_balancer.Service.'
                             'get_router_lb_service'),\
                 mock.patch('vmware_nsx.db.db.get_nsx_router_id',
-                           return_value=1):
+                           return_value='1'),\
+                mock.patch.object(
+                    nsx_db,
+                    'has_nsx_lbaas_loadbalancer_binding_by_router',
+                    return_value=True):
                 self.assertRaises(nc_exc.CallbackFailure,
                                   self.plugin_instance.delete_router,
                                   context.get_admin_context(),
                                   router['router']['id'])
         # Unregister callback
-        lb_driver._unsubscribe_router_delete_callback()
+        oct_listener._unsubscribe_router_delete_callback()
         self.lb_mock1.start()
         self.lb_mock2.start()
 

@@ -1375,12 +1375,12 @@ class NsxPTestL3NatTest(common_v3.FixExternalNetBaseTest,
 
         # Make sure the LB callback is not called on router deletion
         self.lb_mock1 = mock.patch(
-            "vmware_nsx.services.lbaas.nsx_p.v2.lb_driver_v2."
-            "EdgeLoadbalancerDriverV2._check_lb_service_on_router")
+            "vmware_nsx.services.lbaas.octavia.octavia_listener."
+            "NSXOctaviaListenerEndpoint._check_lb_service_on_router")
         self.lb_mock1.start()
         self.lb_mock2 = mock.patch(
-            "vmware_nsx.services.lbaas.nsx_p.v2.lb_driver_v2."
-            "EdgeLoadbalancerDriverV2._check_lb_service_on_router_interface")
+            "vmware_nsx.services.lbaas.octavia.octavia_listener."
+            "NSXOctaviaListenerEndpoint._check_lb_service_on_router_interface")
         self.lb_mock2.start()
 
         super(NsxPTestL3NatTest, self).setUp(*args, **kwargs)

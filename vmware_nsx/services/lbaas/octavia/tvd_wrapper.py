@@ -16,6 +16,8 @@
 from oslo_log import log as logging
 
 from neutron_lib import exceptions as n_exc
+from neutron_lib.plugins import constants
+from neutron_lib.plugins import directory
 
 from vmware_nsx.extensions import projectpluginmap
 from vmware_nsx.plugins.nsx import utils as tvd_utils
@@ -24,6 +26,7 @@ LOG = logging.getLogger(__name__)
 
 
 class OctaviaTVDWrapper(object):
+    _core_plugin = None
 
     def __init__(self, v_manager, t_manager):
         self.managers = {}
@@ -31,6 +34,16 @@ class OctaviaTVDWrapper(object):
             self.managers[projectpluginmap.NsxPlugins.NSX_V] = v_manager
         if t_manager:
             self.managers[projectpluginmap.NsxPlugins.NSX_T] = t_manager
+
+    def _get_plugin(self, plugin_type):
+        return directory.get_plugin(plugin_type)
+
+    @property
+    def core_plugin(self):
+        if not self._core_plugin:
+            self._core_plugin = (
+                self._get_plugin(constants.CORE))
+        return self._core_plugin
 
     def _get_manager_by_project(self, context, project_id):
         plugin_type = tvd_utils.get_tvd_plugin_type_for_project(

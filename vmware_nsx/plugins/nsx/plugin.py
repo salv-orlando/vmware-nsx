@@ -63,7 +63,6 @@ from vmware_nsx.plugins.common import plugin as nsx_plugin_common
 from vmware_nsx.plugins.dvs import plugin as dvs
 from vmware_nsx.plugins.nsx_v import plugin as v
 from vmware_nsx.plugins.nsx_v3 import plugin as t
-from vmware_nsx.services.lbaas.nsx import lb_driver_v2
 from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.services.lbaas.octavia import tvd_wrapper as octavia_tvd
 
@@ -116,7 +115,6 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
         # init the extensions supported by any of the plugins
         self.init_extensions()
-        self.lbv2_driver = lb_driver_v2.EdgeLoadbalancerDriverV2()
 
         self._unsubscribe_callback_events()
 
