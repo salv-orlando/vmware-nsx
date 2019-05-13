@@ -4016,6 +4016,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         intf_net_ids = (
             self._get_internal_network_ids_by_router(context, router_id))
         edge_id = self._get_edge_id_by_rtr_id(context, router_id)
+        if not edge_id:
+            LOG.warning("Cannot update router %s admin state: no edge id "
+                        "found", router_id)
         with locking.LockManager.get_lock(edge_id):
             for network_id in intf_net_ids:
                 address_groups = (
