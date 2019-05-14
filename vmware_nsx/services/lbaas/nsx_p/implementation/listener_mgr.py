@@ -253,21 +253,26 @@ def stats_getter(context, core_plugin, ignore_list=None):
         lb_service_id = lb_service.get('id')
         try:
             # get the NSX statistics for this LB service
-            rsp = lb_service_client.get_statistics(lb_service_id)
-            if rsp and 'virtual_servers' in rsp:
-                # Go over each virtual server in the response
-                for vs in rsp['virtual_servers']:
-                    # look up the virtual server in the DB
-                    if vs.get('statistics'):
-                        vs_stats = vs['statistics']
-                        stats = copy.copy(lb_const.LB_EMPTY_STATS)
-                        stats['id'] = p_utils.path_to_id(
-                            vs['virtual_server_path'])
-                        stats['request_errors'] = 0  # currently unsupported
-                        for stat in lb_const.LB_STATS_MAP:
-                            lb_stat = lb_const.LB_STATS_MAP[stat]
-                            stats[stat] += vs_stats[lb_stat]
-                        stat_list.append(stats)
+            stats_results = lb_service_client.get_statistics(
+                lb_service_id).get('results', [])
+            if stats_results:
+                rsp = stats_results[0]
+            else:
+                rsp = {}
+
+            # Go over each virtual server in the response
+            for vs in rsp.get('virtual_servers', []):
+                # look up the virtual server in the DB
+                if vs.get('statistics'):
+                    vs_stats = vs['statistics']
+                    stats = copy.copy(lb_const.LB_EMPTY_STATS)
+                    stats['id'] = p_utils.path_to_id(
+                        vs['virtual_server_path'])
+                    stats['request_errors'] = 0  # currently unsupported
+                    for stat in lb_const.LB_STATS_MAP:
+                        lb_stat = lb_const.LB_STATS_MAP[stat]
+                        stats[stat] += vs_stats[lb_stat]
+                    stat_list.append(stats)
 
         except nsxlib_exc.ManagerError:
             pass
