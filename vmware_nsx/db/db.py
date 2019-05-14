@@ -448,6 +448,16 @@ def save_sg_mappings(context, sg_id, nsgroup_id, section_id):
                                                   nsx_id=nsgroup_id))
 
 
+def delete_sg_mappings(context, sg_id, nsgroup_id, section_id):
+    context.session.query(
+        nsx_models.NeutronNsxFirewallSectionMapping).filter_by(
+            neutron_id=sg_id, nsx_id=section_id).delete()
+
+    context.session.query(
+        nsx_models.NeutronNsxSecurityGroupMapping).filter_by(
+            neutron_id=sg_id, nsx_id=nsgroup_id).delete()
+
+
 def get_sg_mappings(session, sg_id, moref=False):
     nsgroup_mappings = session.query(
         nsx_models.NeutronNsxSecurityGroupMapping

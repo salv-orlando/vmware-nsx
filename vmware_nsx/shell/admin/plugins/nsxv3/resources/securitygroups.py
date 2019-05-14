@@ -13,15 +13,18 @@
 #    under the License.
 
 from neutron.db import securitygroups_db
+from neutron.extensions import securitygroup as ext_sg
 from neutron_lib.callbacks import registry
 from neutron_lib import context as neutron_context
 from neutron_lib.db import api as db_api
 from oslo_log import log as logging
 
+from vmware_nsx.common import nsx_constants
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.db import nsx_models
 from vmware_nsx.extensions import providersecuritygroup as provider_sg
 from vmware_nsx.extensions import securitygrouplogging as sg_logging
+from vmware_nsx.plugins.nsx_v3 import plugin as v3_plugin
 from vmware_nsx.plugins.nsx_v3 import utils as plugin_utils
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
@@ -45,6 +48,15 @@ class NeutronSecurityGroupApi(securitygroups_db.SecurityGroupDbMixin):
         return super(NeutronSecurityGroupApi,
                      self).get_security_groups(self.context,
                                                filters=self.filters)
+
+    def get_security_group(self, sg_id):
+        return super(NeutronSecurityGroupApi,
+                     self).get_security_group(self.context, sg_id)
+
+    def create_security_group(self, sg, default_sg=False):
+        return super(NeutronSecurityGroupApi,
+                     self).create_security_group(self.context, sg,
+                                                 default_sg=default_sg)
 
     def delete_security_group(self, sg_id):
         return super(NeutronSecurityGroupApi,
@@ -381,6 +393,82 @@ def update_security_groups_logging(resource, event, trigger, **kwargs):
                               "for rule in section %s", section_id)
 
 
+def reuse_default_section(resource, event, trigger, **kwargs):
+    """Reuse existing NSX default section & NS group that might already exist
+    on the NSX from a previous installation.
+    """
+    # first check if the backend has a default OS section
+    nsxlib = v3_utils.get_connected_nsxlib()
+    fw_sections = nsxlib.firewall_section.list()
+    section_name = v3_plugin.NSX_V3_FW_DEFAULT_SECTION
+    section_id = None
+    for section in fw_sections:
+        if section['display_name'] == section_name:
+            if section_id is not None:
+                # Multiple sections already exist!
+                LOG.error("Multiple default OS NSX sections already exist. "
+                          "Please delete unused ones")
+                return False
+            section_id = section['id']
+
+    if not section_id:
+        LOG.error("No OS NSX section found")
+        return False
+
+    # Get existing default NS group from the NSX
+    ns_groups = nsxlib.ns_group.find_by_display_name(
+        v3_plugin.NSX_V3_FW_DEFAULT_NS_GROUP)
+    if len(ns_groups) > 1:
+        LOG.error("Multiple default OS NS groups already exist. "
+                  "Please delete unused ones")
+        return False
+    if not ns_groups:
+        LOG.error("No OS NS group found")
+        return False
+    nsgroup_id = ns_groups[0]['id']
+
+    # Reuse this section by adding it to the DB mapping
+    context = neutron_context.get_admin_context()
+    # Add global SG to the neutron DB
+    try:
+        neutron_sg.get_security_group(plugin_utils.NSX_V3_OS_DFW_UUID)
+    except ext_sg.SecurityGroupNotFound:
+        sec_group = {'security_group':
+                     {'id': plugin_utils.NSX_V3_OS_DFW_UUID,
+                      'tenant_id': nsx_constants.INTERNAL_V3_TENANT_ID,
+                      'name': 'NSX Internal',
+                      'description': ''}}
+        neutron_sg.create_security_group(
+            sec_group, default_sg=True)
+
+    # Get existing mapping from the DB
+    db_nsgroup_id, db_section_id = nsx_db.get_sg_mappings(
+        context.session, plugin_utils.NSX_V3_OS_DFW_UUID)
+    if db_nsgroup_id or db_section_id:
+        if db_nsgroup_id == nsgroup_id and db_section_id == section_id:
+            LOG.info('Neutron DB is already configured correctly with section '
+                     '%s and NS group %s', section_id, nsgroup_id)
+            return True
+        else:
+            LOG.info('Deleting old DB mappings for section %s and NS group %s',
+                db_section_id, db_nsgroup_id)
+            nsx_db.delete_sg_mappings(
+                context, plugin_utils.NSX_V3_OS_DFW_UUID,
+                db_nsgroup_id, db_section_id)
+
+    # Add mappings to the neutron DB
+    LOG.info('Creating new DB mappings for section %s and NS group %s',
+             section_id, nsgroup_id)
+    nsx_db.save_sg_mappings(
+        context, plugin_utils.NSX_V3_OS_DFW_UUID,
+        nsgroup_id, section_id)
+
+    # The DB mappings were changed.
+    # The user must restart neutron to avoid failures.
+    LOG.info("Please restart neutron service")
+    return True
+
+
 registry.subscribe(update_security_groups_logging,
                    constants.SECURITY_GROUPS,
                    shell.Operations.UPDATE_LOGGING.value)
@@ -408,3 +496,7 @@ registry.subscribe(clean_orphaned_sections,
 registry.subscribe(clean_orphaned_section_rules,
                    constants.ORPHANED_FIREWALL_SECTIONS,
                    shell.Operations.NSX_CLEAN.value)
+
+registry.subscribe(reuse_default_section,
+                   constants.FIREWALL_SECTIONS,
+                   shell.Operations.REUSE.value)

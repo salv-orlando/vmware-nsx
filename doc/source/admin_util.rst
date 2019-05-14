@@ -432,6 +432,10 @@ Firewall Sections
 
     nsxadmin -r firewall-sections -o list-mismatches
 
+- Reuse default NSX section ans NS group from a previous installation::
+
+    nsxadmin -r firewall-sections -o reuse
+
 Orphaned Firewall Sections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
