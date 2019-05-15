@@ -174,7 +174,7 @@ class NSXClient(object):
             # remove all nat rules from this router before deletion
             self.cleanup_tier1_nat_rules(rtr['id'])
             try:
-                self.nsxpolicy.tier1.remove_edge_cluster(rtr['id'])
+                self.nsxpolicy.tier1.delete_locale_service(rtr['id'])
             except exceptions.ManagerError as e:
                 # Not always exists
                 pass
