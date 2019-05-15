@@ -62,6 +62,7 @@ from vmware_nsx.tests.unit.extensions import test_metadata
 from vmware_nsxlib.tests.unit.v3 import mocks as nsx_v3_mocks
 from vmware_nsxlib.tests.unit.v3 import nsxlib_testcase
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
+from vmware_nsxlib.v3 import nsx_constants
 
 
 PLUGIN_NAME = 'vmware_nsx.plugin.NsxV3Plugin'
@@ -929,7 +930,7 @@ class TestSubnetsV2(common_v3.NsxV3TestSubnets, NsxV3PluginTestCaseMixin):
                                'ip_version': 4}}
             count = 1
             host_routes = []
-            while count < 28:
+            while count < nsx_constants.MAX_STATIC_ROUTES:
                 host_routes.append("'host_routes': [{'destination': "
                                    "'135.207.0.0/%s', 'nexthop': "
                                    "'1.2.3.%s'}]" % (count, count))
