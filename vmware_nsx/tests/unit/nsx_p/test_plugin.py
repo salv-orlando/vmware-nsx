@@ -1557,6 +1557,49 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                         r['router']['id'],
                         ipv6_ndra_profile_id='default')
 
+    def test_slaac_profile_dual_stack(self):
+        with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                        "NsxPolicyTier1Api.update") as t1_update:
+
+            with self.router() as r,\
+                self.network() as n:
+                with self.subnet(network=n, cidr='2.3.3.0/24') as s1,\
+                    self.subnet(network=n, cidr='fd10::0/64',
+                                gateway_ip='fd10::1', ip_version=6,
+                                ipv6_address_mode='slaac',
+                                ipv6_ra_mode='slaac') as s2:
+
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s1['subnet']['id'],
+                                                  None)
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s2['subnet']['id'],
+                                                  None)
+                    # Validate T1 was updated with slaac profile
+                    t1_update.assert_called_with(
+                        r['router']['id'],
+                        ipv6_ndra_profile_id='neutron-slaac-profile')
+
+                    # Remove non-slaac subnets first
+                    self._router_interface_action('remove',
+                                                  r['router']['id'],
+                                                  s1['subnet']['id'],
+                                                  None)
+                    self._router_interface_action('remove',
+                                                  r['router']['id'],
+                                                  s2['subnet']['id'],
+                                                  None)
+
+                    # Validate T1 was updated with default profile
+                    t1_update.assert_called_with(
+                        r['router']['id'],
+                        ipv6_ndra_profile_id='default')
+
+                    self._delete('subnets', s1['subnet']['id'])
+                    self._delete('subnets', s2['subnet']['id'])
+
     def test_slaac_profile_multi_net(self):
         with mock.patch("vmware_nsxlib.v3.policy.core_resources."
                         "NsxPolicyTier1Api.update") as t1_update:

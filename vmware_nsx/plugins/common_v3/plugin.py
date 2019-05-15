@@ -2478,7 +2478,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         # Check if there is only one DHCP-enabled subnet in the network.
         count = 0
         for subnet in network.subnets:
-            if subnet.enable_dhcp:
+            if subnet.enable_dhcp and subnet.ip_version == 4:
                 count += 1
                 if count > 1:
                     return False

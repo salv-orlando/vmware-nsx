@@ -1051,8 +1051,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         device_owner = port_data.get('device_owner')
         is_router_interface = (device_owner == l3_db.DEVICE_OWNER_ROUTER_INTF)
+        is_dhcp_port = (device_owner == const.DEVICE_OWNER_DHCP)
 
-        if is_external_net or is_router_interface:
+        if is_external_net or is_router_interface or is_dhcp_port:
+            # DHCP is handled on MP level so far
+            # Router is connected automatically in policy
             return False
 
         return True
