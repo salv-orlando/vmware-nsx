@@ -24,7 +24,7 @@ from vmware_nsx.api_client import version
 from vmware_nsx.common import config  # noqa
 from vmware_nsx import nsx_cluster as cluster
 from vmware_nsx.tests import unit as vmware
-from vmware_nsx.tests.unit.nsx_mh.apiclient import fake
+from vmware_nsx.tests.unit.nsxlib import fake
 
 _uuid = test_base._uuid
 

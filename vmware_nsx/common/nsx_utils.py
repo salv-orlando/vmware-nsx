@@ -17,40 +17,15 @@ from neutron_lib.api.definitions import multiprovidernet as mpnet_apidef
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
 from neutron_lib import constants
-from neutron_lib import exceptions as n_exc
 from oslo_log import log
-import six
 
 from vmware_nsx.api_client import client
-from vmware_nsx.api_client import exception as api_exc
 from vmware_nsx.common import utils as vmw_utils
 from vmware_nsx.db import db as nsx_db
-from vmware_nsx.db import networkgw_db
 from vmware_nsx import nsx_cluster
-from vmware_nsx.nsxlib.mh import l2gateway as l2gwlib
-from vmware_nsx.nsxlib.mh import router as routerlib
-from vmware_nsx.nsxlib.mh import secgroup as secgrouplib
 from vmware_nsx.nsxlib.mh import switch as switchlib
 
 LOG = log.getLogger(__name__)
-
-
-def fetch_nsx_switches(session, cluster, neutron_net_id):
-    """Retrieve logical switches for a neutron network.
-
-    This function is optimized for fetching all the lswitches always
-    with a single NSX query.
-    If there is more than 1 logical switch (chained switches use case)
-    NSX lswitches are queried by 'quantum_net_id' tag. Otherwise the NSX
-    lswitch is directly retrieved by id (more efficient).
-    """
-    nsx_switch_ids = get_nsx_switch_ids(session, cluster, neutron_net_id)
-    if len(nsx_switch_ids) > 1:
-        lswitches = switchlib.get_lswitches(cluster, neutron_net_id)
-    else:
-        lswitches = [switchlib.get_lswitch_by_id(
-            cluster, nsx_switch_ids[0])]
-    return lswitches
 
 
 def get_nsx_switch_ids(session, cluster, neutron_network_id):
@@ -134,77 +109,6 @@ def get_nsx_switch_and_port_id(session, cluster, neutron_port_id):
     return nsx_switch_id, nsx_port_id
 
 
-def get_nsx_security_group_id(session, cluster, neutron_id):
-    """Return the NSX sec profile uuid for a given neutron sec group.
-
-    First, look up the Neutron database. If not found, execute
-    a query on NSX platform as the mapping might be missing.
-    NOTE: Security groups are called 'security profiles' on the NSX backend.
-    """
-    nsx_id = nsx_db.get_nsx_security_group_id(session, neutron_id)
-    if not nsx_id:
-        # Find security profile on backend.
-        # This is a rather expensive query, but it won't be executed
-        # more than once for each security group in Neutron's lifetime
-        nsx_sec_profiles = secgrouplib.query_security_profiles(
-            cluster, '*',
-            filters={'tag': neutron_id,
-                     'tag_scope': 'q_sec_group_id'})
-        # Only one result expected
-        # NOTE(salv-orlando): Not handling the case where more than one
-        # security profile is found with the same neutron port tag
-        if not nsx_sec_profiles:
-            LOG.warning("Unable to find NSX security profile for Neutron "
-                        "security group %s", neutron_id)
-            return
-        elif len(nsx_sec_profiles) > 1:
-            LOG.warning("Multiple NSX security profiles found for Neutron "
-                        "security group %s", neutron_id)
-        nsx_sec_profile = nsx_sec_profiles[0]
-        nsx_id = nsx_sec_profile['uuid']
-        with session.begin(subtransactions=True):
-            # Create DB mapping
-            nsx_db.add_neutron_nsx_security_group_mapping(
-                session, neutron_id, nsx_id)
-    return nsx_id
-
-
-def get_nsx_router_id(session, cluster, neutron_router_id):
-    """Return the NSX router uuid for a given neutron router.
-
-    First, look up the Neutron database. If not found, execute
-    a query on NSX platform as the mapping might be missing.
-    """
-    if not neutron_router_id:
-        return
-    nsx_router_id = nsx_db.get_nsx_router_id(
-        session, neutron_router_id)
-    if not nsx_router_id:
-        # Find logical router from backend.
-        # This is a rather expensive query, but it won't be executed
-        # more than once for each router in Neutron's lifetime
-        nsx_routers = routerlib.query_lrouters(
-            cluster, '*',
-            filters={'tag': neutron_router_id,
-                     'tag_scope': 'q_router_id'})
-        # Only one result expected
-        # NOTE(salv-orlando): Not handling the case where more than one
-        # port is found with the same neutron port tag
-        if not nsx_routers:
-            LOG.warning("Unable to find NSX router for Neutron router %s",
-                        neutron_router_id)
-            return
-        nsx_router = nsx_routers[0]
-        nsx_router_id = nsx_router['uuid']
-        with session.begin(subtransactions=True):
-            # Create DB mapping
-            nsx_db.add_neutron_nsx_router_mapping(
-                session,
-                neutron_router_id,
-                nsx_router_id)
-    return nsx_router_id
-
-
 def create_nsx_cluster(cluster_opts, concurrent_connections, gen_timeout):
     cluster = nsx_cluster.NSXCluster(**cluster_opts)
 
@@ -221,39 +125,6 @@ def create_nsx_cluster(cluster_opts, concurrent_connections, gen_timeout):
         concurrent_connections=concurrent_connections,
         gen_timeout=gen_timeout)
     return cluster
-
-
-def get_nsx_device_status(cluster, nsx_uuid):
-    try:
-        status_up = l2gwlib.get_gateway_device_status(
-            cluster, nsx_uuid)
-        if status_up:
-            return networkgw_db.STATUS_ACTIVE
-        else:
-            return networkgw_db.STATUS_DOWN
-    except api_exc.NsxApiException:
-        return networkgw_db.STATUS_UNKNOWN
-    except n_exc.NotFound:
-        return networkgw_db.ERROR
-
-
-def get_nsx_device_statuses(cluster, tenant_id):
-    try:
-        status_dict = l2gwlib.get_gateway_devices_status(
-            cluster, tenant_id)
-        return dict((nsx_device_id,
-                     networkgw_db.STATUS_ACTIVE if connected
-                     else networkgw_db.STATUS_DOWN) for
-                    (nsx_device_id, connected) in six.iteritems(status_dict))
-    except api_exc.NsxApiException:
-        # Do not make a NSX API exception fatal
-        if tenant_id:
-            LOG.warning("Unable to retrieve operational status for "
-                        "gateway devices belonging to tenant: %s",
-                        tenant_id)
-        else:
-            LOG.warning("Unable to retrieve operational status for "
-                        "gateway devices")
 
 
 def _convert_bindings_to_nsx_transport_zones(bindings):

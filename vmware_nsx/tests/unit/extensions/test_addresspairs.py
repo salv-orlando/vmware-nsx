@@ -19,13 +19,12 @@ from oslo_config import cfg
 
 from neutron.tests.unit.db import test_allowedaddresspairs_db as ext_pairs
 
-from vmware_nsx.tests.unit.nsx_mh import test_plugin as test_nsx_plugin
 from vmware_nsx.tests.unit.nsx_v import test_plugin as test_nsx_v_plugin
 from vmware_nsx.tests.unit.nsx_v3 import test_constants as v3_constants
 from vmware_nsx.tests.unit.nsx_v3 import test_plugin as test_v3_plugin
 
 
-class TestAllowedAddressPairsNSXv2(test_nsx_plugin.NsxPluginV2TestCase,
+class TestAllowedAddressPairsNSXv2(test_v3_plugin.NsxV3PluginTestCaseMixin,
                                    ext_pairs.TestAllowedAddressPairs):
 
     # TODO(arosen): move to ext_pairs.TestAllowedAddressPairs once all

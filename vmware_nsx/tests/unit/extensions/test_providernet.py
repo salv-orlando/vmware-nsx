@@ -19,10 +19,10 @@ import webob.exc
 from neutron_lib.api.definitions import multiprovidernet as mpnet_apidef
 from neutron_lib.api.definitions import provider_net as pnet
 from vmware_nsx.tests import unit as vmware
-from vmware_nsx.tests.unit.nsx_mh import test_plugin as test_nsx_plugin
+from vmware_nsx.tests.unit.nsx_v import test_plugin as test_nsxv
 
 
-class TestProvidernet(test_nsx_plugin.NsxPluginV2TestCase):
+class TestProvidernet(test_nsxv.NsxVPluginV2TestCase):
 
     def test_create_delete_provider_network_default_physical_net(self):
         '''Leaves physical_net unspecified'''
@@ -78,7 +78,7 @@ class TestProvidernet(test_nsx_plugin.NsxPluginV2TestCase):
         self.assertEqual(net['network'][pnet.PHYSICAL_NETWORK], 'physnet2')
 
 
-class TestMultiProviderNetworks(test_nsx_plugin.NsxPluginV2TestCase):
+class TestMultiProviderNetworks(test_nsxv.NsxVPluginV2TestCase):
 
     def setUp(self, plugin=None):
         cfg.CONF.set_override('api_extensions_path', vmware.NSXEXT_PATH)
@@ -142,8 +142,9 @@ class TestMultiProviderNetworks(test_nsx_plugin.NsxPluginV2TestCase):
                             [{pnet.NETWORK_TYPE: 'vlan',
                               pnet.PHYSICAL_NETWORK: 'physnet1',
                               pnet.SEGMENTATION_ID: 1},
-                             {pnet.NETWORK_TYPE: 'stt',
-                              pnet.PHYSICAL_NETWORK: 'physnet1'}],
+                             {pnet.NETWORK_TYPE: 'vlan',
+                              pnet.PHYSICAL_NETWORK: 'physnet2',
+                              pnet.SEGMENTATION_ID: 2}],
                             'tenant_id': 'tenant_one'}}
         network_req = self.new_create_request('networks', data)
         network = self.deserialize(self.fmt,
@@ -174,20 +175,6 @@ class TestMultiProviderNetworks(test_nsx_plugin.NsxPluginV2TestCase):
                             pnet.SEGMENTATION_ID: 1,
                             'tenant_id': 'tenant_one'}}
 
-        network_req = self.new_create_request('networks', data)
-        res = network_req.get_response(self.api)
-        self.assertEqual(res.status_int, 400)
-
-    def test_create_network_duplicate_segments(self):
-        data = {'network': {'name': 'net1',
-                            mpnet_apidef.SEGMENTS:
-                            [{pnet.NETWORK_TYPE: 'vlan',
-                              pnet.PHYSICAL_NETWORK: 'physnet1',
-                              pnet.SEGMENTATION_ID: 1},
-                             {pnet.NETWORK_TYPE: 'vlan',
-                              pnet.PHYSICAL_NETWORK: 'physnet1',
-                              pnet.SEGMENTATION_ID: 1}],
-                            'tenant_id': 'tenant_one'}}
         network_req = self.new_create_request('networks', data)
         res = network_req.get_response(self.api)
         self.assertEqual(res.status_int, 400)
