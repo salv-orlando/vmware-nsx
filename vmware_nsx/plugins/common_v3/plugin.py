@@ -861,7 +861,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         # Check the host-switch-mode of the TZ connected to the ports network
         return self._is_ens_tz_net(context, port_data['network_id'])
 
-    def _is_overlay_network(self, network_id):
+    def _is_overlay_network(self, context, network_id):
         """Should be implemented by each plugin"""
         pass
 
