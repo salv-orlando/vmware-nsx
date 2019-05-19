@@ -18,6 +18,7 @@ from oslo_utils import excutils
 
 from neutron.db import l3_db
 
+from neutron_lib.api import validators
 from neutron_lib import constants
 from neutron_lib.db import api as db_api
 from neutron_lib import exceptions as n_exc
@@ -82,8 +83,15 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
         self.edge_manager.create_lrouter(context, lrouter, dist=True,
                                          availability_zone=az)
 
+    def _validate_no_size(self, router):
+        if (validators.is_attr_set(router.get('routes')) and
+            len(router['routes']) > 0):
+            msg = _("Cannot specify router-size for distributed router")
+            raise n_exc.InvalidInput(error_message=msg)
+
     def update_router(self, context, router_id, router):
         r = router['router']
+        self._validate_no_size(r)
         is_routes_update = True if 'routes' in r else False
         gw_info = self.plugin._extract_external_gw(context, router,
                                                    is_extract=True)
