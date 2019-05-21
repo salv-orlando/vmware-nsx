@@ -4523,6 +4523,20 @@ class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
                      {'router': {'distributed': True}},
                      expected_code=200)
 
+    def test_router_update_size_fails(self):
+        """Check distributed router cannot change it's type
+        """
+        # create a distributed router
+        tenant_id = _uuid()
+        res = self._create_router(self.fmt, tenant_id, distributed=True)
+        r = self.deserialize(self.fmt, res)
+        router_id = r['router']['id']
+
+        # make sure changing the type fails
+        self._update('routers', router_id,
+                     {'router': {'router_size': 'small'}},
+                     expected_code=400)
+
     def test_router_add_interface_multiple_ipv4_subnets(self):
         self.skipTest('TBD')
 
@@ -5774,6 +5788,17 @@ class TestSharedRouterTestCase(L3NatTest, L3NatTestCaseBase,
 
     def test_create_router_without_az_hint(self):
         self._test_create_router_with_az_hint(False)
+
+    def test_router_update_with_size_fail(self):
+        """Shared router currently does not support static routes
+        """
+        with self.router() as r:
+            router_id = r['router']['id']
+            body = self._show('routers', router_id)
+            body['router']['router_size'] = 'small'
+            self._update('routers', router_id, body,
+                         expected_code=400,
+                         neutron_context=context.get_admin_context())
 
 
 class TestRouterFlavorTestCase(extension.ExtensionTestCase,

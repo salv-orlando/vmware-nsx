@@ -30,6 +30,7 @@ from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import locking
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.db import nsxv_models
+from vmware_nsx.extensions import routersize
 from vmware_nsx.plugins.nsx_v.drivers import (
     abstract_router_driver as router_driver)
 from vmware_nsx.plugins.nsx_v import md_proxy as nsx_v_md_proxy
@@ -56,9 +57,15 @@ class RouterSharedDriver(router_driver.RouterBaseDriver):
             msg = _("Cannot configure static routes on a shared router")
             raise n_exc.InvalidInput(error_message=msg)
 
+    def _validate_no_size(self, router):
+        if validators.is_attr_set(router.get(routersize.ROUTER_SIZE)):
+            msg = _("Cannot specify router-size for shared router")
+            raise n_exc.InvalidInput(error_message=msg)
+
     def update_router(self, context, router_id, router):
         r = router['router']
         self._validate_no_routes(r)
+        self._validate_no_size(r)
 
         # If only the name and or description are updated. We do not need to
         # update the backend.
