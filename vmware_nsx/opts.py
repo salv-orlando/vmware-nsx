@@ -31,6 +31,8 @@ def list_opts():
             ('nsx_v3', vmware_nsx.common.config.nsx_v3_opts),
             ('QUOTAS', vmware_nsx.extensions.networkgw.nw_gw_quota_opts),
             ('dvs', vmware_nsx.dvs.dvs_utils.dvs_opts),
+            ('nsx_tvd', vmware_nsx.common.config.nsx_tvd_opts),
+            ('nsx_p', vmware_nsx.common.config.nsx_p_opts),
             ('NSX_DHCP', vmware_nsx.dhcp_meta.nsx.dhcp_opts),
             ('NSX_METADATA', vmware_nsx.dhcp_meta.nsx.metadata_opts),
             ('NSX_LSN', vmware_nsx.dhcp_meta.lsnmanager.lsn_opts)]
