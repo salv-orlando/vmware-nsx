@@ -934,6 +934,21 @@ class TestSubnetsV2(test_plugin.TestSubnetsV2, NsxV3PluginTestCaseMixin):
                               self.plugin.update_subnet,
                               context.get_admin_context(), subnet['id'], data)
 
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
 
 class TestPortsV2(test_plugin.TestPortsV2, NsxV3PluginTestCaseMixin,
                   test_bindings.PortBindingsTestCase,
