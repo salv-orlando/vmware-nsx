@@ -116,6 +116,12 @@ class EdgeMemberManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 nsx_router_id = nsx_db.get_nsx_router_id(context.session,
                                                          router_id)
                 try:
+                    # Make sure the NSX service router exists
+                    if not self.core_plugin.verify_sr_at_backend(
+                            context, router_id):
+                        self.core_plugin.create_service_router(
+                            context, router_id)
+
                     tags = lb_utils.get_tags(self.core_plugin, router_id,
                                              lb_const.LR_ROUTER_TYPE,
                                              member['tenant_id'],
