@@ -1884,6 +1884,21 @@ class TestSubnetsV2(NsxVPluginV2TestCase,
     def test_create_subnet_ipv6_gw_is_nw_end_addr_returns_201(self):
         self.skipTest('No DHCP v6 Support yet')
 
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
     def test_create_subnet_ipv6_out_of_cidr_global(self):
         self.skipTest('No DHCP v6 Support yet')
 
@@ -2176,7 +2191,19 @@ class TestSubnetPoolsV2(NsxVPluginV2TestCase, test_plugin.TestSubnetsV2):
     def test_subnet_update_ipv4_and_ipv6_pd_v6stateless_subnets(self):
         self.skipTest('No DHCP v6 Support yet')
 
-    def test_create_subnet_ipv6_gw_is_nw_end_addr_returns_201(self):
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
         self.skipTest('No DHCP v6 Support yet')
 
     def test_create_subnet_ipv6_out_of_cidr_global(self):
