@@ -279,7 +279,19 @@ class NsxV3TestSubnets(NsxV3SubnetMixin,
     def test_list_subnets_with_parameter(self):
         super(NsxV3TestSubnets, self).test_list_subnets_with_parameter()
 
-    def test_create_subnet_ipv6_gw_is_nw_end_addr_returns_201(self):
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
         self.skipTest('No DHCP v6 Support yet')
 
     def test_create_subnet_with_v6_pd_allocation_pool(self):

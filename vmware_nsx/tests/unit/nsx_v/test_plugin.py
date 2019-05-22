@@ -1908,7 +1908,19 @@ class TestSubnetsV2(NsxVPluginV2TestCase,
             res = subnet_req.get_response(self.api)
             self.assertEqual(res.status_int, webob.exc.HTTPClientError.code)
 
-    def test_create_subnet_ipv6_gw_is_nw_end_addr_returns_201(self):
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
         self.skipTest('No DHCP v6 Support yet')
 
     def test_create_subnet_ipv6_out_of_cidr_global(self):
@@ -1936,6 +1948,9 @@ class TestSubnetsV2(NsxVPluginV2TestCase,
         self.skipTest('No DHCP v6 Support yet')
 
     def test_create_subnet_ipv6_out_of_cidr_lla(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_xxxa(self):
         self.skipTest('No DHCP v6 Support yet')
 
     def test_update_subnet_inconsistent_ipv6_hostroute_dst_v4(self):
@@ -2191,7 +2206,19 @@ class TestSubnetPoolsV2(NsxVPluginV2TestCase, test_plugin.TestSubnetsV2):
     def test_subnet_update_ipv4_and_ipv6_pd_v6stateless_subnets(self):
         self.skipTest('No DHCP v6 Support yet')
 
-    def test_create_subnet_ipv6_gw_is_nw_end_addr_returns_201(self):
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
+        self.skipTest('No DHCP v6 Support yet')
+
+    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
         self.skipTest('No DHCP v6 Support yet')
 
     def test_create_subnet_ipv6_out_of_cidr_global(self):
