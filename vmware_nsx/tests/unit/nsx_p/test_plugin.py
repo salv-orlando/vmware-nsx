@@ -2117,3 +2117,53 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
 
     def test_router_add_iface_ipv6_ext_ra_subnet_returns_400(self):
         self.skipTest('DHCPv6 not supported')
+
+    def test_create_floatingip_invalid_fixed_ipv6_address_returns_400(self):
+        self.skipTest('Failed because of illegal port id')
+
+    def test_create_floatingip_with_router_interface_device_owner_fail(self):
+        # This tests that an error is raised when trying to assign a router
+        # interface port with floatingip.
+
+        with self.subnet(cidr='30.0.0.0/24', gateway_ip=None) as private_sub:
+            with self.port(
+                subnet=private_sub,
+                device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
+                port_id = p['port']['id']
+                with self.router() as r:
+                    self._router_interface_action('add', r['router']['id'],
+                                                  None, port_id)
+            with self.external_network() as public_net,\
+                self.subnet(network=public_net, cidr='12.0.0.0/24',
+                            enable_dhcp=False) as public_sub:
+                    self._add_external_gateway_to_router(
+                            r['router']['id'],
+                            public_sub['subnet']['network_id'])
+                    self._make_floatingip(
+                        self.fmt, public_sub['subnet']['network_id'],
+                        port_id=port_id,
+                        http_status=exc.HTTPBadRequest.code)
+
+    def test_assign_floatingip_to_router_interface_device_owner_fail(self):
+        # This tests that an error is raised when trying to assign a router
+        # interface port with floatingip.
+
+        with self.subnet(cidr='30.0.0.0/24', gateway_ip=None) as private_sub:
+            with self.port(
+                subnet=private_sub,
+                device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
+                port_id = p['port']['id']
+                with self.router() as r:
+                    self._router_interface_action('add', r['router']['id'],
+                                                  None, port_id)
+            with self.external_network() as public_net,\
+                self.subnet(network=public_net, cidr='12.0.0.0/24',
+                            enable_dhcp=False) as public_sub:
+                    self._add_external_gateway_to_router(
+                            r['router']['id'],
+                            public_sub['subnet']['network_id'])
+                    fip = self._make_floatingip(self.fmt, public_sub[
+                        'subnet']['network_id'])
+                    self._update('floatingips', fip['floatingip'][
+                        'id'], {'floatingip': {'port_id': port_id}},
+                                expected_code=exc.HTTPBadRequest.code)

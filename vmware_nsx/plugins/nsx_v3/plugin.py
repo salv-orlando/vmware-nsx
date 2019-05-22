@@ -2933,13 +2933,21 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                     else const.FLOATINGIP_STATUS_DOWN))
 
     def create_floatingip(self, context, floatingip):
+        # First do some validations
+        fip_data = floatingip['floatingip']
+        port_id = fip_data.get('port_id')
+        if port_id:
+            port_data = self.get_port(context, port_id)
+            self._assert_on_assoc_floatingip_to_special_ports(
+                fip_data, port_data)
+
+        # create the neutron fip
         new_fip = self._create_floating_ip_wrapper(context, floatingip)
+
         router_id = new_fip['router_id']
         if not router_id:
             return new_fip
-        port_id = floatingip['floatingip']['port_id']
         if port_id:
-            port_data = self.get_port(context, port_id)
             device_owner = port_data.get('device_owner')
             fip_address = new_fip['floating_ip_address']
             if (device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
@@ -3001,11 +3009,19 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         super(NsxV3Plugin, self).delete_floatingip(context, fip_id)
 
     def update_floatingip(self, context, fip_id, floatingip):
+        fip_data = floatingip['floatingip']
         old_fip = self.get_floatingip(context, fip_id)
         old_port_id = old_fip['port_id']
         new_status = (const.FLOATINGIP_STATUS_ACTIVE
-                      if floatingip['floatingip'].get('port_id')
+                      if fip_data.get('port_id')
                       else const.FLOATINGIP_STATUS_DOWN)
+
+        updated_port_id = fip_data.get('port_id')
+        if updated_port_id:
+            updated_port_data = self.get_port(context, updated_port_id)
+            self._assert_on_assoc_floatingip_to_special_ports(
+                fip_data, updated_port_data)
+
         new_fip = super(NsxV3Plugin, self).update_floatingip(
             context, fip_id, floatingip)
         router_id = new_fip['router_id']
