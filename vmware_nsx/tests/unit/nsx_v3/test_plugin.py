@@ -15,6 +15,7 @@
 
 import mock
 import netaddr
+from neutron.db import l3_db
 from neutron.db import models_v2
 from neutron.db import securitygroups_db as sg_db
 from neutron.extensions import address_scope
@@ -1735,6 +1736,40 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
             self.assertRaises(n_exc.InvalidInput,
                               self.plugin.create_port,
                               self.ctx, data)
+
+    def test_create_compute_port_with_relay_and_router(self):
+        self._enable_dhcp_relay()
+        with self.network() as network, \
+            self.subnet(network=network, enable_dhcp=True) as s1,\
+            mock.patch.object(self.plugin, '_get_router',
+                              return_value={'name': 'dummy'}):
+            # first create a router interface to simulate a router
+            data = {'port': {
+                        'network_id': network['network']['id'],
+                        'tenant_id': self._tenant_id,
+                        'name': 'port',
+                        'admin_state_up': True,
+                        'device_id': 'dummy',
+                        'device_owner': l3_db.DEVICE_OWNER_ROUTER_INTF,
+                        'fixed_ips': [{'subnet_id': s1['subnet']['id']}],
+                        'mac_address': '00:00:00:00:00:02'}
+                    }
+            port1 = self.plugin.create_port(self.ctx, data)
+            self.assertIn('id', port1)
+            # Now create a compute port
+            device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'X'
+            data = {'port': {
+                        'network_id': network['network']['id'],
+                        'tenant_id': self._tenant_id,
+                        'name': 'port',
+                        'admin_state_up': True,
+                        'device_id': 'fake_device',
+                        'device_owner': device_owner,
+                        'fixed_ips': [{'subnet_id': s1['subnet']['id']}],
+                        'mac_address': '00:00:00:00:00:01'}
+                    }
+            port2 = self.plugin.create_port(self.ctx, data)
+            self.assertIn('id', port2)
 
     def _test_create_direct_network(self, vlan_id=0):
         net_type = vlan_id and 'vlan' or 'flat'

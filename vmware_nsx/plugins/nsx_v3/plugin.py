@@ -1493,11 +1493,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                         'network_id': [original_port['network_id']]}
         interfaces = self.get_ports(context.elevated(), filters=port_filters)
         for interface in interfaces:
-            for subnet in subnets:
-                for fixed_ip in interface['fixed_ips']:
-                    if fixed_ip['subnet_id'] in subnet_ids:
-                        # Router exists - validation passed
-                        return
+            for fixed_ip in interface['fixed_ips']:
+                if fixed_ip['subnet_id'] in subnet_ids:
+                    # Router exists - validation passed
+                    return
 
         err_msg = _("Neutron is configured with DHCP_Relay but no router "
                     "connected to the subnet")
