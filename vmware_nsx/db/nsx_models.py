@@ -22,7 +22,6 @@ This module defines data models used by the VMware NSX plugin family.
 from neutron_lib.db import model_base
 import sqlalchemy as sa
 from sqlalchemy import orm
-from sqlalchemy import sql
 
 from neutron.db import models_v2
 from oslo_db.sqlalchemy import models
@@ -294,49 +293,6 @@ class Lsn(models_v2.model_base.BASEV2, models.TimestampMixin):
     def __init__(self, net_id, lsn_id):
         self.net_id = net_id
         self.lsn_id = lsn_id
-
-
-class QoSQueue(model_base.BASEV2, model_base.HasId, model_base.HasProject,
-               models.TimestampMixin):
-    name = sa.Column(sa.String(255))
-    default = sa.Column(sa.Boolean, default=False, server_default=sql.false())
-    min = sa.Column(sa.Integer, nullable=False)
-    max = sa.Column(sa.Integer, nullable=True)
-    qos_marking = sa.Column(sa.Enum('untrusted', 'trusted',
-                                    name='qosqueues_qos_marking'))
-    dscp = sa.Column(sa.Integer)
-
-
-class PortQueueMapping(model_base.BASEV2, models.TimestampMixin):
-    port_id = sa.Column(sa.String(36),
-                        sa.ForeignKey("ports.id", ondelete="CASCADE"),
-                        primary_key=True)
-
-    queue_id = sa.Column(sa.String(36), sa.ForeignKey("qosqueues.id"),
-                         primary_key=True)
-
-    # Add a relationship to the Port model adding a backref which will
-    # allow SQLAlchemy for eagerly load the queue binding
-    port = orm.relationship(
-        models_v2.Port,
-        backref=orm.backref("qos_queue", uselist=False,
-                            cascade='delete', lazy='joined'))
-
-
-class NetworkQueueMapping(model_base.BASEV2, models.TimestampMixin):
-    network_id = sa.Column(sa.String(36),
-                           sa.ForeignKey("networks.id", ondelete="CASCADE"),
-                           primary_key=True)
-
-    queue_id = sa.Column(sa.String(36), sa.ForeignKey("qosqueues.id",
-                                                      ondelete="CASCADE"))
-
-    # Add a relationship to the Network model adding a backref which will
-    # allow SQLAlcremy for eagerly load the queue binding
-    network = orm.relationship(
-        models_v2.Network,
-        backref=orm.backref("qos_queue", uselist=False,
-                            cascade='delete', lazy='joined'))
 
 
 class NsxL2GWConnectionMapping(model_base.BASEV2, models.TimestampMixin):

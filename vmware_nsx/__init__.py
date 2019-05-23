@@ -11,6 +11,7 @@
 #  under the License.
 
 from neutron.common import eventlet_utils
+from neutron.db.models import securitygroup  # noqa
 
 eventlet_utils.monkey_patch()
 

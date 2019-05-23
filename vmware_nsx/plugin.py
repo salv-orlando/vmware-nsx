@@ -18,17 +18,15 @@
 # Note: this import should be here in order to appear before NeutronDbPluginV2
 #  in each of the plugins. If not: security-group/-rule will not have all the
 # relevant extend dict registries.
-from neutron.db.models import securitygroup  # noqa
+from neutron.db import l3_dvr_db  # noqa
 
 from vmware_nsx.plugins.dvs import plugin as dvs
 from vmware_nsx.plugins.nsx import plugin as nsx
-from vmware_nsx.plugins.nsx_mh import plugin as nsx_mh
 from vmware_nsx.plugins.nsx_p import plugin as nsx_p
 from vmware_nsx.plugins.nsx_v import plugin as nsx_v
 from vmware_nsx.plugins.nsx_v3 import plugin as nsx_v3
 
 NsxDvsPlugin = dvs.NsxDvsV2
-NsxPlugin = nsx_mh.NsxPluginV2
 NsxVPlugin = nsx_v.NsxVPluginV2
 NsxV3Plugin = nsx_v3.NsxV3Plugin
 NsxPolicyPlugin = nsx_p.NsxPolicyPlugin

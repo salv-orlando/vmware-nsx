@@ -18,7 +18,6 @@ from vmware_nsx.policies import maclearning
 from vmware_nsx.policies import network_gateway
 from vmware_nsx.policies import nsxpolicy
 from vmware_nsx.policies import providersecuritygroup
-from vmware_nsx.policies import qos_queue
 from vmware_nsx.policies import security_group
 
 
@@ -28,7 +27,6 @@ def list_rules():
         maclearning.list_rules(),
         network_gateway.list_rules(),
         providersecuritygroup.list_rules(),
-        qos_queue.list_rules(),
         security_group.list_rules(),
         nsxpolicy.list_rules(),
         housekeeper.list_rules(),

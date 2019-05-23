@@ -16,7 +16,6 @@ import vmware_nsx.common.config
 import vmware_nsx.dhcp_meta.lsnmanager
 import vmware_nsx.dhcp_meta.nsx
 import vmware_nsx.dvs.dvs_utils
-import vmware_nsx.extensions.networkgw
 
 
 def list_opts():
@@ -29,7 +28,6 @@ def list_opts():
             ('NSX_SYNC', vmware_nsx.common.config.sync_opts),
             ('nsxv', vmware_nsx.common.config.nsxv_opts),
             ('nsx_v3', vmware_nsx.common.config.nsx_v3_opts),
-            ('QUOTAS', vmware_nsx.extensions.networkgw.nw_gw_quota_opts),
             ('dvs', vmware_nsx.dvs.dvs_utils.dvs_opts),
             ('nsx_tvd', vmware_nsx.common.config.nsx_tvd_opts),
             ('nsx_p', vmware_nsx.common.config.nsx_p_opts),

@@ -30,7 +30,7 @@ from vmware_nsx.plugins.nsx_v.vshield import vcns
 import vmware_nsx.plugins.nsx_v.vshield.vcns_driver as vcnsdriver
 
 
-plugin = neutron_plugin.NsxPlugin
+plugin = neutron_plugin.NsxV3Plugin
 api_client = nsx_client.NsxApiClient
 evt_client = eventlet_client.EventletApiClient
 vcns_class = vcns.Vcns
