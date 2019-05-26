@@ -1003,6 +1003,10 @@ nsx_tvd_opts = [
                 help=_("The default availability zones that will be used for "
                        "NSX-V3 networks and routers creation under the TVD "
                        "plugin.")),
+    cfg.IntOpt('init_retries',
+               default=3,
+               help=_('Maximum number of times a particular plugin '
+                      'initialization should be retried')),
 ]
 
 # Register the configuration options

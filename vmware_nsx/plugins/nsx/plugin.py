@@ -53,6 +53,7 @@ from vmware_nsx.common import config
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import locking
 from vmware_nsx.common import managers as nsx_managers
+from vmware_nsx.common import utils as com_utils
 from vmware_nsx.db import (
     routertype as rt_rtr)
 from vmware_nsx.db import db as nsx_db
@@ -134,6 +135,16 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def is_tvd_plugin():
         return True
 
+    @com_utils.retry_upon_exception(Exception, 0.5, 2,
+                                    cfg.CONF.nsx_tvd.init_retries)
+    def _call_plugin_init_with_retry(self, map_type, plugin_class):
+        try:
+            self.plugins[map_type] = plugin_class()
+        except Exception as e:
+            with excutils.save_and_reraise_exception():
+                LOG.warning("%s plugin failed to initialized: %s",
+                            map_type.upper(), e)
+
     def _init_plugin(self, map_type, plugin_class):
         if map_type not in cfg.CONF.nsx_tvd.enabled_plugins:
             # skip this plugin
@@ -141,10 +152,10 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                      map_type.upper())
             return
         try:
-            self.plugins[map_type] = plugin_class()
+            self._call_plugin_init_with_retry(map_type, plugin_class)
         except Exception as e:
-            LOG.warning("%s plugin will not be supported: %s",
-                        map_type.upper(), e)
+            LOG.warning("%s plugin will not be supported",
+                        map_type.upper())
             if map_type == self.default_plugin:
                 msg = (_("The default plugin %(def)s failed to start. "
                          "Reason: %(reason)s") % {'def': self.default_plugin,
