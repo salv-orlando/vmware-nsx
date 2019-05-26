@@ -2024,11 +2024,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             nat_rule_id=self._get_fip_dnat_rule_id(fip_id))
 
     def create_floatingip(self, context, floatingip):
+        # First do some validations
+        fip_data = floatingip['floatingip']
+        port_id = fip_data.get('port_id')
+        if port_id:
+            port_data = self.get_port(context, port_id)
+            self._assert_on_assoc_floatingip_to_special_ports(
+                fip_data, port_data)
+
         new_fip = super(NsxPolicyPlugin, self).create_floatingip(
                 context, floatingip, initial_status=(
                     const.FLOATINGIP_STATUS_ACTIVE
-                    if floatingip['floatingip']['port_id']
-                    else const.FLOATINGIP_STATUS_DOWN))
+                    if port_id else const.FLOATINGIP_STATUS_DOWN))
         router_id = new_fip['router_id']
         if not router_id:
             return new_fip
@@ -2053,10 +2060,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         super(NsxPolicyPlugin, self).delete_floatingip(context, fip_id)
 
     def update_floatingip(self, context, fip_id, floatingip):
+        fip_data = floatingip['floatingip']
         old_fip = self.get_floatingip(context, fip_id)
         new_status = (const.FLOATINGIP_STATUS_ACTIVE
-                      if floatingip['floatingip'].get('port_id')
+                      if fip_data.get('port_id')
                       else const.FLOATINGIP_STATUS_DOWN)
+
+        updated_port_id = fip_data.get('port_id')
+        if updated_port_id:
+            updated_port_data = self.get_port(context, updated_port_id)
+            self._assert_on_assoc_floatingip_to_special_ports(
+                fip_data, updated_port_data)
+
         new_fip = super(NsxPolicyPlugin, self).update_floatingip(
             context, fip_id, floatingip)
         router_id = new_fip['router_id']

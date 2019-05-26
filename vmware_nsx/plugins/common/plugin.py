@@ -415,6 +415,17 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
                      "Default security group already created", tenant_id)
             return self._get_default_sg_id(context, tenant_id)
 
+    def _assert_on_assoc_floatingip_to_special_ports(self, fip, internal_port):
+        """Do not allow attaching fip to dedicated ports"""
+        port_id = fip.get('port_id')
+        dev_owner = internal_port.get('device_owner', '')
+        if (port_id and dev_owner and
+            (dev_owner in constants.ROUTER_INTERFACE_OWNERS or
+             dev_owner == constants.DEVICE_OWNER_DHCP)):
+            msg = _('Associating floatingip to %s port is '
+                    'restricted') % dev_owner
+            raise n_exc.BadRequest(resource='floatingip', msg=msg)
+
     def get_housekeeper(self, context, name, fields=None):
         # run the job in readonly mode and get the results
         self.housekeeper.run(context, name, readonly=True)
