@@ -64,13 +64,18 @@ class EdgePoolManager(base_mgr.EdgeLoadbalancerBaseManager):
                                                 pool.id,
                                                 edge_pool_id)
 
-            if pool.listener:
+            try:
+                listener = pool.listener or pool.listeners[0]
+            except IndexError:
+                listener = None
+
+            if listener:
                 listener_binding = nsxv_db.get_nsxv_lbaas_listener_binding(
-                    context.session, lb_id, pool.listener.id)
+                    context.session, lb_id, listener.id)
                 # Associate listener with pool
                 vse = listener_mgr.listener_to_edge_vse(
                     context,
-                    pool.listener,
+                    listener,
                     lb_binding['vip_address'],
                     edge_pool_id,
                     listener_binding['app_profile_id'])
