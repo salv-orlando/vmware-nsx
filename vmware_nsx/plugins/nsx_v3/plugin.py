@@ -700,33 +700,28 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         return self._mac_learning_disabled_profile
 
     def _init_lb_profiles(self):
+        ssl_c_prof_client = self.nsxlib.load_balancer.client_ssl_profile
+        ssl_s_prof_client = self.nsxlib.load_balancer.server_ssl_profile
         with locking.LockManager.get_lock('nsxv3_lb_profiles_init'):
-            lb_profiles = self._get_lb_profiles()
-            if not lb_profiles.get('client_ssl_profile'):
-                self.nsxlib.load_balancer.client_ssl_profile.create(
+            if not self.client_ssl_profile:
+                profile = ssl_c_prof_client.find_by_display_name(
+                    NSX_V3_CLIENT_SSL_PROFILE)
+            if not profile:
+                profile = ssl_c_prof_client.create(
                     NSX_V3_CLIENT_SSL_PROFILE,
                     'Neutron LB Client SSL Profile',
                     tags=self.nsxlib.build_v3_api_version_tag())
-            if not lb_profiles.get('server_ssl_profile'):
-                self.nsxlib.load_balancer.server_ssl_profile.create(
+            self.client_ssl_profile = profile[0]['id'] if profile else None
+
+            if not self.server_ssl_profile:
+                profile = ssl_s_prof_client.find_by_display_name(
+                    NSX_V3_SERVER_SSL_PROFILE)
+            if not profile:
+                profile = self.nsxlib.load_balancer.server_ssl_profile.create(
                     NSX_V3_SERVER_SSL_PROFILE,
                     'Neutron LB Server SSL Profile',
                     tags=self.nsxlib.build_v3_api_version_tag())
-
-    def _get_lb_profiles(self):
-        if not self.client_ssl_profile:
-            ssl_profile_client = self.nsxlib.load_balancer.client_ssl_profile
-            profile = ssl_profile_client.find_by_display_name(
-                NSX_V3_CLIENT_SSL_PROFILE)
-            self.client_ssl_profile = profile[0]['id'] if profile else None
-        if not self.server_ssl_profile:
-            ssl_profile_client = self.nsxlib.load_balancer.server_ssl_profile
-            profile = ssl_profile_client.find_by_display_name(
-                NSX_V3_SERVER_SSL_PROFILE)
             self.server_ssl_profile = profile[0]['id'] if profile else None
-
-        return {'client_ssl_profile': self.client_ssl_profile,
-                'server_ssl_profile': self.server_ssl_profile}
 
     def _get_port_security_profile_id(self):
         return self.nsxlib.switching_profile.build_switch_profile_ids(
