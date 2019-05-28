@@ -237,6 +237,42 @@ class NeutronSimpleDvsTest(NeutronSimpleDvsTestCase):
                                             vlan_tag=7)
         self.assertTrue(fake_pg_info.call_count)
 
+    def test_create_dvs_vlan_network_no_physical_network(self):
+        params = {'provider:network_type': 'vlan',
+                  'provider:segmentation_id': 10,
+                  'admin_state_up': True,
+                  'name': 'fake-name',
+                  'tenant_id': 'fake_tenant',
+                  'shared': False,
+                  'port_security_enabled': False}
+        params['arg_list'] = tuple(params.keys())
+        ctx = context.get_admin_context()
+        with mock.patch.object(self._plugin._dvs, 'add_port_group'),\
+                mock.patch.object(dvs.DvsManager, 'add_port_group'),\
+                mock.patch.object(dvs.DvsManager, 'get_dvs_moref_by_name',
+                                  return_value=mock.MagicMock()):
+            network = self._plugin.create_network(ctx, {'network': params})
+            # Should work and take the default dvs
+            self.assertIn('id', network)
+
+    def test_create_dvs_pg_network_no_physical_network(self):
+        params = {'provider:network_type': 'portgroup',
+                  'provider:segmentation_id': 10,
+                  'admin_state_up': True,
+                  'name': 'fake-name',
+                  'tenant_id': 'fake_tenant',
+                  'shared': False,
+                  'port_security_enabled': False}
+        params['arg_list'] = tuple(params.keys())
+        ctx = context.get_admin_context()
+        with mock.patch.object(self._plugin._dvs, 'add_port_group'),\
+                mock.patch.object(dvs.DvsManager, 'add_port_group'),\
+                mock.patch.object(dvs.DvsManager, 'get_dvs_moref_by_name',
+                                  return_value=mock.MagicMock()):
+            self.assertRaises(exp.InvalidInput,
+                              self._plugin.create_network,
+                              ctx, {'network': params})
+
     def test_create_and_delete_dvs_port(self):
         params = {'provider:network_type': 'vlan',
                   'provider:physical_network': 'dvs',
@@ -294,10 +330,7 @@ class NeutronSimpleDvsTest(NeutronSimpleDvsTestCase):
                 req = self.new_update_request('ports',
                                               data, port['port']['id'])
                 res = self.deserialize('json', req.get_response(self.api))
-                port_security = res['port']['port_security_enabled']
-                security_groups = res['port']['security_groups']
-                self.assertEqual(port_security, False)
-                self.assertEqual(security_groups, [])
+                self.assertIn('NeutronError', res)
 
     def test_create_router_only_dvs_backend(self):
         data = {'router': {'tenant_id': 'whatever'}}
@@ -401,5 +434,27 @@ class NeutronSimpleDvsTest(NeutronSimpleDvsTestCase):
                return_value=mock.MagicMock()):
             ctx = context.get_admin_context()
             self._plugin.create_network(ctx, {'network': params})
+            self.assertRaises(exp.InvalidInput, self._plugin.create_network,
+                              ctx, {'network': params})
+
+    def test_create_external_network_fail(self):
+        params = {'provider:network_type': 'vlan',
+                  'admin_state_up': True,
+                  'name': 'test_net',
+                  'tenant_id': 'fake_tenant',
+                  'router:external': True,
+                  'shared': False,
+                  'provider:physical_network': 'fake-moid',
+                  'provider:segmentation_id': 7,
+                  'port_security_enabled': False}
+
+        with mock.patch.object(self._plugin._dvs,
+              'add_port_group'),\
+              mock.patch.object(dvs.DvsManager,
+              'add_port_group'),\
+              mock.patch.object(dvs.DvsManager,
+              'get_dvs_moref_by_name',
+               return_value=mock.MagicMock()):
+            ctx = context.get_admin_context()
             self.assertRaises(exp.InvalidInput, self._plugin.create_network,
                               ctx, {'network': params})

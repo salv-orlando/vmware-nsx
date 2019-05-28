@@ -275,7 +275,10 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
         segmentation_id = net_data.get(pnet.SEGMENTATION_ID)
         segmentation_id_set = validators.is_attr_set(segmentation_id)
         physical_network = net_data.get(pnet.PHYSICAL_NETWORK)
+        physical_network_set = validators.is_attr_set(physical_network)
         if network_type == 'vlan':
+            if not physical_network_set:
+                physical_network = dvs_utils.dvs_name_get()
             bindings = nsx_db.get_network_bindings_by_vlanid_and_physical_net(
                 context.session, segmentation_id, physical_network)
             if bindings:
@@ -286,6 +289,14 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
             err_msg = _("Only an admin can create a DVS provider "
                         "network")
             raise n_exc.InvalidInput(error_message=err_msg)
+
+        external = net_data.get(enet_apidef.EXTERNAL)
+        is_external_net = validators.is_attr_set(external) and external
+        if is_external_net:
+            err_msg = _("External network cannot be created with dvs based "
+                        "port groups")
+            raise n_exc.InvalidInput(error_message=err_msg)
+
         err_msg = None
         if not network_type_set:
             err_msg = _("Network provider information must be "
@@ -295,7 +306,11 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
             network_type == c_utils.NetworkTypes.PORTGROUP):
             if segmentation_id_set:
                 err_msg = (_("Segmentation ID cannot be specified with "
-                            "%s network type"), network_type)
+                            "%s network type") % network_type)
+            if (network_type == c_utils.NetworkTypes.PORTGROUP and
+                not physical_network_set):
+                err_msg = (_("Physical network must be specified with "
+                            "%s network type") % network_type)
         elif network_type == c_utils.NetworkTypes.VLAN:
             if not segmentation_id_set:
                 err_msg = _("Segmentation ID must be specified with "
@@ -356,6 +371,10 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
             self._extend_get_network_dict_provider(context, net_result)
         return db_utils.resource_fields(net_result, fields)
 
+    def _dvs_get_network_type(self, context, id, fields=None):
+        net = self._dvs_get_network(context, id, fields=fields)
+        return net[pnet.NETWORK_TYPE]
+
     def get_network(self, context, id, fields=None):
         return self._dvs_get_network(context, id, fields=None)
 
@@ -411,14 +430,15 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
         # ATTR_NOT_SPECIFIED is for the case where a port is created on a
         # shared network that is not owned by the tenant.
         port_data = port['port']
-        network_type = self._dvs_get_network(context, port['port'][
-            'network_id'])['provider:network_type']
+        network_type = self._dvs_get_network_type(context, port['port'][
+                                                  'network_id'])
         with db_api.CONTEXT_WRITER.using(context):
             # First we allocate port in neutron database
             neutron_db = super(NsxDvsV2, self).create_port(context, port)
             self._extension_manager.process_create_port(
                 context, port_data, neutron_db)
             if network_type and network_type == 'vlan':
+                # Not allowed to enable port security on vlan DVS ports
                 port_data[psec.PORTSECURITY] = False
             else:
                 port_security = self._get_network_security_binding(
@@ -496,13 +516,19 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
             ret_port.update(port['port'])
 
             # populate port_security setting, ignoring vlan network ports.
-            network_type = self._dvs_get_network(context,
-                                                 ret_port['network_id'])[
-                'provider:network_type']
+            network_type = self._dvs_get_network_type(context,
+                                                      ret_port['network_id'])
             if (psec.PORTSECURITY not in port['port'] and network_type !=
                     'vlan'):
                 ret_port[psec.PORTSECURITY] = self._get_port_security_binding(
                     context, id)
+            elif (network_type == 'vlan' and
+                  psec.PORTSECURITY in port['port'] and
+                  port['port'][psec.PORTSECURITY]):
+                # Not allowed to enable port security on vlan DVS ports
+                err_msg = _("Cannot enable port security on port %s") % id
+                raise n_exc.InvalidInput(error_message=err_msg)
+
             # validate port security and allowed address pairs
             if not ret_port[psec.PORTSECURITY]:
                 #  has address pairs in request
