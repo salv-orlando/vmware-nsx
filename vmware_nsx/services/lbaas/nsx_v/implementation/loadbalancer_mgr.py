@@ -115,11 +115,12 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         # Discard any ports which are associated with LB
         filters = {
             'device_id': [lb['id'], oct_const.DEVICE_ID_PREFIX + lb['id']],
-            'device_owner': [constants.DEVICE_OWNER_NEUTRON_PREFIX + 'LB']}
+            'device_owner': [lb_common.LBAAS_DEVICE_OWNER]}
         lb_ports = self.core_plugin.get_ports(context.elevated(),
                                               filters=filters)
         for lb_port in lb_ports:
-            self.core_plugin.delete_port(context.elevated(), lb_port['id'])
+            self.core_plugin.delete_port(context.elevated(), lb_port['id'],
+                                         allow_delete_lb_if=True)
 
         binding = nsxv_db.get_nsxv_lbaas_loadbalancer_binding(
             context.session, lb['id'])

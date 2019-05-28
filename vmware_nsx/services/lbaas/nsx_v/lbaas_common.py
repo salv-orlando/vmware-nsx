@@ -32,6 +32,7 @@ LOG = logging.getLogger(__name__)
 MEMBER_ID_PFX = 'member-'
 RESOURCE_ID_PFX = 'lbaas-'
 LBAAS_FW_SECTION_NAME = 'LBaaS FW Rules'
+LBAAS_DEVICE_OWNER = constants.DEVICE_OWNER_NEUTRON_PREFIX + 'LB'
 
 
 def get_member_id(member_id):
@@ -82,7 +83,7 @@ def get_lb_edge_name(context, lb_id):
 def get_lb_interface(context, plugin, lb_id, subnet_id):
     filters = {'fixed_ips': {'subnet_id': [subnet_id]},
                'device_id': [lb_id],
-               'device_owner': [constants.DEVICE_OWNER_NEUTRON_PREFIX + 'LB']}
+               'device_owner': [LBAAS_DEVICE_OWNER]}
 
     lb_ports = plugin.get_ports(context.elevated(), filters=filters)
     return lb_ports
@@ -99,7 +100,7 @@ def create_lb_interface(context, plugin, lb_id, subnet_id, tenant_id,
                  'network_id': network_id,
                  'tenant_id': tenant_id,
                  'fixed_ips': [{'subnet_id': subnet['id']}],
-                 'device_owner': constants.DEVICE_OWNER_NEUTRON_PREFIX + 'LB',
+                 'device_owner': LBAAS_DEVICE_OWNER,
                  'device_id': lb_id,
                  'mac_address': constants.ATTR_NOT_SPECIFIED
                  }
@@ -127,7 +128,7 @@ def delete_lb_interface(context, plugin, lb_id, subnet_id):
     network_id = subnet.get('network_id')
     lb_ports = get_lb_interface(context, plugin, lb_id, subnet_id)
     for lb_port in lb_ports:
-        plugin.delete_port(context, lb_port['id'])
+        plugin.delete_port(context, lb_port['id'], allow_delete_lb_if=True)
 
     edge_utils.delete_interface(plugin.nsx_v, context, resource_id, network_id,
                                 dist=False)

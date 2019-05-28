@@ -160,6 +160,7 @@ from vmware_nsx.services.lbaas.nsx_v.implementation import listener_mgr
 from vmware_nsx.services.lbaas.nsx_v.implementation import loadbalancer_mgr
 from vmware_nsx.services.lbaas.nsx_v.implementation import member_mgr
 from vmware_nsx.services.lbaas.nsx_v.implementation import pool_mgr
+from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsx.services.lbaas.octavia import octavia_listener
 
@@ -2708,7 +2709,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
     def delete_port(self, context, id, l3_port_check=True,
                     nw_gw_port_check=True, force_delete_dhcp=False,
-                    allow_delete_internal=False):
+                    allow_delete_internal=False,
+                    allow_delete_lb_if=False):
         # Send delete port notification to any interested service plugin
         registry.publish(resources.PORT, events.BEFORE_DELETE, self,
                          payload=events.DBEventPayload(
@@ -2721,6 +2723,11 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         if not allow_delete_internal:
             self._validate_internal_network(
                 context, neutron_db_port['network_id'])
+        if (not allow_delete_lb_if and
+            neutron_db_port.get('device_owner') and
+            neutron_db_port['device_owner'] == lb_common.LBAAS_DEVICE_OWNER):
+            msg = _("Cannot delete LB interface port")
+            raise n_exc.InvalidInput(error_message=msg)
 
         if is_compute_port and device_id:
             # Lock on the device ID to make sure we do not change/delete
