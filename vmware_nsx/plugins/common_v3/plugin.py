@@ -18,6 +18,7 @@ import netaddr
 from oslo_config import cfg
 from oslo_db import exception as db_exc
 from oslo_log import log as logging
+import oslo_messaging
 from oslo_utils import excutils
 from sqlalchemy import exc as sql_exc
 import webob.exc
@@ -43,6 +44,7 @@ from neutron.db import portsecurity_db
 from neutron.db import securitygroups_db
 from neutron.db import vlantransparent_db
 from neutron.extensions import securitygroup as ext_sg
+from neutron.extensions import tagging
 from neutron_lib.agent import topics
 from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
 from neutron_lib.api.definitions import availability_zone as az_def
@@ -61,6 +63,7 @@ from neutron_lib import exceptions as n_exc
 from neutron_lib.exceptions import allowedaddresspairs as addr_exc
 from neutron_lib.exceptions import l3 as l3_exc
 from neutron_lib.exceptions import port_security as psec_exc
+from neutron_lib.plugins import directory
 from neutron_lib.plugins import utils as plugin_utils
 from neutron_lib import rpc as n_rpc
 from neutron_lib.services.qos import constants as qos_consts
@@ -182,6 +185,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         """Should be implemented by each plugin"""
         pass
 
+    @property
+    def support_external_port_tagging(self):
+        # oslo_messaging_notifications must be defined for this to work
+        if (cfg.CONF.oslo_messaging_notifications.driver and
+            self._get_conf_attr('support_nsx_port_tagging')):
+            return True
+        return False
+
+    def update_port_nsx_tags(self, context, port_id, tags, is_delete=False):
+        """Can be implemented by each plugin to update the backend port tags"""
+        pass
+
     def start_rpc_listeners(self):
         if self.start_rpc_listeners_called:
             # If called more than once - we should not create it again
@@ -196,7 +211,45 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                   fanout=False)
         self.start_rpc_listeners_called = True
 
+        if self.support_external_port_tagging:
+            self.start_tagging_rpc_listener()
+
         return self.conn.consume_in_threads()
+
+    def start_tagging_rpc_listener(self):
+        # Add listener for tags plugin notifications
+        transport = oslo_messaging.get_notification_transport(cfg.CONF)
+        targets = [oslo_messaging.Target(
+            topic=cfg.CONF.oslo_messaging_notifications.topics[0])]
+        endpoints = [TagsCallbacks()]
+        pool = "tags-listeners"
+        server = oslo_messaging.get_notification_listener(transport, targets,
+                                                          endpoints, pool=pool)
+        server.start()
+        server.wait()
+
+    def _translate_external_tag(self, external_tag, port_id):
+        tag_parts = external_tag.split(':')
+        if len(tag_parts) != 2:
+            LOG.warning("Skipping tag %s for port %s: wrong format",
+                        external_tag, port_id)
+        else:
+            return {'scope': tag_parts[0][:nsxlib_utils.MAX_RESOURCE_TYPE_LEN],
+                    'tag': tag_parts[1][:nsxlib_utils.MAX_TAG_LEN]}
+
+    def _translate_external_tags(self, external_tags, port_id):
+        new_tags = []
+        for tag in external_tags:
+            new_tag = self._translate_external_tag(tag, port_id)
+            if new_tag:
+                new_tags.append(new_tag)
+        return new_tags
+
+    def get_external_tags_for_port(self, context, port_id):
+        tags_plugin = directory.get_plugin(tagging.TAG_PLUGIN_TYPE)
+        if tags_plugin:
+            extra_tags = tags_plugin.get_tags(context, 'ports', port_id)
+            return self._translate_external_tags(extra_tags['tags'], port_id)
 
     def _get_interface_subnet(self, context, interface_info):
         is_port, is_sub = self._validate_interface_info(interface_info)
@@ -2659,3 +2712,28 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if self.fwaas_callbacks and self.fwaas_callbacks.fwaas_enabled:
             ports = self._get_router_interfaces(context, router.id)
             return self.fwaas_callbacks.router_with_fwg(context, ports)
+
+
+class TagsCallbacks(object):
+
+    target = oslo_messaging.Target(
+        namespace=None,
+        version='1.0')
+
+    def __init__(self, **kwargs):
+        super(TagsCallbacks, self).__init__()
+
+    def info(self, ctxt, publisher_id, event_type, payload, metadata):
+        # Make sure we catch only tags operations, and each one only once
+        # tagging events look like 'tag.create/delete.start/end'
+        if (event_type.startswith('tag.') and
+            event_type.endswith('.end')):
+            action = event_type.split('.')[1]
+            is_delete = (action == 'delete')
+            # Currently support only ports tags
+            if payload.get('parent_resource') == 'ports':
+                core_plugin = directory.get_plugin()
+                port_id = payload.get('parent_resource_id')
+                core_plugin.update_port_nsx_tags(ctxt, port_id,
+                                                 payload.get('tags'),
+                                                 is_delete=is_delete)
