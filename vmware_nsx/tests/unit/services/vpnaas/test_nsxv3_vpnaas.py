@@ -633,6 +633,7 @@ class TestVpnaasDriver(test_plugin.NsxV3PluginTestCaseMixin):
                                   return_value=FAKE_ROUTER),\
                 mock.patch.object(self.plugin, 'get_ports',
                                   return_value=[dummy_port]),\
+                mock.patch.object(self.plugin, 'delete_port'),\
                 mock.patch.object(self.plugin.nsxlib.logical_router, 'get',
                                   return_value=tier0_rtr):
                 self.driver.create_vpnservice(self.context, FAKE_VPNSERVICE)
@@ -692,6 +693,7 @@ class TestVpnaasDriver(test_plugin.NsxV3PluginTestCaseMixin):
                                   return_value=FAKE_ROUTER),\
                 mock.patch.object(self.plugin, 'get_ports',
                                   return_value=[dummy_port]),\
+                mock.patch.object(self.plugin, 'delete_port'),\
                 mock.patch.object(self.plugin.nsxlib.logical_router, 'get',
                                   return_value=tier0_rtr):
                 self.driver.create_vpnservice(self.context, FAKE_VPNSERVICE)
@@ -703,6 +705,8 @@ class TestVpnaasDriver(test_plugin.NsxV3PluginTestCaseMixin):
                 with mock.patch.object(
                     self.nsxlib_vpn.service, 'list',
                     return_value={'results': nsx_services}),\
+                    mock.patch.object(self.service_plugin, 'get_vpnservices',
+                                   return_value=[{'id': 'dummy', 'router_id': 'dummy'}]),\
                     mock.patch.object(self.nsxlib_vpn.service,
                                       'delete') as delete_service:
                     self.driver.delete_vpnservice(
@@ -714,6 +718,8 @@ class TestVpnaasDriver(test_plugin.NsxV3PluginTestCaseMixin):
                     return_value={'results': nsx_services}),\
                     mock.patch.object(self.service_plugin, 'get_vpnservices',
                                       return_value=[]),\
+                    mock.patch.object(self.service_plugin, 'get_vpnservices',
+                                   return_value=[]),\
                     mock.patch.object(self.nsxlib_vpn.service,
                                       'delete') as delete_service:
                     self.driver.delete_vpnservice(

@@ -356,7 +356,7 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
         if ep_list['results']:
             return ep_list['results'][0]['id']
 
-    def _get_local_endpoint(self, context, connection, vpnservice):
+    def _get_local_endpoint(self, context, vpnservice):
         """Get the id of the local endpoint for a service
 
         The NSX allows only one local endpoint per local address
@@ -386,18 +386,22 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
         if ports:
             return ports[0]
 
-    def _delete_local_endpoint(self, resource, event, trigger, **kwargs):
-        """Upon router deletion / gw removal delete the matching endpoint"""
-        router_id = kwargs.get('router_id')
+    def _delete_local_endpoint_by_router(self, context, router_id):
         # delete the local endpoint from the NSX
         local_ep_id = self._search_local_endpint(router_id)
         if local_ep_id:
             self._nsx_vpn.local_endpoint.delete(local_ep_id)
         # delete the neutron port with this IP
-        ctx = n_context.get_admin_context()
-        port = self._find_vpn_service_port(ctx, router_id)
+        port = self._find_vpn_service_port(context, router_id)
         if port:
-            self.l3_plugin.delete_port(ctx, port['id'], force_delete_vpn=True)
+            self.l3_plugin.delete_port(context, port['id'],
+                                       force_delete_vpn=True)
+
+    def _delete_local_endpoint(self, resource, event, trigger, **kwargs):
+        """Upon router deletion / gw removal delete the matching endpoint"""
+        router_id = kwargs.get('router_id')
+        ctx = n_context.get_admin_context()
+        self._delete_local_endpoint_by_router(ctx, router_id)
 
     def _check_subnets_overlap_with_all_conns(self, context, subnets):
         # find all vpn services with connections
@@ -556,8 +560,7 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
             LOG.debug("Created NSX peer endpoint %s", peer_ep_id)
 
             # create or reuse a local endpoint using the vpn service
-            local_ep_id = self._get_local_endpoint(
-                context, ipsec_site_conn, vpnservice)
+            local_ep_id = self._get_local_endpoint(context, vpnservice)
 
             # Finally: create the session with policy rules
             rules = self._get_session_rules(
@@ -698,7 +701,8 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
 
         return service['id']
 
-    def _get_tier0_uuid(self, context, router_id):
+    def _get_tier0_uuid(self, context, vpnservice):
+        router_id = vpnservice['router_id']
         router_db = self._core_plugin._get_router(context, router_id)
         return self._core_plugin._get_tier0_uuid_by_router(context, router_db)
 
@@ -722,8 +726,7 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
     def _create_vpn_service_if_needed(self, context, vpnservice):
         # The service is created on the TIER0 router attached to the router GW
         # The NSX can keep only one service per tier0 router so we reuse it
-        router_id = vpnservice['router_id']
-        tier0_uuid = self._get_tier0_uuid(context, router_id)
+        tier0_uuid = self._get_tier0_uuid(context, vpnservice)
         if self._find_vpn_service(tier0_uuid):
             return
 
@@ -731,23 +734,44 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
         self._create_vpn_service(tier0_uuid)
 
     def _delete_vpn_service_if_needed(self, context, vpnservice):
-        # Delete the VPN service on the NSX if no other service uses it
-        filters = {'router_id': [vpnservice['router_id']]}
-        services = self.vpn_plugin.get_vpnservices(
-            context.elevated(), filters=filters)
-        if not services:
-            srv_id = self._get_nsx_vpn_service(context, vpnservice)
-            if not srv_id:
+        # Delete the VPN service on the NSX if no other service connected
+        # to the same tier0 use it
+        elev_context = context.elevated()
+        tier0_uuid = self._get_tier0_uuid(elev_context, vpnservice)
+        all_services = self.vpn_plugin.get_vpnservices(elev_context)
+        for srv in all_services:
+            if (srv['id'] != vpnservice['id'] and
+                self._get_tier0_uuid(elev_context, srv) == tier0_uuid):
+                LOG.info("Not deleting vpn service from the NSX as other "
+                         "neutron vpn services still use it.")
                 return
-            try:
-                self._nsx_vpn.service.delete(srv_id)
-            except Exception as e:
-                LOG.error("Failed to delete VPN service %s: %s",
-                          srv_id, e)
+
+        # Find the NSX-ID
+        srv_id = self._get_nsx_vpn_service(elev_context, vpnservice)
+        if not srv_id:
+            LOG.error("Not deleting vpn service from the NSX as the "
+                      "service was not found on the NSX.")
+            return
+        try:
+            self._nsx_vpn.service.delete(srv_id)
+        except Exception as e:
+            LOG.error("Failed to delete VPN service %s: %s",
+                      srv_id, e)
+
+    def _delete_local_endpoints_if_needed(self, context, vpnservice):
+        """When deleting the last service of a logical router
+        delete its local endpoint
+        """
+        router_id = vpnservice['router_id']
+        elev_context = context.elevated()
+        filters = {'router_id': [router_id]}
+        services = self.vpn_plugin.get_vpnservices(
+            elev_context, filters=filters)
+        if not services:
+            self._delete_local_endpoint_by_router(elev_context, router_id)
 
     def _get_nsx_vpn_service(self, context, vpnservice):
-        router_id = vpnservice['router_id']
-        tier0_uuid = self._get_tier0_uuid(context, router_id)
+        tier0_uuid = self._get_tier0_uuid(context, vpnservice)
         return self._find_vpn_service(tier0_uuid, validate=False)
 
     def _get_service_local_address(self, context, vpnservice):
@@ -817,4 +841,5 @@ class NSXv3IPsecVpnDriver(service_drivers.VpnDriver):
                                          enabled=connection_enabled)
 
     def delete_vpnservice(self, context, vpnservice):
+        self._delete_local_endpoints_if_needed(context, vpnservice)
         self._delete_vpn_service_if_needed(context, vpnservice)
