@@ -175,7 +175,7 @@ class NSXClient(object):
             self.cleanup_tier1_nat_rules(rtr['id'])
             try:
                 self.nsxpolicy.tier1.delete_locale_service(rtr['id'])
-            except exceptions.ManagerError as e:
+            except exceptions.ManagerError:
                 # Not always exists
                 pass
             try:

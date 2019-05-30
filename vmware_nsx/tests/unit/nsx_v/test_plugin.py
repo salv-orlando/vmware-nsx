@@ -2697,31 +2697,33 @@ class L3NatTestCaseBase(test_l3_plugin.L3NatTestCaseMixin):
         to a router places them all on the same router interface.
         """
         with self.router() as r, self.network() as n:
-            with (self.subnet(network=n, cidr='fd00::1/64',
-                              enable_dhcp=False, ip_version=6)
-                  ) as s1, self.subnet(network=n, cidr='fd01::1/64',
-                                       ip_version=6, enable_dhcp=False) as s2:
-                    body = self._router_interface_action('add',
-                                                         r['router']['id'],
-                                                         s1['subnet']['id'],
-                                                         None)
-                    pid1 = body['port_id']
-                    body = self._router_interface_action('add',
-                                                         r['router']['id'],
-                                                         s2['subnet']['id'],
-                                                         None)
-                    pid2 = body['port_id']
-                    self.assertEqual(pid1, pid2)
-                    port = self._show('ports', pid1)
-                    self.assertEqual(2, len(port['port']['fixed_ips']))
-                    port_subnet_ids = [fip['subnet_id'] for fip in
-                                       port['port']['fixed_ips']]
-                    self.assertIn(s1['subnet']['id'], port_subnet_ids)
-                    self.assertIn(s2['subnet']['id'], port_subnet_ids)
-                    self._router_interface_action('remove', r['router']['id'],
-                                                  s1['subnet']['id'], None)
-                    self._router_interface_action('remove', r['router']['id'],
-                                                  s2['subnet']['id'], None)
+            with self.subnet(
+                    network=n, cidr='fd00::1/64',
+                    enable_dhcp=False, ip_version=6) as s1, self.subnet(
+                network=n, cidr='fd01::1/64',
+                    ip_version=6, enable_dhcp=False) as s2:
+
+                body = self._router_interface_action('add',
+                                                     r['router']['id'],
+                                                     s1['subnet']['id'],
+                                                     None)
+                pid1 = body['port_id']
+                body = self._router_interface_action('add',
+                                                     r['router']['id'],
+                                                     s2['subnet']['id'],
+                                                     None)
+                pid2 = body['port_id']
+                self.assertEqual(pid1, pid2)
+                port = self._show('ports', pid1)
+                self.assertEqual(2, len(port['port']['fixed_ips']))
+                port_subnet_ids = [fip['subnet_id'] for fip in
+                                   port['port']['fixed_ips']]
+                self.assertIn(s1['subnet']['id'], port_subnet_ids)
+                self.assertIn(s2['subnet']['id'], port_subnet_ids)
+                self._router_interface_action('remove', r['router']['id'],
+                                              s1['subnet']['id'], None)
+                self._router_interface_action('remove', r['router']['id'],
+                                              s2['subnet']['id'], None)
 
     def test_router_add_interface_ipv6_port_existing_network_returns_400(self):
         """Ensure unique IPv6 router ports per network id.
@@ -5379,36 +5381,36 @@ class TestSharedRouterTestCase(L3NatTest, L3NatTestCaseBase,
                 ext_subnet['subnet']['network_id'])
 
     def test_routers_with_interface_on_same_edge(self):
-            with self.router() as r1, self.router() as r2,\
-                    self.subnet(cidr='11.0.0.0/24') as s11,\
-                    self.subnet(cidr='12.0.0.0/24') as s12:
-                self._router_interface_action('add',
-                                              r1['router']['id'],
-                                              s11['subnet']['id'],
-                                              None)
-                self._router_interface_action('add',
-                                              r2['router']['id'],
-                                              s12['subnet']['id'],
-                                              None)
-                routers_expected = [r1['router']['id'], r2['router']['id']]
-                routers_1 = (self.plugin_instance.edge_manager.
-                             get_routers_on_same_edge(
-                                 context.get_admin_context(),
-                                 r1['router']['id']))
-                self.assertEqual(set(routers_expected), set(routers_1))
-                routers_2 = (self.plugin_instance.edge_manager.
-                             get_routers_on_same_edge(
-                                 context.get_admin_context(),
-                                 r2['router']['id']))
-                self.assertEqual(set(routers_expected), set(routers_2))
-                self._router_interface_action('remove',
-                                              r1['router']['id'],
-                                              s11['subnet']['id'],
-                                              None)
-                self._router_interface_action('remove',
-                                              r2['router']['id'],
-                                              s12['subnet']['id'],
-                                              None)
+        with self.router() as r1, self.router() as r2,\
+                self.subnet(cidr='11.0.0.0/24') as s11,\
+                self.subnet(cidr='12.0.0.0/24') as s12:
+            self._router_interface_action('add',
+                                          r1['router']['id'],
+                                          s11['subnet']['id'],
+                                          None)
+            self._router_interface_action('add',
+                                          r2['router']['id'],
+                                          s12['subnet']['id'],
+                                          None)
+            routers_expected = [r1['router']['id'], r2['router']['id']]
+            routers_1 = (self.plugin_instance.edge_manager.
+                         get_routers_on_same_edge(
+                             context.get_admin_context(),
+                             r1['router']['id']))
+            self.assertEqual(set(routers_expected), set(routers_1))
+            routers_2 = (self.plugin_instance.edge_manager.
+                         get_routers_on_same_edge(
+                             context.get_admin_context(),
+                             r2['router']['id']))
+            self.assertEqual(set(routers_expected), set(routers_2))
+            self._router_interface_action('remove',
+                                          r1['router']['id'],
+                                          s11['subnet']['id'],
+                                          None)
+            self._router_interface_action('remove',
+                                          r2['router']['id'],
+                                          s12['subnet']['id'],
+                                          None)
 
     def test_routers_with_overlap_interfaces(self):
         with self.router() as r1, self.router() as r2,\

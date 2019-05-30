@@ -291,7 +291,7 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                 with locking.LockManager.get_lock(edge_id):
                     self.vcns.delete_app_profile(edge_id, app_profile_id)
             except (vcns_exc.ResourceNotFound, vcns_exc.RequestBad):
-                    LOG.error('app profile not found on edge: %s', edge_id)
+                LOG.error('app profile not found on edge: %s', edge_id)
             except vcns_exc.VcnsApiException:
                 LOG.error('Failed to delete app profile on Edge: %s', edge_id)
 

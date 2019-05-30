@@ -104,8 +104,9 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             ssl_profile_binding = self._upload_certificate(
                 listener['id'], listener['default_tls_container_id'], tags,
                 certificate=certificate)
-            if (listener['protocol'] == lb_const.LB_PROTOCOL_TERMINATED_HTTPS
-                and ssl_profile_binding):
+            if (listener['protocol'] ==
+                    lb_const.LB_PROTOCOL_TERMINATED_HTTPS and
+                    ssl_profile_binding):
                 kwargs.update(ssl_profile_binding)
 
         waf_profile, mode = self.core_plugin.get_waf_profile_path_and_mode()

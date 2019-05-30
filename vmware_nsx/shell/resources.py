@@ -71,6 +71,7 @@ class Operations(enum.Enum):
     VALIDATE = 'validate'
     REUSE = 'reuse'
 
+
 ops = [op.value for op in Operations]
 
 

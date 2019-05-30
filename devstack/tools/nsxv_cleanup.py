@@ -253,7 +253,7 @@ class VSMClient(object):
         # Query all firewall sections
         response = self.get()
         # Get layer3 sections related to security group
-        if response.status_code is 200:
+        if response.status_code == 200:
             l3_sections = response.json()['layer3Sections']['layer3Sections']
             # do not delete the default section, or sections created by the
             # service composer
@@ -289,7 +289,7 @@ class VSMClient(object):
         self.__set_endpoint("/services/securitygroup/scope/globalroot-0")
         # Query all security groups
         response = self.get()
-        if response.status_code is 200:
+        if response.status_code == 200:
             sg_all = response.json()
         else:
             print("ERROR: wrong response status code! Exiting...")
@@ -323,7 +323,7 @@ class VSMClient(object):
         self.__set_endpoint("/services/spoofguard/policies/")
         # Query all spoofguard policies
         response = self.get()
-        if response.status_code is not 200:
+        if response.status_code != 200:
             print("ERROR: Faield to get spoofguard policies")
             return
         sgp_all = response.json()
@@ -395,7 +395,7 @@ def ceil(a, b):
     if b == 0:
         return 0
     div = a / b
-    mod = 0 if a % b is 0 else 1
+    mod = 0 if a % b == 0 else 1
     return int(div + mod)
 
 

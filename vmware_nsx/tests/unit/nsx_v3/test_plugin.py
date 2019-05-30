@@ -569,7 +569,7 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                 'provider:physical_network': 'xxx',
                 'port_security_enabled': True}}
         with mock_ens, mock_tz, mock_tt:
-                self.plugin.create_network(context.get_admin_context(), data)
+            self.plugin.create_network(context.get_admin_context(), data)
 
     def test_create_ens_network_with_qos(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
@@ -590,11 +590,11 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                 'provider:physical_network': 'xxx',
                 'qos_policy_id': policy_id,
                 'port_security_enabled': False}}
-        with mock_ens, mock_tz, mock_tt,\
-            mock.patch.object(self.plugin, '_validate_qos_policy_id'):
-                self.assertRaises(n_exc.InvalidInput,
-                                  self.plugin.create_network,
-                                  context.get_admin_context(), data)
+        with mock_ens, mock_tz, mock_tt, mock.patch.object(
+                self.plugin, '_validate_qos_policy_id'):
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.create_network,
+                              context.get_admin_context(), data)
 
     def test_update_ens_network_with_qos(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
@@ -720,13 +720,14 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                             pnet.PHYSICAL_NETWORK:
                                 'fb69d878-958e-4f32-84e4-50286f26226b'}
 
-        with mock.patch('vmware_nsxlib.v3.core_resources.NsxLibTransportZone.'
-                        'get_transport_type', return_value='VLAN'):
+        gtt_path = "vmware_nsxlib.v3.core_resources." \
+                   "NsxLibTransportZone.get_transport_type"
+        with mock.patch(gtt_path, return_value='VLAN'):
             with self.network(name=name, providernet_args=providernet_args,
                               arg_list=(pnet.NETWORK_TYPE,
                                         pnet.PHYSICAL_NETWORK)) as net:
                 for k, v in expected:
-                        self.assertEqual(net['network'][k], v)
+                    self.assertEqual(net['network'][k], v)
 
     def test_create_phys_vlan_generate(self):
         cfg.CONF.set_override('network_vlan_ranges',
@@ -1069,27 +1070,27 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                 self.plugin.update_port, self.ctx, port['id'], data)
 
     def test_fail_create_allowed_address_pairs_over_limit(self):
-        with self.network() as network,\
-                self.subnet(network=network, enable_dhcp=True) as s1:
-                    data = {'port': {
-                        'network_id': network['network']['id'],
-                        'tenant_id': self._tenant_id,
-                        'name': 'pair_port',
-                        'admin_state_up': True,
-                        'device_id': 'fake_device',
-                        'device_owner': 'fake_owner',
-                        'fixed_ips': [{'subnet_id': s1['subnet']['id']}]
-                                }
-                            }
-                    count = 1
-                    address_pairs = []
-                    while count < 129:
-                        address_pairs.append({'ip_address': '10.0.0.%s' %
-                                                            count})
-                        count += 1
-                    data['port']['allowed_address_pairs'] = address_pairs
-                    self.assertRaises(n_exc.InvalidInput,
-                                      self.plugin.create_port, self.ctx, data)
+        with self.network() as network, self.subnet(
+                network=network, enable_dhcp=True) as s1:
+            data = {
+                'port': {
+                    'network_id': network['network']['id'],
+                    'tenant_id': self._tenant_id,
+                    'name': 'pair_port',
+                    'admin_state_up': True,
+                    'device_id': 'fake_device',
+                    'device_owner': 'fake_owner',
+                    'fixed_ips': [{'subnet_id': s1['subnet']['id']}]
+                }
+            }
+            count = 1
+            address_pairs = []
+            while count < 129:
+                address_pairs.append({'ip_address': '10.0.0.%s' % count})
+                count += 1
+            data['port']['allowed_address_pairs'] = address_pairs
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.create_port, self.ctx, data)
 
     def test_fail_update_lb_port_with_fixed_ip(self):
         with self.network() as network:
@@ -3171,21 +3172,20 @@ class TestL3NatTestCase(L3NatTest,
         with self.subnet(cidr='30.0.0.0/24', gateway_ip=None) as private_sub:
             with self.port(
                 subnet=private_sub,
-                device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
+                    device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
                 port_id = p['port']['id']
                 with self.router() as r:
                     self._router_interface_action('add', r['router']['id'],
                                                   None, port_id)
-            with self.external_network() as public_net,\
-                self.subnet(
+            with self.external_network() as public_net, self.subnet(
                     network=public_net, cidr='12.0.0.0/24') as public_sub:
-                    self._add_external_gateway_to_router(
-                            r['router']['id'],
-                            public_sub['subnet']['network_id'])
-                    self._make_floatingip(
-                        self.fmt, public_sub['subnet']['network_id'],
-                        port_id=port_id,
-                        http_status=exc.HTTPBadRequest.code)
+                self._add_external_gateway_to_router(
+                        r['router']['id'],
+                        public_sub['subnet']['network_id'])
+                self._make_floatingip(
+                    self.fmt, public_sub['subnet']['network_id'],
+                    port_id=port_id,
+                    http_status=exc.HTTPBadRequest.code)
 
     def test_assign_floatingip_to_router_interface_device_owner_fail(self):
         # This tests that an error is raised when trying to assign a router
@@ -3194,22 +3194,21 @@ class TestL3NatTestCase(L3NatTest,
         with self.subnet(cidr='30.0.0.0/24', gateway_ip=None) as private_sub:
             with self.port(
                 subnet=private_sub,
-                device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
+                    device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
                 port_id = p['port']['id']
                 with self.router() as r:
                     self._router_interface_action('add', r['router']['id'],
                                                   None, port_id)
-            with self.external_network() as public_net,\
-                self.subnet(
+            with self.external_network() as public_net, self.subnet(
                     network=public_net, cidr='12.0.0.0/24') as public_sub:
-                    self._add_external_gateway_to_router(
-                            r['router']['id'],
-                            public_sub['subnet']['network_id'])
-                    fip = self._make_floatingip(self.fmt, public_sub[
-                        'subnet']['network_id'])
-                    self._update('floatingips', fip['floatingip'][
-                        'id'], {'floatingip': {'port_id': port_id}},
-                                expected_code=exc.HTTPBadRequest.code)
+                self._add_external_gateway_to_router(
+                        r['router']['id'],
+                        public_sub['subnet']['network_id'])
+                fip = self._make_floatingip(self.fmt, public_sub[
+                    'subnet']['network_id'])
+                self._update('floatingips', fip['floatingip'][
+                    'id'], {'floatingip': {'port_id': port_id}},
+                            expected_code=exc.HTTPBadRequest.code)
 
 
 class ExtGwModeTestCase(test_ext_gw_mode.ExtGwModeIntTestCase,

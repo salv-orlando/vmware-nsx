@@ -45,13 +45,14 @@ class DhcpAgentNotifyAPI(dhcp_rpc_agent_api.DhcpAgentNotifyAPI):
         if lsn_exists:
             # if lsn exists, the network is one created with the new model
             if (resource == 'subnet' and action == 'create' and
-                const.DEVICE_OWNER_DHCP not in plugin.port_special_owners):
+                    const.DEVICE_OWNER_DHCP not in
+                    plugin.port_special_owners):
                 # network/subnet provisioned in the new model have a plain
                 # nsx lswitch port, no vif attachment
-                    plugin.port_special_owners.append(const.DEVICE_OWNER_DHCP)
-                    treat_dhcp_owner_specially = True
+                plugin.port_special_owners.append(const.DEVICE_OWNER_DHCP)
+                treat_dhcp_owner_specially = True
             if (resource == 'port' and action == 'update' or
-                resource == 'subnet'):
+                    resource == 'subnet'):
                 self.agentless_notifier.notify(context, data, methodname)
         elif not lsn_exists and resource in ['port', 'subnet']:
             # call notifier for the agent-based mode

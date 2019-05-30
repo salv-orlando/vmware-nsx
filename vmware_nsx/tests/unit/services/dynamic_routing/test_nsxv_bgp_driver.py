@@ -297,11 +297,11 @@ class TestNSXvBgpPlugin(test_plugin.NsxVPluginV2TestCase,
         self.skipTest('No SNAT with floating ips not supported')
 
     def test_add_bgp_peer_with_bad_id(self):
-            with self.subnetpool_with_address_scope(
+        with self.subnetpool_with_address_scope(
                 4, prefixes=['8.0.0.0/8']) as sp:
-                with self.bgp_speaker(sp['ip_version'], 1234) as speaker:
-                    self.assertRaises(ext_bgp.BgpPeerNotFound,
-                                      self.bgp_plugin.add_bgp_peer,
-                                      self.context,
-                                      speaker['id'],
-                                      {'bgp_peer_id': 'aaa'})
+            with self.bgp_speaker(sp['ip_version'], 1234) as speaker:
+                self.assertRaises(ext_bgp.BgpPeerNotFound,
+                                  self.bgp_plugin.add_bgp_peer,
+                                  self.context,
+                                  speaker['id'],
+                                  {'bgp_peer_id': 'aaa'})

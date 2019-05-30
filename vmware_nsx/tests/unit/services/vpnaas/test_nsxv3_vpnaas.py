@@ -315,31 +315,31 @@ class TestDriverValidation(base.BaseTestCase):
             else:
                 return connections
 
-        with mock.patch.object(self.validator.vpn_plugin, '_get_vpnservice',
-                               side_effect=mock_get_service),\
-            mock.patch.object(self.validator._core_plugin, 'get_routers',
-                              side_effect=mock_get_routers),\
-            mock.patch.object(self.validator._core_plugin,
-                              '_find_router_subnets_cidrs',
-                              return_value=router_subnets),\
-            mock.patch.object(self.validator.vpn_plugin,
-                              'get_ipsec_site_connections',
-                              side_effect=mock_get_connections):
-                ipsec_sitecon = {'id': '1',
-                                 'vpnservice_id': '1',
-                                 'mtu': 1500,
-                                 'peer_address': self.peer_address,
-                                 'peer_cidrs': [self.peer_cidr]}
-                if conn_params:
-                    ipsec_sitecon.update(conn_params)
-                if success:
-                    self.validator.validate_ipsec_site_connection(
-                        self.context, ipsec_sitecon)
-                else:
-                    self.assertRaises(
-                        nsx_exc.NsxVpnValidationError,
-                        self.validator.validate_ipsec_site_connection,
-                        self.context, ipsec_sitecon)
+        with mock.patch.object(
+                self.validator.vpn_plugin, '_get_vpnservice',
+                side_effect=mock_get_service), mock.patch.object(
+            self.validator._core_plugin, 'get_routers',
+            side_effect=mock_get_routers), mock.patch.object(
+            self.validator._core_plugin, '_find_router_subnets_cidrs',
+            return_value=router_subnets), mock.patch.object(
+            self.validator.vpn_plugin, 'get_ipsec_site_connections',
+                side_effect=mock_get_connections):
+
+            ipsec_sitecon = {'id': '1',
+                             'vpnservice_id': '1',
+                             'mtu': 1500,
+                             'peer_address': self.peer_address,
+                             'peer_cidrs': [self.peer_cidr]}
+            if conn_params:
+                ipsec_sitecon.update(conn_params)
+            if success:
+                self.validator.validate_ipsec_site_connection(
+                    self.context, ipsec_sitecon)
+            else:
+                self.assertRaises(
+                    nsx_exc.NsxVpnValidationError,
+                    self.validator.validate_ipsec_site_connection,
+                    self.context, ipsec_sitecon)
 
     def test_dpd_validation(self):
         params = {'dpd': {'action': 'hold',
@@ -705,8 +705,9 @@ class TestVpnaasDriver(test_plugin.NsxV3PluginTestCaseMixin):
                 with mock.patch.object(
                     self.nsxlib_vpn.service, 'list',
                     return_value={'results': nsx_services}),\
-                    mock.patch.object(self.service_plugin, 'get_vpnservices',
-                                   return_value=[{'id': 'dummy', 'router_id': 'dummy'}]),\
+                    mock.patch.object(
+                        self.service_plugin, 'get_vpnservices',
+                        return_value=[{'id': 'dummy', 'router_id': 'dummy'}]),\
                     mock.patch.object(self.nsxlib_vpn.service,
                                       'delete') as delete_service:
                     self.driver.delete_vpnservice(

@@ -1555,6 +1555,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if (actions['remove_router_link_port'] or
             actions['add_router_link_port']):
             # GW was changed. update GW and route advertisement
+            # pylint: disable=unexpected-keyword-arg
             self.nsxpolicy.tier1.update_route_advertisement(
                 router_id,
                 nat=actions['advertise_route_nat_flag'],

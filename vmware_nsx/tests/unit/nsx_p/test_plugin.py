@@ -552,11 +552,11 @@ class NsxPTestNetworks(test_db_base_plugin_v2.TestNetworksV2,
                 'provider:physical_network': 'xxx',
                 'qos_policy_id': policy_id,
                 'port_security_enabled': False}}
-        with mock_ens, mock_tz, mock_tt,\
-            mock.patch.object(self.plugin, '_validate_qos_policy_id'):
-                self.assertRaises(n_exc.InvalidInput,
-                                  self.plugin.create_network,
-                                  context.get_admin_context(), data)
+        with mock_ens, mock_tz, mock_tt, mock.patch.object(
+                self.plugin, '_validate_qos_policy_id'):
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.create_network,
+                              context.get_admin_context(), data)
 
     def test_update_ens_network_with_qos(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
@@ -1660,38 +1660,38 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                         "NsxPolicySegmentApi.update") as seg_update:
 
             with self.router() as r, self.network() as n:
-                with self.subnet(network=n, cidr='fd00::0/64',
-                                 gateway_ip='fd00::1', ip_version=6,
-                                 enable_dhcp=False) as s6, \
-                    self.subnet(network=n, cidr='2.0.0.0/24',
-                                gateway_ip='2.0.0.1') as s4:
+                with self.subnet(
+                    network=n, cidr='fd00::0/64', gateway_ip='fd00::1',
+                        ip_version=6, enable_dhcp=False) as s6, self.subnet(
+                        network=n, cidr='2.0.0.0/24',
+                        gateway_ip='2.0.0.1') as s4:
 
-                        subnets = []
-                        if s6_first:
-                            self._router_interface_action('add',
-                                                          r['router']['id'],
-                                                          s6['subnet']['id'],
-                                                          None)
-                            subnets.append(s6['subnet']['cidr'])
-
+                    subnets = []
+                    if s6_first:
                         self._router_interface_action('add',
                                                       r['router']['id'],
-                                                      s4['subnet']['id'],
+                                                      s6['subnet']['id'],
                                                       None)
-                        subnets.append(s4['subnet']['cidr'])
+                        subnets.append(s6['subnet']['cidr'])
 
-                        if not s6_first:
-                            self._router_interface_action('add',
-                                                          r['router']['id'],
-                                                          s6['subnet']['id'],
-                                                          None)
-                            subnets.append(s6['subnet']['cidr'])
+                    self._router_interface_action('add',
+                                                  r['router']['id'],
+                                                  s4['subnet']['id'],
+                                                  None)
+                    subnets.append(s4['subnet']['cidr'])
 
-                        # We expect two subnet objects on segment
-                        seg_update.assert_called_with(
-                            n['network']['id'],
-                            subnets=[mock.ANY, mock.ANY],
-                            tier1_id=r['router']['id'])
+                    if not s6_first:
+                        self._router_interface_action('add',
+                                                      r['router']['id'],
+                                                      s6['subnet']['id'],
+                                                      None)
+                        subnets.append(s6['subnet']['cidr'])
+
+                    # We expect two subnet objects on segment
+                    seg_update.assert_called_with(
+                        n['network']['id'],
+                        subnets=[mock.ANY, mock.ANY],
+                        tier1_id=r['router']['id'])
 
     def test_router_add_v4_v6_subnets(self):
         self._test_router_add_dual_stack_subnets()
@@ -2031,21 +2031,20 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
         path_prefix = ("/infra/sites/default/enforcement-points/default/"
                        "edge-clusters/")
         # create a router and external network
-        with self.router() as r,\
-            self._create_l3_ext_network() as ext_net,\
-            self.subnet(network=ext_net, cidr='10.0.1.0/24',
-                        enable_dhcp=False) as s,\
-            mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                       "NsxPolicyTier1Api.get_edge_cluster_path",
-                       return_value=False),\
-            mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                       "NsxPolicyTier1Api.set_edge_cluster_path"
-                       ) as add_srv_router:
-                self._add_external_gateway_to_router(
-                    r['router']['id'],
-                    s['subnet']['network_id'])
-                add_srv_router.assert_called_once_with(
-                    mock.ANY, '%s%s' % (path_prefix, edge_cluster))
+        with self.router() as r, self._create_l3_ext_network() as ext_net, \
+                self.subnet(
+                    network=ext_net, cidr='10.0.1.0/24',
+                    enable_dhcp=False) as s, mock.patch(
+            "vmware_nsxlib.v3.policy.core_resources."
+            "NsxPolicyTier1Api.get_edge_cluster_path",
+            return_value=False), mock.patch(
+            "vmware_nsxlib.v3.policy.core_resources."
+                "NsxPolicyTier1Api.set_edge_cluster_path") as add_srv_router:
+            self._add_external_gateway_to_router(
+                r['router']['id'],
+                s['subnet']['network_id'])
+            add_srv_router.assert_called_once_with(
+                mock.ANY, '%s%s' % (path_prefix, edge_cluster))
 
     def test_router_add_interface_cidr_overlapped_with_gateway(self):
         with self.router() as r,\
@@ -2127,22 +2126,22 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
 
         with self.subnet(cidr='30.0.0.0/24', gateway_ip=None) as private_sub:
             with self.port(
-                subnet=private_sub,
-                device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
+                    subnet=private_sub,
+                    device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
                 port_id = p['port']['id']
                 with self.router() as r:
                     self._router_interface_action('add', r['router']['id'],
                                                   None, port_id)
-            with self.external_network() as public_net,\
-                self.subnet(network=public_net, cidr='12.0.0.0/24',
-                            enable_dhcp=False) as public_sub:
-                    self._add_external_gateway_to_router(
-                            r['router']['id'],
-                            public_sub['subnet']['network_id'])
-                    self._make_floatingip(
-                        self.fmt, public_sub['subnet']['network_id'],
-                        port_id=port_id,
-                        http_status=exc.HTTPBadRequest.code)
+            with self.external_network() as public_net, self.subnet(
+                    network=public_net, cidr='12.0.0.0/24',
+                    enable_dhcp=False) as public_sub:
+                self._add_external_gateway_to_router(
+                        r['router']['id'],
+                        public_sub['subnet']['network_id'])
+                self._make_floatingip(
+                    self.fmt, public_sub['subnet']['network_id'],
+                    port_id=port_id,
+                    http_status=exc.HTTPBadRequest.code)
 
     def test_assign_floatingip_to_router_interface_device_owner_fail(self):
         # This tests that an error is raised when trying to assign a router
@@ -2150,20 +2149,20 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
 
         with self.subnet(cidr='30.0.0.0/24', gateway_ip=None) as private_sub:
             with self.port(
-                subnet=private_sub,
-                device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
+                    subnet=private_sub,
+                    device_owner=constants.DEVICE_OWNER_ROUTER_INTF) as p:
                 port_id = p['port']['id']
                 with self.router() as r:
                     self._router_interface_action('add', r['router']['id'],
                                                   None, port_id)
-            with self.external_network() as public_net,\
-                self.subnet(network=public_net, cidr='12.0.0.0/24',
-                            enable_dhcp=False) as public_sub:
-                    self._add_external_gateway_to_router(
-                            r['router']['id'],
-                            public_sub['subnet']['network_id'])
-                    fip = self._make_floatingip(self.fmt, public_sub[
-                        'subnet']['network_id'])
-                    self._update('floatingips', fip['floatingip'][
-                        'id'], {'floatingip': {'port_id': port_id}},
-                                expected_code=exc.HTTPBadRequest.code)
+            with self.external_network() as public_net, self.subnet(
+                    network=public_net, cidr='12.0.0.0/24',
+                    enable_dhcp=False) as public_sub:
+                self._add_external_gateway_to_router(
+                        r['router']['id'],
+                        public_sub['subnet']['network_id'])
+                fip = self._make_floatingip(self.fmt, public_sub[
+                    'subnet']['network_id'])
+                self._update('floatingips', fip['floatingip'][
+                    'id'], {'floatingip': {'port_id': port_id}},
+                            expected_code=exc.HTTPBadRequest.code)

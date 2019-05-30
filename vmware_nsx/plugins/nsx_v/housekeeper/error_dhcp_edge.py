@@ -296,14 +296,14 @@ class ErrorDhcpEdgeJob(base_job.BaseJob):
 
         if vnic['type'] != 'trunk':
             # reinitialize the interface as it is missing config
-                vnic['name'] = (vcns_const.INTERNAL_VNIC_NAME +
-                                str(vnic['index']))
-                vnic['type'] = 'trunk'
-                vnic['portgroupId'] = port_group_id
-                vnic['mtu'] = 1500
-                vnic['enableProxyArp'] = False
-                vnic['enableSendRedirects'] = True
-                vnic['isConnected'] = True
+            vnic['name'] = (vcns_const.INTERNAL_VNIC_NAME +
+                            str(vnic['index']))
+            vnic['type'] = 'trunk'
+            vnic['portgroupId'] = port_group_id
+            vnic['mtu'] = 1500
+            vnic['enableProxyArp'] = False
+            vnic['enableSendRedirects'] = True
+            vnic['isConnected'] = True
 
     def _update_router_bindings(self, context, edge_id):
         edge_router_binds = nsxv_db.get_nsxv_router_bindings_by_edge(

@@ -343,6 +343,7 @@ def nsx_fix_name_mismatch(resource, event, trigger, **kwargs):
                 'Edge %s has no backup prefix on NSX', edge_id)
             return
 
+
 registry.subscribe(nsx_list_backup_edges,
                    constants.BACKUP_EDGES,
                    shell.Operations.LIST.value)

@@ -266,14 +266,14 @@ class TestQosNsxV3Notification(base.BaseQosTestCase,
             self.ctxt, **self.policy_data['policy'])
         # add a rule to the policy
         setattr(_policy, "rules", [rule])
-        with mock.patch.object(QoSPolicy, 'get_object',
-                               return_value=_policy),\
-            mock.patch('neutron.objects.db.api.update_object',
-                       return_value=rule_data):
-                self.assertRaises(
-                    exceptions.DriverCallError,
-                    self.qos_plugin.update_policy_bandwidth_limit_rule,
-                    self.ctxt, rule.id, _policy.id, rule_data)
+        with mock.patch.object(
+            QoSPolicy, 'get_object', return_value=_policy), mock.patch(
+                'neutron.objects.db.api.update_object',
+                return_value=rule_data):
+            self.assertRaises(
+                exceptions.DriverCallError,
+                self.qos_plugin.update_policy_bandwidth_limit_rule,
+                self.ctxt, rule.id, _policy.id, rule_data)
 
     @mock.patch.object(QoSPolicy, '_reload_rules')
     def test_dscp_rule_create_profile(self, *mocks):
@@ -325,9 +325,9 @@ class TestQosNsxV3Notification(base.BaseQosTestCase,
         # add a rule to the policy
         setattr(policy, "rules", [min_bw_rule])
         with mock.patch.object(
-                QoSPolicy, 'get_object', return_value=policy),\
-            mock.patch('neutron.objects.db.api.'
-                       'update_object', return_value=self.dscp_rule_data):
+            QoSPolicy, 'get_object', return_value=policy), mock.patch(
+            'neutron.objects.db.api.update_object',
+                return_value=self.dscp_rule_data):
             self.assertRaises(
                 exceptions.DriverCallError,
                 self.qos_plugin.update_policy_minimum_bandwidth_rule,
