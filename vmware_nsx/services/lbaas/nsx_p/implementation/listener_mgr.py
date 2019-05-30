@@ -134,6 +134,19 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         return app_client
 
+    def _validate_default_pool(self, listener, completor):
+        l_pool_id = listener.get('default_pool_id')
+        if l_pool_id:
+            vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
+            vs_list = vs_client.list()
+            for vs in vs_list:
+                pool_id = p_utils.path_to_id(vs.get('pool_path', ''))
+                if pool_id == l_pool_id:
+                    completor(success=False)
+                    msg = (_('Default pool %s is already used by another '
+                             'listener') % listener['default_pool_id'])
+                    raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
+
     @log_helpers.log_method_call
     def create(self, context, listener, completor,
                certificate=None):
@@ -142,8 +155,9 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         vs_name = utils.get_name_and_uuid(listener['name'] or 'listener',
                                           listener['id'])
         tags = self._get_listener_tags(context, listener)
-        app_client = self._get_nsxlib_app_profile(nsxlib_lb, listener)
+        self._validate_default_pool(listener, completor)
         try:
+            app_client = self._get_nsxlib_app_profile(nsxlib_lb, listener)
             app_client.create_or_overwrite(
                 lb_app_profile_id=listener['id'], name=vs_name, tags=tags)
             kwargs = self._get_virtual_server_kwargs(
@@ -165,6 +179,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         vs_name = None
         tags = None
+        self._validate_default_pool(new_listener, completor)
         if new_listener['name'] != old_listener['name']:
             vs_name = utils.get_name_and_uuid(
                 new_listener['name'] or 'listener',
