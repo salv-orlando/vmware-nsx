@@ -111,25 +111,41 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     @log_helpers.log_method_call
     def delete(self, context, lb, completor):
-        service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         router_id = lb_utils.get_router_from_network(
             context, self.core_plugin, lb['vip_subnet_id'])
+        service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
 
+        if not router_id:
+            # Try to get it from the service
+            try:
+                service = service_client.get(lb['id'])
+            except nsxlib_exc.ResourceNotFound:
+                pass
+            else:
+                router_id = lib_p_utils.path_to_id(
+                    service.get('connectivity_path', ''))
+        try:
+            service_client.delete(lb['id'])
+        except Exception as e:
+            with excutils.save_and_reraise_exception():
+                completor(success=False)
+                LOG.error('Failed to delete loadbalancer %(lb)s for lb '
+                          'with error %(err)s',
+                          {'lb': lb['id'], 'err': e})
+
+        # if no router for vip - should check the member router
         if router_id:
             try:
-                service_client.delete(lb['id'])
-
                 if not self.core_plugin.service_router_has_services(
                         context.elevated(), router_id):
                     self.core_plugin.delete_service_router(router_id)
             except Exception as e:
                 with excutils.save_and_reraise_exception():
                     completor(success=False)
-                    LOG.error('Failed to delete loadbalancer %(lb)s for lb '
-                              'with error %(err)s',
+                    LOG.error('Failed to delete service router upon deletion '
+                              'of loadbalancer %(lb)s with error %(err)s',
                               {'lb': lb['id'], 'err': e})
-        else:
-            LOG.warning('Router not found for loadbalancer %s', lb['id'])
+
         completor(success=True)
 
     @log_helpers.log_method_call

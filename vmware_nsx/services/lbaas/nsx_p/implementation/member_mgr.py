@@ -76,7 +76,7 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             tags = lb_utils.get_tags(self.core_plugin,
                                      router_id,
                                      lb_const.LR_ROUTER_TYPE,
-                                     lb['tenant_id'], context.project_name)
+                                     lb.get('tenant_id'), context.project_name)
             try:
                 service_client.update(lb['id'],
                                       tags=tags,
