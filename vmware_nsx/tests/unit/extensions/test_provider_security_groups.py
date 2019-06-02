@@ -422,4 +422,5 @@ class TestNSXpProviderSecurityGrp(test_nsxp_plugin.NsxPPluginTestCaseMixin,
                     source_groups=mock.ANY,
                     dest_groups=mock.ANY,
                     scope=scope,
-                    logged=False)
+                    logged=False,
+                    tag=rule_data['project_id'])

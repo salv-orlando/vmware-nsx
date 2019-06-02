@@ -1305,7 +1305,8 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
                     source_groups=mock.ANY,
                     dest_groups=mock.ANY,
                     scope=scope,
-                    logged=False)
+                    logged=False,
+                    tag=mock.ANY)
 
     def test_create_security_group_rule_with_remote_group(self):
         with self.security_group() as sg1, self.security_group() as sg2:
