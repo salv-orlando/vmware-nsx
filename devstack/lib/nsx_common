@@ -43,7 +43,7 @@ function install_neutron_projects {
         elif use_library_from_git $pkg; then
             echo "Project $pkg enabled explicitly from LIBS_FROM_GIT"
         else
-            sudo pip install -e "git+https://git.openstack.org/openstack/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
+            sudo -H pip install -e "git+https://opendev.org/openstack/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
             sudo chown -R ${USER}:${USER} src/${pkg}
         fi
     done
@@ -54,7 +54,7 @@ function install_neutron_projects {
     if is_service_enabled neutron; then
        echo "service Neutron is enabled explicitly by devstack"
     else
-        sudo pip install -e "git+https://git.openstack.org/openstack/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
+        sudo -H pip install -e "git+https://opendev.org/openstack/neutron@${NEUTRON_BRANCH}#egg=neutron"
         sudo chown -R ${USER}:${USER} src/neutron
     fi
 }
