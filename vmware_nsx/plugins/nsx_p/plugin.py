@@ -26,7 +26,7 @@ from oslo_utils import uuidutils
 from neutron.db import agents_db
 from neutron.db import l3_db
 from neutron.db.models import l3 as l3_db_models
-from neutron.db.models import securitygroup as securitygroup_model  # noqa
+from neutron.db.models import securitygroup as securitygroup_model
 from neutron.db import models_v2
 from neutron.extensions import securitygroup as ext_sg
 from neutron.quota import resource_registry

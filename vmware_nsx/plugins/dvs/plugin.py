@@ -41,7 +41,7 @@ from neutron.db import allowedaddresspairs_db as addr_pair_db
 from neutron.db import dns_db
 from neutron.db import external_net_db
 from neutron.db import l3_db
-from neutron.db.models import securitygroup as securitygroup_model  # noqa
+from neutron.db.models import securitygroup as securitygroup_model
 from neutron.db import models_v2
 from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
