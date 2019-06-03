@@ -137,7 +137,8 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         vs_client = self.core_plugin.nsxlib.load_balancer.virtual_server
         if listener.get('default_pool_id'):
             vs_id = vs_data['id']
-            lb_id = listener['loadbalancer']['id']
+            lb_id = (listener.get('loadbalancer_id') or
+                     listener.get('loadbalancer', {}).get('id'))
             pool_id = listener['default_pool_id']
             pool = listener['default_pool']
             try:
@@ -178,7 +179,8 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             return
 
         # Remove the current default pool from the DB bindings
-        lb_id = listener['loadbalancer']['id']
+        lb_id = (listener.get('loadbalancer_id') or
+                 listener.get('loadbalancer', {}).get('id'))
         pool_id = listener['default_pool_id']
         pool_binding = nsx_db.get_nsx_lbaas_pool_binding(
             context.session, lb_id, pool_id)
