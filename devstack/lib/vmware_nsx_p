@@ -30,7 +30,7 @@ source $dir/lib/nsx_v3_p_common
 
 function _ovsdb_connection {
     managers=(${NSX_POLICY//,/ })
-    _ovsdb_connection ${managers[0]}
+    _ovsdb_connection_common ${managers[0]}
 }
 
 function setup_integration_bridge {
