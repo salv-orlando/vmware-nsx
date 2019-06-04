@@ -193,7 +193,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 context, new_listener, vs_name, tags, certificate)
             vs_client.update(**updated_kwargs)
             if vs_name:
-                app_client.update(app_profile_id, display_name=vs_name,
+                app_client.update(app_profile_id, name=vs_name,
                                   tags=tags)
         except Exception as e:
             with excutils.save_and_reraise_exception():
