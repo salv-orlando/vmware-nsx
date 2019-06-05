@@ -401,6 +401,12 @@ nsx_v3_and_p = [
     cfg.IntOpt('dhcp_lease_time',
                default=86400,
                help=_("DHCP default lease time.")),
+    cfg.BoolOpt('support_nsx_port_tagging',
+                default=False,
+                help=_("If true, adding neutron tags to ports will also add "
+                       "tags on the NSX logical ports. This feature requires "
+                       "oslo_messaging_notifications driver to be "
+                       "configured.")),
 ]
 
 nsx_v3_opts = nsx_v3_and_p + [

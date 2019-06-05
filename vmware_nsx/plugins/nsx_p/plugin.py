@@ -51,6 +51,7 @@ from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib import constants as const
+from neutron_lib import context as n_context
 from neutron_lib.db import api as db_api
 from neutron_lib.db import resource_extend
 from neutron_lib.db import utils as db_utils
@@ -982,6 +983,17 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if self._is_excluded_port(device_owner, is_psec_on):
             tags.append({'scope': security.PORT_SG_SCOPE,
                          'tag': NSX_P_EXCLUDE_LIST_TAG})
+
+        if self.support_external_port_tagging:
+            external_tags = self.get_external_tags_for_port(
+                context, port_data['id'])
+            if external_tags:
+                total_len = len(external_tags) + len(tags)
+                if total_len > nsxlib_utils.MAX_TAGS:
+                    LOG.warning("Cannot add external tags to port %s: "
+                                "too many tags", port_data['id'])
+                else:
+                    tags.extend(external_tags)
 
         segment_id = self._get_network_nsx_segment_id(
             context, port_data['network_id'])
@@ -2768,3 +2780,36 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # let the fwaas callbacks update the router FW
             return self.fwaas_callbacks.update_router_firewall(
                 context, router_id, router_db, ports, called_from_fw=from_fw)
+
+    def update_port_nsx_tags(self, context, port_id, tags, is_delete=False):
+        """Update backend NSX segment port with tags from the tagging plugin"""
+        # Make sure it is a backend port
+        ctx = n_context.get_admin_context()
+        port_data = self.get_port(ctx, port_id)
+        if not self._is_backend_port(ctx, port_data):
+            LOG.info("Ignoring tags on port %s: this port has no backend "
+                     "NSX logical port", port_id)
+            return
+
+        # Get the current tags on this port
+        segment_id = self._get_network_nsx_segment_id(
+            ctx, port_data['network_id'])
+        lport = self.nsxpolicy.segment_port.get(segment_id, port_id)
+        port_tags = lport.get('tags')
+        orig_len = len(port_tags)
+
+        # Update and validate the list of tags
+        extra_tags = self._translate_external_tags(tags, port_id)
+        if is_delete:
+            port_tags = [tag for tag in port_tags if tag not in extra_tags]
+        else:
+            port_tags.extend(
+                [tag for tag in extra_tags if tag not in port_tags])
+            if len(port_tags) > nsxlib_utils.MAX_TAGS:
+                LOG.warning("Cannot add external tags to port %s: "
+                            "too many tags", port_id)
+
+        # Update the NSX port
+        if len(port_tags) != orig_len:
+            self.nsxpolicy.segment_port.update(
+                segment_id, port_id, tags=port_tags)

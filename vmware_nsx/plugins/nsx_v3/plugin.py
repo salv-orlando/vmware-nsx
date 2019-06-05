@@ -3460,3 +3460,34 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _support_vlan_router_interfaces(self):
         return self.nsxlib.feature_supported(
             nsxlib_consts.FEATURE_VLAN_ROUTER_INTERFACE)
+
+    def update_port_nsx_tags(self, context, port_id, tags, is_delete=False):
+        """Update backend NSX port with tags from the tagging plugin"""
+        ctx = q_context.get_admin_context()
+        _, nsx_lport_id = nsx_db.get_nsx_switch_and_port_id(
+            ctx.session, port_id)
+        if not nsx_lport_id:
+            LOG.info("Ignoring tags on port %s: this port has no backend "
+                     "NSX logical port", port_id)
+            return
+
+        # Get the current tags on this port
+        lport = self.nsxlib.logical_port.get(nsx_lport_id)
+        port_tags = lport.get('tags')
+        orig_len = len(port_tags)
+
+        # Update and validate the list of tags
+        extra_tags = self._translate_external_tags(tags, port_id)
+        if is_delete:
+            port_tags = [tag for tag in port_tags if tag not in extra_tags]
+        else:
+            port_tags.extend(
+                [tag for tag in extra_tags if tag not in port_tags])
+            if len(port_tags) > nsxlib_utils.MAX_TAGS:
+                LOG.warning("Cannot add external tags to port %s: "
+                            "too many tags", port_id)
+
+        # Update the NSX port
+        if len(port_tags) != orig_len:
+            self.nsxlib.logical_port.update(
+                nsx_lport_id, False, tags=port_tags)
