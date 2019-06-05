@@ -2468,7 +2468,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             source_groups=[source] if source else None,
             dest_groups=[destination] if destination else None,
             scope=scope,
-            direction=direction, logged=logging)
+            direction=direction, logged=logging,
+            tag=sg_rule.get('project_id'))
 
     def create_security_group(self, context, security_group, default_sg=False):
         secgroup = security_group['security_group']
