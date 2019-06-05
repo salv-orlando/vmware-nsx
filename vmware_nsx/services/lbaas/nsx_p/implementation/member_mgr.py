@@ -73,10 +73,10 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
             connectivity_path = self.core_plugin.nsxpolicy.tier1.get_path(
                 router_id)
-            tags = lb_utils.get_tags(self.core_plugin,
-                                     router_id,
-                                     lb_const.LR_ROUTER_TYPE,
-                                     lb.get('tenant_id'), context.project_name)
+            tags = p_utils.get_tags(self.core_plugin,
+                                    router_id,
+                                    lb_const.LR_ROUTER_TYPE,
+                                    lb.get('tenant_id'), context.project_name)
             try:
                 service_client.update(lb['id'],
                                       tags=tags,

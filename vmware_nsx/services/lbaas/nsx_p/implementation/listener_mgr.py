@@ -24,7 +24,7 @@ from vmware_nsx._i18n import _
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_const
-from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3.policy import core_resources
 from vmware_nsxlib.v3.policy import lb_defs
