@@ -21,8 +21,8 @@ from oslo_log import log as logging
 from oslo_utils import excutils
 
 from vmware_nsx._i18n import _
-from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.services.lbaas import base_mgr
+from vmware_nsx.services.lbaas import lb_common
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
@@ -135,18 +135,28 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         return app_client
 
-    def _validate_default_pool(self, listener, completor):
-        l_pool_id = listener.get('default_pool_id')
-        if l_pool_id:
+    def _validate_default_pool(self, listener, completor,
+                               old_listener=None):
+        def_pool_id = listener.get('default_pool_id')
+        if def_pool_id:
             vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
             vs_list = vs_client.list()
             for vs in vs_list:
                 pool_id = p_utils.path_to_id(vs.get('pool_path', ''))
-                if pool_id == l_pool_id:
+                if pool_id == def_pool_id:
                     completor(success=False)
                     msg = (_('Default pool %s is already used by another '
                              'listener') % listener['default_pool_id'])
                     raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
+
+            # Perform additional validation for session persistence before
+            # creating resources in the backend
+            old_pool = None
+            if old_listener:
+                old_pool = old_listener.get('default_pool')
+            lb_common.validate_session_persistence(
+                listener.get('default_pool'), listener, completor,
+                old_pool=old_pool)
 
     @log_helpers.log_method_call
     def create(self, context, listener, completor,
@@ -169,7 +179,53 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             msg = _('Failed to create virtual server at NSX backend')
             raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
 
+        self._update_default_pool(context, listener, completor)
+
         completor(success=True)
+
+    def _get_pool_tags(self, context, pool):
+        return lb_utils.get_tags(self.core_plugin, pool['id'],
+                                 lb_const.LB_POOL_TYPE, pool['tenant_id'],
+                                 context.project_name)
+
+    def _update_default_pool(self, context, listener, completor):
+        if not listener.get('default_pool_id'):
+            return
+        nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
+        vs_client = nsxlib_lb.virtual_server
+        vs_data = vs_client.get(listener['id'])
+        pool_id = listener['default_pool_id']
+        pool = listener['default_pool']
+        try:
+            (persistence_profile_id,
+             post_process_func) = lb_utils.setup_session_persistence(
+                self.core_plugin.nsxpolicy,
+                pool,
+                self._get_pool_tags(context, pool),
+                listener, vs_data)
+        except nsxlib_exc.ManagerError:
+            with excutils.save_and_reraise_exception():
+                completor(success=False)
+                LOG.error("Failed to configure session persistence "
+                          "profile for listener %s", listener['id'])
+        try:
+            # Update persistence profile and pool on virtual server
+            vs_client.update(
+                listener['id'],
+                pool_id=pool_id,
+                lb_persistence_profile_id=persistence_profile_id)
+            LOG.debug("Updated NSX virtual server %(vs_id)s with "
+                      "persistence profile %(prof)s",
+                      {'vs_id': listener['id'],
+                       'prof': persistence_profile_id})
+            if post_process_func:
+                post_process_func()
+        except nsxlib_exc.ManagerError:
+            with excutils.save_and_reraise_exception():
+                completor(success=False)
+                LOG.error("Failed to attach persistence profile %s to "
+                          "virtual server %s",
+                          persistence_profile_id, listener['id'])
 
     @log_helpers.log_method_call
     def update(self, context, old_listener, new_listener, completor,
@@ -180,7 +236,8 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         vs_name = None
         tags = None
-        self._validate_default_pool(new_listener, completor)
+        self._validate_default_pool(new_listener, completor,
+                                    old_listener=old_listener)
         if new_listener['name'] != old_listener['name']:
             vs_name = utils.get_name_and_uuid(
                 new_listener['name'] or 'listener',
@@ -201,6 +258,11 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 LOG.error('Failed to update listener %(listener)s with '
                           'error %(error)s',
                           {'listener': old_listener['id'], 'error': e})
+
+        # Update default pool and session persistence
+        if (old_listener.get('default_pool_id') !=
+            new_listener.get('default_pool_id')):
+            self._update_default_pool(context, new_listener, completor)
         completor(success=True)
 
     @log_helpers.log_method_call
@@ -213,8 +275,16 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         app_profile_id = listener['id']
 
         try:
+            profile_path = None
+            if listener.get('default_pool_id'):
+                vs_data = vs_client.get(vs_id)
+                profile_path = vs_data.get('lb_persistence_profile_path', '')
             vs_client.delete(vs_id)
-        except nsx_exc.NsxResourceNotFound:
+            # Also delete the old session persistence profile
+            if profile_path:
+                lb_utils.delete_persistence_profile(
+                    self.core_plugin.nsxpolicy, profile_path)
+        except nsxlib_exc.ResourceNotFound:
             LOG.error("virtual server not found on nsx: %(vs)s", {'vs': vs_id})
         except nsxlib_exc.ManagerError:
             completor(success=False)
@@ -224,10 +294,9 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         try:
             app_client.delete(app_profile_id)
-        except nsx_exc.NsxResourceNotFound:
+        except nsxlib_exc.ResourceNotFound:
             LOG.error("application profile not found on nsx: %s",
                       app_profile_id)
-
         except nsxlib_exc.ManagerError:
             completor(success=False)
             msg = (_('Failed to delete application profile: %(app)s') %
@@ -239,7 +308,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             cert_client = self.core_plugin.nsxpolicy.certificate
             try:
                 cert_client.delete(listener['id'])
-            except nsx_exc.NsxResourceNotFound:
+            except nsxlib_exc.ResourceNotFound:
                 LOG.error("Certificate not found on nsx: %s", listener['id'])
 
             except nsxlib_exc.ManagerError:

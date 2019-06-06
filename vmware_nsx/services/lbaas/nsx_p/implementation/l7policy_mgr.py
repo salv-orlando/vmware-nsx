@@ -19,7 +19,6 @@ from oslo_log import log as logging
 from oslo_utils import excutils
 
 from vmware_nsx._i18n import _
-from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
@@ -79,7 +78,7 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         try:
             vs_client.remove_lb_rule(policy['listener_id'],
                                      policy_name)
-        except nsx_exc.NsxResourceNotFound:
+        except nsxlib_exc.ResourceNotFound:
             pass
         except nsxlib_exc.ManagerError:
             completor(success=False)
