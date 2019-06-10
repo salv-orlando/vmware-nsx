@@ -550,13 +550,14 @@ class NsxPTestNetworks(test_db_base_plugin_v2.TestNetworksV2,
                 'tenant_id': 'some_tenant',
                 'provider:network_type': 'flat',
                 'provider:physical_network': 'xxx',
+                'admin_state_up': True,
+                'shared': False,
                 'qos_policy_id': policy_id,
                 'port_security_enabled': False}}
         with mock_ens, mock_tz, mock_tt, mock.patch.object(
                 self.plugin, '_validate_qos_policy_id'):
-            self.assertRaises(n_exc.InvalidInput,
-                              self.plugin.create_network,
-                              context.get_admin_context(), data)
+            res = self.plugin.create_network(context.get_admin_context(), data)
+            self.assertEqual(policy_id, res['qos_policy_id'])
 
     def test_update_ens_network_with_qos(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
@@ -589,10 +590,10 @@ class NsxPTestNetworks(test_db_base_plugin_v2.TestNetworksV2,
                     'port_security_enabled': False,
                     'tenant_id': 'some_tenant',
                     'qos_policy_id': policy_id}}
-            self.assertRaises(n_exc.InvalidInput,
-                              self.plugin.update_network,
-                              context.get_admin_context(),
-                              network['id'], data)
+            res = self.plugin.update_network(
+                context.get_admin_context(),
+                network['id'], data)
+            self.assertEqual(policy_id, res['qos_policy_id'])
 
 
 class NsxPTestPorts(common_v3.NsxV3TestPorts,
@@ -787,8 +788,8 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
                 # Cannot add qos policy to this type of port
                 with mock_ens, mock_tz, mock_tt, \
                     mock.patch.object(self.plugin, '_validate_qos_policy_id'):
-                    self.assertRaises(n_exc.InvalidInput,
-                                      self.plugin.create_port, self.ctx, data)
+                    res = self.plugin.create_port(self.ctx, data)
+                    self.assertEqual(policy_id, res['qos_policy_id'])
 
     def test_create_port_with_mac_learning_true(self):
         plugin = directory.get_plugin()

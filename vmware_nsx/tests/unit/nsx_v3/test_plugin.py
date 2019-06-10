@@ -582,6 +582,8 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
         mock_tt = mock.patch('vmware_nsxlib.v3'
                              '.core_resources.NsxLibTransportZone'
                              '.get_transport_type', return_value='VLAN')
+        mock_ver = mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
+                              return_value='2.4.0')
         policy_id = uuidutils.generate_uuid()
         data = {'network': {
                 'name': 'qos_net',
@@ -590,7 +592,7 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                 'provider:physical_network': 'xxx',
                 'qos_policy_id': policy_id,
                 'port_security_enabled': False}}
-        with mock_ens, mock_tz, mock_tt, mock.patch.object(
+        with mock_ens, mock_tz, mock_tt, mock_ver, mock.patch.object(
                 self.plugin, '_validate_qos_policy_id'):
             self.assertRaises(n_exc.InvalidInput,
                               self.plugin.create_network,
@@ -607,6 +609,8 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
         mock_tt = mock.patch('vmware_nsxlib.v3'
                              '.core_resources.NsxLibTransportZone'
                              '.get_transport_type', return_value='VLAN')
+        mock_ver = mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
+                              return_value='2.4.0')
         data = {'network': {
                 'name': 'qos_net',
                 'tenant_id': 'some_tenant',
@@ -615,7 +619,7 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                 'admin_state_up': True,
                 'shared': False,
                 'port_security_enabled': False}}
-        with mock_ens, mock_tz, mock_tt,\
+        with mock_ens, mock_tz, mock_tt, mock_ver,\
             mock.patch.object(self.plugin, '_validate_qos_policy_id'):
             network = self.plugin.create_network(context.get_admin_context(),
                                                  data)
@@ -1207,6 +1211,8 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                                      '.core_resources.NsxLibTransportZone'
                                      '.get_transport_type',
                                      return_value='VLAN')
+                mock_ver = mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
+                                      return_value='2.4.0')
                 data = {'port': {
                     'network_id': network['network']['id'],
                     'tenant_id': self._tenant_id,
@@ -1220,7 +1226,7 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                     'qos_policy_id': policy_id}
                 }
                 # Cannot add qos policy to this type of port
-                with mock_ens, mock_tz, mock_tt,\
+                with mock_ens, mock_tz, mock_tt, mock_ver,\
                     mock.patch.object(self.plugin, '_validate_qos_policy_id'):
                     self.assertRaises(n_exc.InvalidInput,
                                       self.plugin.create_port, self.ctx, data)
@@ -1273,6 +1279,8 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                                      '.core_resources.NsxLibTransportZone'
                                      '.get_transport_type',
                                      return_value='VLAN')
+                mock_ver = mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
+                                      return_value='2.4.0')
                 data = {'port': {
                         'network_id': network['network']['id'],
                         'tenant_id': self._tenant_id,
@@ -1284,7 +1292,7 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                         'port_security_enabled': False,
                         'mac_address': '00:00:00:00:00:01'}
                         }
-                with mock_ens, mock_tz, mock_tt,\
+                with mock_ens, mock_tz, mock_tt, mock_ver,\
                     mock.patch.object(self.plugin, '_validate_qos_policy_id'):
                     port = self.plugin.create_port(self.ctx, data)
                     data['port'] = {'qos_policy_id': policy_id}

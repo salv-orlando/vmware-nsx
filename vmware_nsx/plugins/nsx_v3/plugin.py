@@ -1021,6 +1021,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         return self.nsxlib.feature_supported(
             nsxlib_consts.FEATURE_ENS_WITH_SEC)
 
+    def _ens_qos_supported(self):
+        return self.nsxlib.feature_supported(
+            nsxlib_consts.FEATURE_ENS_WITH_QOS)
+
     def _validate_ens_net_portsecurity(self, net_data):
         """Validate/Update the port security of the new network for ENS TZ"""
         if not self._ens_psec_supported():
