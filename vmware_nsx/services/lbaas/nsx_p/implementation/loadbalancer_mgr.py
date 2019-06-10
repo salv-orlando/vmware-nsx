@@ -74,10 +74,10 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         lb_name = utils.get_name_and_uuid(lb['name'] or 'lb',
                                           lb_id)
-        tags = lb_utils.get_tags(self.core_plugin,
-                                 router_id if router_id else '',
-                                 lb_const.LR_ROUTER_TYPE,
-                                 lb['tenant_id'], context.project_name)
+        tags = p_utils.get_tags(self.core_plugin,
+                                router_id if router_id else '',
+                                lb_const.LR_ROUTER_TYPE,
+                                lb['tenant_id'], context.project_name)
 
         lb_size = lb_utils.get_lb_flavor_size(self.flavor_plugin, context,
                                               lb.get('flavor_id'))

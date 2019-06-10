@@ -24,11 +24,8 @@ from vmware_nsx._i18n import _
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_common
 from vmware_nsx.services.lbaas import lb_const
-from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils as p_utils
-from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
-from vmware_nsxlib.v3 import load_balancer as nsxlib_lb
-from vmware_nsxlib.v3.policy import utils as pol_utils
 from vmware_nsxlib.v3 import utils
 
 LOG = logging.getLogger(__name__)
@@ -54,28 +51,10 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                  lb_const.LB_POOL_TYPE, pool['tenant_id'],
                                  context.project_name)
 
-    def _remove_persistence(self, pool, vs_data):
-        sp = pool.get('session_persistence')
-        lb_client = self.core_plugin.nsxpolicy.load_balancer
-        pp_client = None
-        # TODO(asarfaty): the delete action is the same for all types,
-        # so it is better to add a generic resource that will work for all
-        if not sp:
-            LOG.debug("No session persistence info for pool %s", pool['id'])
-            # Set the pp_client to a default one, as the delete action is
-            # the same
-            pp_client = lb_client.lb_source_ip_persistence_profile
-        elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_HTTP_COOKIE:
-            pp_client = lb_client.lb_cookie_persistence_profile
-        elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_APP_COOKIE:
-            pp_client = lb_client.lb_cookie_persistence_profile
-        else:
-            pp_client = lb_client.lb_source_ip_persistence_profile
-
-        persistence_profile_id = pol_utils.path_to_id(
+    def _remove_persistence(self, vs_data):
+        lb_utils.delete_persistence_profile(
+            self.core_plugin.nsxpolicy,
             vs_data.get('lb_persistence_profile_path', ''))
-        if persistence_profile_id:
-            pp_client.delete(persistence_profile_id)
 
     def _process_vs_update(self, context, pool, pool_id, listener, completor):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
@@ -85,12 +64,13 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             vs_data = vs_client.get(listener['id'])
             if pool and pool_id:
                 (persistence_profile_id,
-                 post_process_func) = self._setup_session_persistence(
-                    pool, self._get_pool_tags(context, pool),
+                 post_process_func) = lb_utils.setup_session_persistence(
+                    self.core_plugin.nsxpolicy, pool,
+                    self._get_pool_tags(context, pool),
                     listener, vs_data)
             else:
                 post_process_func = functools.partial(
-                    self._remove_persistence, pool, vs_data)
+                    self._remove_persistence, vs_data)
                 persistence_profile_id = None
         except nsxlib_exc.ManagerError:
             with excutils.save_and_reraise_exception():
@@ -116,91 +96,6 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 completor(success=False)
                 LOG.error('Failed to attach pool %s to virtual '
                           'server %s', pool['id'], listener['id'])
-
-    def _build_persistence_profile_tags(self, pool_tags, listener):
-        tags = pool_tags[:]
-        # With octavia loadbalancer name might not be among data passed
-        # down to the driver
-        lb_data = listener.get('loadbalancer')
-        if lb_data:
-            tags.append({
-                'scope': lb_const.LB_LB_NAME,
-                'tag': lb_data['name'][:utils.MAX_TAG_LEN]})
-        tags.append({
-            'scope': lb_const.LB_LB_TYPE,
-            'tag': listener['loadbalancer_id']})
-        tags.append({
-            'scope': lb_const.LB_LISTENER_TYPE,
-            'tag': listener['id']})
-        return tags
-
-    def _setup_session_persistence(self, pool, pool_tags, listener, vs_data):
-        sp = pool.get('session_persistence')
-        pers_type = None
-        cookie_name = None
-        cookie_mode = None
-        lb_client = self.core_plugin.nsxpolicy.load_balancer
-        pp_client = None
-        if not sp:
-            LOG.debug("No session persistence info for pool %s", pool['id'])
-        elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_HTTP_COOKIE:
-            pp_client = lb_client.lb_cookie_persistence_profile
-            pers_type = nsxlib_lb.PersistenceProfileTypes.COOKIE
-            cookie_name = sp.get('cookie_name')
-            if not cookie_name:
-                cookie_name = lb_const.SESSION_PERSISTENCE_DEFAULT_COOKIE_NAME
-            cookie_mode = "INSERT"
-        elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_APP_COOKIE:
-            pp_client = lb_client.lb_cookie_persistence_profile
-            pers_type = nsxlib_lb.PersistenceProfileTypes.COOKIE
-            # In this case cookie name is mandatory
-            cookie_name = sp['cookie_name']
-            cookie_mode = "REWRITE"
-        else:
-            pp_client = lb_client.lb_source_ip_persistence_profile
-            pers_type = nsxlib_lb.PersistenceProfileTypes.SOURCE_IP
-
-        if pers_type:
-            # There is a profile to create or update
-            pp_kwargs = {
-                'persistence_profile_id': pool['id'],
-                'name': "persistence_%s" % utils.get_name_and_uuid(
-                    pool['name'] or 'pool', pool['id'], maxlen=235),
-                'tags': self._build_persistence_profile_tags(
-                    pool_tags, listener)
-            }
-            if cookie_name:
-                pp_kwargs['cookie_name'] = cookie_name
-                pp_kwargs['cookie_mode'] = cookie_mode
-
-        persistence_profile_id = pol_utils.path_to_id(
-            vs_data.get('lb_persistence_profile_path', ''))
-        if persistence_profile_id:
-            # NOTE: removal of the persistence profile must be executed
-            # after the virtual server has been updated
-            if pers_type:
-                # Update existing profile
-                LOG.debug("Updating persistence profile %(profile_id)s for "
-                          "listener %(listener_id)s with pool %(pool_id)s",
-                          {'profile_id': persistence_profile_id,
-                           'listener_id': listener['id'],
-                           'pool_id': pool['id']})
-                pp_client.update(persistence_profile_id, **pp_kwargs)
-                return persistence_profile_id, None
-            else:
-                # Prepare removal of persistence profile
-                return (None, functools.partial(self._remove_persistence,
-                                                pool, vs_data))
-        elif pers_type:
-            # Create persistence profile
-            pp_id = pp_client.create_or_overwrite(**pp_kwargs)
-            LOG.debug("Created persistence profile %(profile_id)s for "
-                      "listener %(listener_id)s with pool %(pool_id)s",
-                      {'profile_id': pp_id,
-                       'listener_id': listener['id'],
-                       'pool_id': pool['id']})
-            return pp_id, None
-        return None, None
 
     @log_helpers.log_method_call
     def create(self, context, pool, completor):
@@ -331,7 +226,7 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # Delete the attached health monitor as well
         if pool.get('healthmonitor'):
             hm = pool['healthmonitor']
-            monitor_client = p_utils.get_monitor_policy_client(
+            monitor_client = lb_utils.get_monitor_policy_client(
                 self.core_plugin.nsxpolicy.load_balancer, hm)
 
             try:
