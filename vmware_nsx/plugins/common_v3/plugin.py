@@ -545,6 +545,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             raise n_exc.InvalidInput(error_message=err_msg)
 
     def _validate_ens_create_port(self, context, port_data):
+        if self._ens_qos_supported():
+            return
+
         qos_selected = validators.is_attr_set(port_data.get(
             qos_consts.QOS_POLICY_ID))
         if qos_selected:
@@ -716,7 +719,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 raise nsx_exc.QoSOnExternalNet()
             self._assert_on_illegal_port_with_qos(device_owner)
             is_ens_tz_port = self._is_ens_tz_port(context, original_port)
-            if is_ens_tz_port:
+            if is_ens_tz_port and not self._ens_qos_supported():
                 err_msg = _("Cannot configure QOS on ENS networks")
                 raise n_exc.InvalidInput(error_message=err_msg)
 
@@ -833,6 +836,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                           fields) for network in networks])
 
     def _assert_on_ens_with_qos(self, net_data):
+        if self._ens_qos_supported():
+            return
         qos_id = net_data.get(qos_consts.QOS_POLICY_ID)
         if validators.is_attr_set(qos_id):
             err_msg = _("Cannot configure QOS on ENS networks")
@@ -877,6 +882,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         return qos_policy_id
 
     def _ens_psec_supported(self):
+        """Should be implemented by each plugin"""
+        pass
+
+    def _ens_qos_supported(self):
         """Should be implemented by each plugin"""
         pass
 
