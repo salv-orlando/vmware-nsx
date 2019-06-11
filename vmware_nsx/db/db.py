@@ -587,9 +587,9 @@ def get_nsx_lbaas_loadbalancer_binding_by_service(session, lb_service_id):
 
 def has_nsx_lbaas_loadbalancer_binding_by_router(session, nsx_router_id):
     try:
-        session.query(nsx_models.NsxLbaasLoadbalancer).filter_by(
-            lb_router_id=nsx_router_id).one()
-        return True
+        bindings = session.query(nsx_models.NsxLbaasLoadbalancer).filter_by(
+            lb_router_id=nsx_router_id).all()
+        return len(bindings) > 0
     except exc.NoResultFound:
         return False
 
