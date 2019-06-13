@@ -1997,12 +1997,12 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 raise n_exc.InvalidInput(error_message=msg)
 
     def _validate_address_pairs(self, context, attrs, db_port):
-        self._validate_unique_address_pair_across_network(
-            context, db_port, attrs[addr_apidef.ADDRESS_PAIRS])
         network_port_security = self._get_network_security_binding(
             context, db_port['network_id'])
-        if (not cfg.CONF.nsxv.allow_multiple_ip_addresses and
+        if not (cfg.CONF.nsxv.allow_multiple_ip_addresses and
                 not network_port_security):
+            self._validate_unique_address_pair_across_network(
+                 context, db_port, attrs[addr_apidef.ADDRESS_PAIRS])
             for ap in attrs[addr_apidef.ADDRESS_PAIRS]:
                 # Check that the IP address is a subnet
                 if len(ap['ip_address'].split('/')) > 1:
