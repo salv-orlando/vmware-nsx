@@ -441,12 +441,23 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
                           gw_connection['id'])
 
         try:
-            # Update neutron's database with the mappings.
-            nsx_db.add_l2gw_connection_mapping(
-                session=context.session,
-                connection_id=gw_connection['id'],
-                bridge_endpoint_id=bridge_endpoint['id'],
-                port_id=port['id'])
+            with db_api.CONTEXT_WRITER.using(context):
+                # Update neutron's database with the mappings.
+                nsx_db.add_l2gw_connection_mapping(
+                    session=context.session,
+                    connection_id=gw_connection['id'],
+                    bridge_endpoint_id=bridge_endpoint['id'],
+                    port_id=port['id'])
+                # If no segmentation_id was passed as a part of the
+                # connection object, update it with the one inherited
+                # from the device spec
+                if seg_id and not gw_connection.get(l2gw_const.SEG_ID):
+                    conn_db = self._plugin._get_l2_gateway_connection(
+                        context, gw_connection['id'])
+                    conn_db['segmentation_id'] = seg_id
+                    # Ensure the object is updated as well so the
+                    # create response returns the segmentation_id
+                    gw_connection[l2gw_const.SEG_ID] = seg_id
         except db_exc.DBError:
             with excutils.save_and_reraise_exception():
                 LOG.exception("Unable to add L2 gateway connection "
