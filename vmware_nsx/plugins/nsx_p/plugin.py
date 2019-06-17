@@ -1469,7 +1469,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             tags_to_search,
             self.nsxpolicy.load_balancer.lb_service.entry_def.resource_type()
         )['results']
-        return True if router_lb_services else False
+        non_delete_services = [srv for srv in router_lb_services
+                               if not srv.get('marked_for_delete')]
+        return True if non_delete_services else False
 
     def service_router_has_vpnaas(self, context, router_id):
         """Return True if there is a vpn service attached to this router"""
