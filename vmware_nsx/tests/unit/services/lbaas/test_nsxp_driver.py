@@ -272,7 +272,7 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
         self.pp_cookie_client = mock.patch.object(
             load_balancer, 'lb_cookie_persistence_profile').start()
         self.pp_generic_client = mock.patch.object(
-            load_balancer, 'lb_generic_persistence_profile').start()
+            load_balancer, 'lb_persistence_profile').start()
         self.tm_client = mock.patch.object(nsxpolicy,
                                            'trust_management').start()
         self.nsxpolicy = nsxpolicy
@@ -520,9 +520,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               self.completor)
 
     def test_create_listener_with_session_persistence(self):
-        # TODO(asarfaty): add this test after supporting default pool
-        # session persistence
-        return
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy',
                                       self.pool_persistency.id,
@@ -537,7 +534,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               return_value=(None, None)), \
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server,\
-            mock.patch.object(self.pp_client, 'create_or_overwrite'
+            mock.patch.object(self.vs_client, 'get', return_value={}),\
+            mock.patch.object(self.edge_driver.listener, '_get_pool_tags'),\
+            mock.patch.object(self.pp_cookie_client, 'create_or_overwrite'
                               ) as mock_create_pp:
             mock_get_floatingips.return_value = []
 
@@ -559,9 +558,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_session_persistence_fail(self):
-        # TODO(asarfaty): add this test after supporting default pool
-        # session persistence
-        return
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy',
                                       self.pool_persistency.id,
@@ -623,9 +619,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_session_persistence(self):
-        # TODO(asarfaty): add this test after supporting default pool
-        # session persistence
-        return
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           self.pool_persistency.id,
@@ -640,9 +633,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
+            mock.patch.object(self.edge_driver.listener, '_get_pool_tags'),\
+            mock.patch.object(self.vs_client, 'get', return_value={}),\
             mock.patch.object(self.vs_client, 'update',
                               return_value={'id': LB_VS_ID}), \
-            mock.patch.object(self.pp_client, 'create_or_overwrite'
+            mock.patch.object(self.pp_cookie_client, 'create_or_overwrite'
                               ) as mock_create_pp:
             mock_get_floatingips.return_value = []
 
@@ -653,9 +648,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_session_persistence_fail(self):
-        # TODO(asarfaty): add this test after supporting default pool
-        # session persistence
-        return
         old_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1', 'description',
                                           self.pool_persistency.id,
@@ -781,8 +773,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                 cookie_mode='INSERT',
                 cookie_name='meh_cookie',
                 name=mock.ANY,
-                tags=mock.ANY,
-                persistence_profile_id=POOL_ID)
+                tags=mock.ANY)
             mock_vs_update.assert_called_once_with(
                 LB_VS_ID, pool_id=LB_POOL_ID,
                 lb_persistence_profile_id=LB_PP_ID)
@@ -897,10 +888,6 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                                            cookie=True)
 
     def test_update_remove_persistency(self):
-        # TODO(asarfaty): add this test after supporting default pool
-        # session persistence
-        return
-
         def verify_func(mock_create_pp, mock_update_pp,
                         mock_delete_pp, mock_vs_update):
             mock_create_pp.assert_not_called()
@@ -929,10 +916,6 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete_with_persistency(self):
-        # TODO(asarfaty): add this test after supporting default pool
-        # session persistence
-        return
-
         with mock.patch.object(self.vs_client, 'get'
                                ) as mock_vs_get, \
             mock.patch.object(self.vs_client, 'update', return_value=None
@@ -982,14 +965,12 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                 cookie_name=cookie_name,
                 cookie_mode=cookie_mode,
                 name=mock.ANY,
-                tags=mock.ANY,
-                persistence_profile_id=POOL_ID)
+                tags=mock.ANY)
         else:
             mock_update_pp.assert_called_once_with(
                 LB_PP_ID,
                 name=mock.ANY,
-                tags=mock.ANY,
-                persistence_profile_id=POOL_ID)
+                tags=mock.ANY)
         # Compare tags - kw args are the last item of a mock call tuple
         self.assertItemsEqual(mock_update_pp.mock_calls[0][-1]['tags'],
             [{'scope': 'os-lbaas-lb-id', 'tag': 'xxx-xxx'},
