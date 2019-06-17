@@ -60,8 +60,14 @@ class CommonEdgeFwaasV3Driver(fwaas_driver_base.EdgeFwaasDriverBaseV2):
 
         # update each router once
         for router_id in routers:
-            self.core_plugin.update_router_firewall(context, router_id,
-                                                    from_fw=True)
+            try:
+                self.core_plugin.update_router_firewall(context, router_id,
+                                                        from_fw=True)
+            except Exception as e:
+                # The core plugin failed to update the firewall
+                LOG.error("Failed to update NSX edge firewall for router %s: "
+                          "%s", router_id, e)
+                raise self.driver_exception(driver=self.driver_name)
 
     def should_apply_firewall_to_router(self, router_data):
         """Return True if the firewall rules should be added the router"""
