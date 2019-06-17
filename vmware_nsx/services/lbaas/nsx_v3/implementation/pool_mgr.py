@@ -49,9 +49,11 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         kwargs['snat_translation'] = {'type': "LbSnatAutoMap"}
         return kwargs
 
-    @log_helpers.log_method_call
     def _process_vs_update(self, context, pool, listener,
                            nsx_pool_id, nsx_vs_id, completor):
+        LOG.debug("Processing NSX virtual server update for pool %(pool_id)s. "
+                  "Will update VS %(nsx_vs_id)s", {'pool_id': pool['id'],
+                                                   'nsx_vs_id': nsx_vs_id})
         vs_client = self.core_plugin.nsxlib.load_balancer.virtual_server
         try:
             # Process pool persistence profile and
