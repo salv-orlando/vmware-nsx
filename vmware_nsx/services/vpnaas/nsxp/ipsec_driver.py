@@ -194,6 +194,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         services = self.vpn_plugin.get_vpnservices(
             context.elevated(), filters=filters)
         rule_name_pref = 'VPN advertisement service'
+        has_connections = False
         for srv in services:
             # use only services with non-errored connections
             filters = {'vpnservice_id': [srv['id']],
@@ -202,6 +203,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
                 context.elevated(), filters=filters)
             if not connections:
                 continue
+            has_connections = True
             if srv['subnet_id']:
                 subnet = self.l3_plugin.get_subnet(
                     context.elevated(), srv['subnet_id'])
@@ -222,6 +224,10 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
 
         self._nsxpolicy.tier1.update_advertisement_rules(
             router_id, rules, name_prefix=rule_name_pref)
+
+        # Also update the ipsec endpoints advertisement
+        self._nsxpolicy.tier1.update_route_advertisement(
+            router_id, ipsec_endpoints=has_connections)
 
     def _nsx_tags(self, context, object):
         return self._nsxpolicy.build_v3_tags_payload(
