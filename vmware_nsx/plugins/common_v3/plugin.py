@@ -927,7 +927,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         """Should be implemented by each plugin"""
         pass
 
-    def _generate_segment_id(self, context, physical_network, net_data):
+    def _generate_segment_id(self, context, physical_network, net_data,
+                             restricted_vlans):
         bindings = nsx_db.get_network_bindings_by_phy_uuid(
             context.session, physical_network)
         vlan_ranges = self._network_vlans.get(physical_network, [])
@@ -939,9 +940,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             vlan_min = constants.MIN_VLAN_TAG
             vlan_max = constants.MAX_VLAN_TAG
             vlan_ids = set(moves.range(vlan_min, vlan_max + 1))
-        used_ids_in_range = set([binding.vlan_id for binding in bindings
-                                 if binding.vlan_id in vlan_ids])
-        free_ids = list(vlan_ids ^ used_ids_in_range)
+        used_ids_in_range = [binding.vlan_id for binding in bindings
+                             if binding.vlan_id in vlan_ids]
+        not_allowed_in_range = set(used_ids_in_range + restricted_vlans)
+        free_ids = list(vlan_ids ^ not_allowed_in_range)
         if len(free_ids) == 0:
             raise n_exc.NoNetworkAvailable()
         net_data[pnet.SEGMENTATION_ID] = free_ids[0]
@@ -1005,18 +1007,25 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 if self._default_physical_net(physical_net):
                     physical_net = default_vlan_tz_uuid
 
+                restricted_vlans = self._get_tz_restricted_vlans(physical_net)
                 if not transparent_vlan:
                     # Validate VLAN id
                     if not vlan_id:
                         vlan_id = self._generate_segment_id(context,
                                                             physical_net,
-                                                            network_data)
+                                                            network_data,
+                                                            restricted_vlans)
                     elif not plugin_utils.is_valid_vlan_tag(vlan_id):
                         err_msg = (_('Segmentation ID %(seg_id)s out of '
                                      'range (%(min_id)s through %(max_id)s)') %
                                    {'seg_id': vlan_id,
                                     'min_id': constants.MIN_VLAN_TAG,
                                     'max_id': constants.MAX_VLAN_TAG})
+                    elif vlan_id in restricted_vlans:
+                        err_msg = (_('Segmentation ID %(seg_id)s cannot be '
+                                     'used as it is used by the transport '
+                                     'node') %
+                                   {'seg_id': vlan_id})
                     else:
                         # Verify VLAN id is not already allocated
                         bindings = nsx_db.\
@@ -2721,6 +2730,32 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if self.fwaas_callbacks and self.fwaas_callbacks.fwaas_enabled:
             ports = self._get_router_interfaces(context, router.id)
             return self.fwaas_callbacks.router_with_fwg(context, ports)
+
+    def _get_tz_restricted_vlans(self, tz_uuid):
+        if not self.nsxlib:
+            return []
+        restricted_vlans = []
+        # Get all transport nodes of this transport zone
+        tns = self.nsxlib.transport_node.list()['results']
+        for tn in tns:
+            # Check if it belongs to the current TZ
+            tzs = [ep.get('transport_zone_id') for ep in
+                   tn.get('transport_zone_endpoints', [])]
+            if tz_uuid not in tzs:
+                continue
+            if ('host_switch_spec' in tn and
+                'host_switches' in tn['host_switch_spec']):
+                for hs in tn['host_switch_spec']['host_switches']:
+                    profile_attrs = hs.get('host_switch_profile_ids', [])
+                    for profile_attr in profile_attrs:
+                        if profile_attr['key'] == 'UplinkHostSwitchProfile':
+                            profile = self.nsxlib.host_switch_profiles.get(
+                                profile_attr['value'])
+                            vlan_id = profile.get('transport_vlan')
+                            if vlan_id:
+                                restricted_vlans.append(vlan_id)
+
+        return restricted_vlans
 
 
 class TagsCallbacks(object):
