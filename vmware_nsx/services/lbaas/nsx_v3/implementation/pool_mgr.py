@@ -142,10 +142,12 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 context.session, lb_id, listener_id)
             if binding:
                 vs_id = binding['lb_vs_id']
-                self._process_vs_update(context, pool, listener,
-                                        lb_pool['id'], vs_id, completor)
-                nsx_db.update_nsx_lbaas_pool_binding(
-                    context.session, lb_id, pool['id'], vs_id)
+                # Updae the virtual server only if it exists
+                if vs_id:
+                    self._process_vs_update(context, pool, listener,
+                                            lb_pool['id'], vs_id, completor)
+                    nsx_db.update_nsx_lbaas_pool_binding(
+                        context.session, lb_id, pool['id'], vs_id)
             else:
                 completor(success=False)
                 msg = (_("Couldn't find binding on the listener: %s") %
@@ -198,8 +200,10 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             kwargs = self._get_pool_kwargs(pool_name, tags, lb_algorithm,
                                            description)
             pool_client.update(lb_pool_id, **kwargs)
+            # Update virtual servers if it exists and there were changes
+            # in session persistence
             if (listener and new_pool['session_persistence'] !=
-                old_pool['session_persistence']):
+                old_pool['session_persistence'] and binding['lb_vs_id']):
                 self._process_vs_update(context, new_pool, listener,
                                         lb_pool_id, binding['lb_vs_id'],
                                         completor)
