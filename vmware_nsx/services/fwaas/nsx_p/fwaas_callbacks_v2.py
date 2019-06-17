@@ -359,8 +359,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
                 if not router_with_services and sr_exists_on_backend:
                     # No other services that require service router: delete it
                     # This also deleted the gateway policy.
-                    self.core_plugin.delete_service_router(
-                        context, router_id)
+                    self.core_plugin.delete_service_router(router_id)
                     sr_exists_on_backend = False
 
         if sr_exists_on_backend:
