@@ -449,7 +449,7 @@ class NsxPTestNetworks(test_db_base_plugin_v2.TestNetworksV2,
         self._test_transparent_vlan_net(
             net_type=utils.NsxV3NetworkTypes.GENEVE,
             tz_type=nsx_constants.TRANSPORT_TYPE_OVERLAY,
-            should_succeed=False)
+            should_succeed=True)
 
     def test_create_provider_flat_network_with_transparent(self):
         self._test_transparent_vlan_net(

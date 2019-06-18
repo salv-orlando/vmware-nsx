@@ -655,14 +655,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self.nsxpolicy.segment,
                 transparent_vlan=vlt)
 
-            # Vlan range is only supported with vlan transport zone
-            if (vlt and
-                provider_data['net_type'] != utils.NsxV3NetworkTypes.VLAN and
-                provider_data['net_type'] != utils.NsxV3NetworkTypes.FLAT):
-                err_msg = (_('vlan_transparent network can be configured only '
-                             'with network-type:vlan or flat'))
-                raise n_exc.InvalidInput(error_message=err_msg)
-
             if (provider_data['is_provider_net'] and
                 provider_data['net_type'] ==
                 utils.NsxV3NetworkTypes.NSX_NETWORK):
