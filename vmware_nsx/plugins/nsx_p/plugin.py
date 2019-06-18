@@ -1356,9 +1356,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         registry.notify(resources.PORT, events.AFTER_UPDATE, self, **kwargs)
         return updated_port
 
-    def get_port(self, context, port_id, fields=None):
+    def get_port(self, context, id, fields=None):
         port = super(NsxPolicyPlugin, self).get_port(
-            context, port_id, fields=None)
+            context, id, fields=None)
         self._extend_nsx_port_dict_binding(context, port)
         self._extend_qos_port_dict_binding(context, port)
         self._remove_provider_security_groups_from_list(port)
