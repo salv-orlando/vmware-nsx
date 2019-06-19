@@ -300,6 +300,9 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                               return_value=neutron_router), \
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
                               return_value=[]),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=False),\
             mock.patch.object(self.service_client, 'get_router_lb_service',
                               return_value=None),\
             mock.patch.object(self.service_client, 'create_or_overwrite'

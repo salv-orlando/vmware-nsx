@@ -86,6 +86,7 @@ from vmware_nsx.services.lbaas.nsx_p.implementation import listener_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import loadbalancer_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import member_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import pool_mgr
+from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.services.qos.common import utils as qos_com_utils
 from vmware_nsx.services.qos.nsx_v3 import driver as qos_driver
@@ -2062,6 +2063,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             tier1_id,
             nat_rule_id=self._get_fip_dnat_rule_id(fip_id))
 
+    def _update_lb_vip(self, port, vip_address):
+        # update the load balancer virtual server's VIP with
+        # floating ip, but don't add NAT rules
+        device_id = port['device_id']
+        if device_id.startswith(oct_const.DEVICE_ID_PREFIX):
+            device_id = device_id[len(oct_const.DEVICE_ID_PREFIX):]
+        tags_to_search = [{'scope': 'os-lbaas-lb-id', 'tag': device_id}]
+        vs_client = self.nsxpolicy.load_balancer.virtual_server
+        vs_list = self.nsxpolicy.search_by_tags(
+            tags_to_search, vs_client.entry_def.resource_type()
+        )['results']
+        for vs in vs_list:
+            vs_client.update(vs['id'], ip_address=vip_address)
+
     def create_floatingip(self, context, floatingip):
         # First do some validations
         fip_data = floatingip['floatingip']
@@ -2079,6 +2094,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if not router_id:
             return new_fip
 
+        if port_id:
+            device_owner = port_data.get('device_owner')
+            fip_address = new_fip['floating_ip_address']
+            if (device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
+                device_owner == oct_const.DEVICE_OWNER_OCTAVIA or
+                device_owner == lb_const.VMWARE_LB_VIP_OWNER):
+                try:
+                    self._update_lb_vip(port_data, fip_address)
+                except nsx_lib_exc.ManagerError:
+                    with excutils.save_and_reraise_exception():
+                        super(NsxPolicyPlugin, self).delete_floatingip(
+                            context, new_fip['id'])
+                return new_fip
+
         try:
             self._add_fip_nat_rules(
                 router_id, new_fip['id'],
@@ -2093,7 +2122,26 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def delete_floatingip(self, context, fip_id):
         fip = self.get_floatingip(context, fip_id)
         router_id = fip['router_id']
-        if router_id:
+        port_id = fip['port_id']
+        is_lb_port = False
+        if port_id:
+            port_data = self.get_port(context, port_id)
+            device_owner = port_data.get('device_owner')
+            fixed_ip_address = fip['fixed_ip_address']
+            if (device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
+                device_owner == oct_const.DEVICE_OWNER_OCTAVIA or
+                device_owner == lb_const.VMWARE_LB_VIP_OWNER):
+                # If the port is LB VIP port, after deleting the FIP,
+                # update the virtual server VIP back to fixed IP.
+                is_lb_port = True
+                try:
+                    self._update_lb_vip(port_data, fixed_ip_address)
+                except nsx_lib_exc.ManagerError as e:
+                    LOG.error("Exception when updating vip ip_address"
+                              "on vip_port %(port)s: %(err)s",
+                              {'port': port_id, 'err': e})
+
+        if router_id and not is_lb_port:
             self._delete_fip_nat_rules(router_id, fip_id)
 
         super(NsxPolicyPlugin, self).delete_floatingip(context, fip_id)
@@ -2101,6 +2149,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def update_floatingip(self, context, fip_id, floatingip):
         fip_data = floatingip['floatingip']
         old_fip = self.get_floatingip(context, fip_id)
+        old_port_id = old_fip['port_id']
         new_status = (const.FLOATINGIP_STATUS_ACTIVE
                       if fip_data.get('port_id')
                       else const.FLOATINGIP_STATUS_DOWN)
@@ -2114,14 +2163,41 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         new_fip = super(NsxPolicyPlugin, self).update_floatingip(
             context, fip_id, floatingip)
         router_id = new_fip['router_id']
+        new_port_id = new_fip['port_id']
 
-        if (old_fip['router_id'] and
+        # Delete old configuration NAT / vip
+        is_lb_port = False
+        if old_port_id:
+            old_port_data = self.get_port(context, old_port_id)
+            old_device_owner = old_port_data['device_owner']
+            old_fixed_ip = old_fip['fixed_ip_address']
+            if (old_device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
+                old_device_owner == oct_const.DEVICE_OWNER_OCTAVIA or
+                old_device_owner == lb_const.VMWARE_LB_VIP_OWNER):
+                # If the port is LB VIP port, after deleting the FIP,
+                # update the virtual server VIP back to fixed IP.
+                is_lb_port = True
+                self._update_lb_vip(old_port_data, old_fixed_ip)
+
+        if (not is_lb_port and old_fip['router_id'] and
             (not router_id or old_fip['router_id'] != router_id)):
             # Delete the old rules (if the router did not change - rewriting
             # the rules with _add_fip_nat_rules is enough)
             self._delete_fip_nat_rules(old_fip['router_id'], fip_id)
 
-        if router_id:
+        # Update LB VIP if the new port is LB port
+        is_lb_port = False
+        if new_port_id:
+            new_port_data = self.get_port(context, new_port_id)
+            new_dev_own = new_port_data['device_owner']
+            new_fip_address = new_fip['floating_ip_address']
+            if (new_dev_own == const.DEVICE_OWNER_LOADBALANCERV2 or
+                new_dev_own == oct_const.DEVICE_OWNER_OCTAVIA or
+                new_dev_own == lb_const.VMWARE_LB_VIP_OWNER):
+                is_lb_port = True
+                self._update_lb_vip(new_port_data, new_fip_address)
+
+        if router_id and not is_lb_port:
             self._add_fip_nat_rules(
                 router_id, new_fip['id'],
                 new_fip['floating_ip_address'],
