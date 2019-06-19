@@ -540,6 +540,9 @@ class TestVpnaasDriver(test_plugin.NsxPPluginTestCaseMixin):
         self.policy_vpn = self.plugin.nsxpolicy.ipsec_vpn
         self.l3plugin = self.plugin
 
+        mock.patch.object(self.plugin.nsxpolicy, 'search_by_tags',
+                          return_value={'results': []}).start()
+
     @contextlib.contextmanager
     def router(self, name='vpn-test-router', tenant_id=_uuid(),
                admin_state_up=True, **kwargs):
