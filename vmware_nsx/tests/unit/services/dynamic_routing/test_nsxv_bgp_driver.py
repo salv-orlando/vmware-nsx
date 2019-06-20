@@ -138,6 +138,9 @@ class TestNSXvBgpPlugin(test_plugin.NsxVPluginV2TestCase,
     def test__get_dvr_fixed_ip_routes_by_bgp_speaker_no_scope(self):
         self.skipTest("DVR specific.")
 
+    def test_get_external_networks_for_port_same_address_scope_v4(self):
+        self.skipTest("Temporarily broken by Neutron.")
+
     def test_create_v6_bgp_speaker(self):
         fake_bgp_speaker = {
             "bgp_speaker": {
