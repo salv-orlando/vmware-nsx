@@ -13,9 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from neutron_lib.api.definitions import availability_zone as az_def
 from neutron_lib.api.definitions import dns
 from neutron_lib.api import validators
+from neutron_lib.api.validators import availability_zone as az_validator
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
@@ -26,6 +26,8 @@ from neutron_lib.plugins import directory
 from oslo_config import cfg
 from oslo_log import log as logging
 
+from neutron.db.models import dns as dns_model
+from neutron.db import models_v2
 from neutron.services.externaldns import driver
 
 from vmware_nsx.common import driver_api
@@ -325,28 +327,56 @@ class DNSExtensionDriverNSXv3(DNSExtensionDriver):
         LOG.info("DNSExtensionDriverNSXv3 initialization complete")
         self.config_dns_domain = cfg.CONF.nsx_v3.dns_domain
 
-    def _get_network_and_az(self, network_id, context):
+    def _get_db_net_dns(self, session, network_id):
+        db_entry = session.query(dns_model.NetworkDNSDomain).filter_by(
+            network_id=network_id).first()
+        if db_entry:
+            return db_entry.dns_domain
+
+    def _get_db_net_az_hints(self, session, network_id):
+        # TODO(asarfaty): Consider caching networks azs in get_ports
+        # and use it here
+        db_entry = session.query(models_v2.Network).filter_by(
+            id=network_id).first()
+        if db_entry:
+            return db_entry.availability_zone_hints
+
+    def _get_network_and_az_dns_domain(self, network_id, context):
         if not context:
             context = n_context.get_admin_context()
-        network = self._get_network(context, network_id)
-        if az_def.AZ_HINTS in network and network[az_def.AZ_HINTS]:
-            az_name = network[az_def.AZ_HINTS][0]
-            az = self._availability_zones.get_availability_zone(az_name)
-            return network, az
-        az = self._availability_zones.get_default_availability_zone()
-        return network, az
+        # Getting only the relevant network attributes directly from the DB
+        net_domain = self._get_db_net_dns(context.session, network_id)
+
+        # Getting the az of the network is relevant only if any of the azs
+        # have dns_domain and if there is no net_domain
+        az_domain = None
+        if not net_domain and self._availability_zones.non_default_dns_domain:
+            az = None
+            net_hints = self._get_db_net_az_hints(context.session, network_id)
+            if net_hints:
+                hints = az_validator.convert_az_string_to_list(net_hints)
+                if hints:
+                    az_name = hints[0]
+                    az = self._availability_zones.get_availability_zone(
+                        az_name)
+            if not az:
+                # Get the default availability zone
+                az = self._availability_zones.get_default_availability_zone()
+            az_domain = az.dns_domain
+        return net_domain, az_domain
 
     def _get_dns_domain(self, network_id, context=None):
-        # first try to get the dns_domain configured on the network
-        net, az = self._get_network_and_az(network_id, context)
-        if net.get('dns_domain'):
-            return _dotted_domain(net['dns_domain'])
-        # try to get the dns-domain from the specific availability zone
+        net_domain, az_domain = self._get_network_and_az_dns_domain(
+            network_id, context)
+        # first try to use the dns_domain configured on the network
+        if net_domain:
+            return _dotted_domain(net_domain)
+        # try to use the dns-domain from the specific availability zone
         # of this network
-        if (az.dns_domain and
-            _dotted_domain(az.dns_domain) !=
+        if (az_domain and
+            _dotted_domain(az_domain) !=
             _dotted_domain(DNS_DOMAIN_DEFAULT)):
-            dns_domain = az.dns_domain
+            dns_domain = az_domain
         # Global nsx_v3 dns domain
         elif (self.config_dns_domain and
               (_dotted_domain(self.config_dns_domain) !=

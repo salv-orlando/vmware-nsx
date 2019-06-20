@@ -187,9 +187,16 @@ class NsxV3AvailabilityZones(common_az.ConfiguredAvailabilityZones):
             cfg.CONF.nsx_v3.availability_zones,
             NsxV3AvailabilityZone,
             default_availability_zones=default_azs)
+        self.non_default_dns_domain = self.dns_domain_configured_non_default()
 
     def dhcp_relay_configured(self):
         for az in self.availability_zones.values():
             if az.dhcp_relay_service:
+                return True
+        return False
+
+    def dns_domain_configured_non_default(self):
+        for az in self.availability_zones.values():
+            if az.dns_domain and az.dns_domain != cfg.CONF.nsx_v3.dns_domain:
                 return True
         return False

@@ -154,3 +154,10 @@ class NsxPAvailabilityZones(common_az.ConfiguredAvailabilityZones):
             cfg.CONF.nsx_p.availability_zones,
             NsxPAvailabilityZone,
             default_availability_zones=default_azs)
+        self.non_default_dns_domain = self.dns_domain_configured_non_default()
+
+    def dns_domain_configured_non_default(self):
+        for az in self.availability_zones.values():
+            if az.dns_domain and az.dns_domain != cfg.CONF.nsx_p.dns_domain:
+                return True
+        return False
