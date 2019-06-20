@@ -277,7 +277,7 @@ def build_persistence_profile_tags(pool_tags, listener):
 
 def get_pool_tags(context, core_plugin, pool):
     return get_tags(core_plugin, pool['id'],
-                    lb_const.LB_POOL_TYPE, pool['tenant_id'],
+                    lb_const.LB_POOL_TYPE, pool.get('tenant_id', ''),
                     context.project_name)
 
 
