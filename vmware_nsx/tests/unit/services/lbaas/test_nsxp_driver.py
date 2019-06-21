@@ -647,7 +647,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
-    def test_update_with_session_persistence_fail(self):
+    def test_update_with_session_persistence_change(self):
         old_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1', 'description',
                                           self.pool_persistency.id,
@@ -659,7 +659,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             old_listener)
         sess_persistence = lb_models.SessionPersistence(
             POOL_ID, 'SOURCE_IP')
-        pool_persistency = lb_models.Pool(POOL_ID, LB_TENANT_ID,
+        pool_persistency = lb_models.Pool('new_pool_id', LB_TENANT_ID,
                                    'pool1', '', None, 'HTTP',
                                    'ROUND_ROBIN', loadbalancer_id=LB_ID,
                                    listener=self.listener,
@@ -678,13 +678,27 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         with mock.patch.object(self.core_plugin,
                                'get_waf_profile_path_and_mode',
                                return_value=(None, None)), \
+            mock.patch.object(self.pp_client, 'create_or_overwrite'
+                              ) as mock_create_pp, \
+            mock.patch.object(self.pp_generic_client, 'delete'
+                              ) as mock_delete_pp, \
             mock.patch.object(self.core_plugin, 'get_floatingips'
-                              ) as mock_get_floatingips:
+                              ) as mock_get_floatingips, \
+            mock.patch.object(self.edge_driver.listener,
+                              '_get_pool_tags'
+                              ) as mock_get_pool_tags:
+            mock_get_pool_tags.return_value = []
             mock_get_floatingips.return_value = []
-            self.assertRaises(n_exc.BadRequest,
-                              self.edge_driver.listener.update,
-                              self.context, old_listener_dict,
-                              new_listener_dict, self.completor)
+            self.edge_driver.listener.update(
+                self.context, old_listener_dict,
+                new_listener_dict, self.completor)
+            mock_create_pp.assert_called_once_with(
+                name='persistence_pool1_new_p...ol_id',
+                persistence_profile_id='new_pool_id_sourceip',
+                tags=mock.ANY)
+            # No reason to check parameters here, it's
+            # all mocked out
+            mock_delete_pp.assert_called_once()
 
     def test_delete(self):
         with mock.patch.object(self.service_client, 'get'
@@ -756,11 +770,11 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                 cookie_name='meh_cookie',
                 name=mock.ANY,
                 tags=mock.ANY,
-                persistence_profile_id=POOL_ID)
+                persistence_profile_id="%s_cookie" % LB_PP_ID)
             mock_update_pp.assert_not_called()
             mock_vs_update.assert_called_once_with(
                 LB_VS_ID, pool_id=LB_POOL_ID,
-                lb_persistence_profile_id=LB_PP_ID)
+                lb_persistence_profile_id="%s_cookie" % LB_PP_ID)
         vs_data = {'id': LB_VS_ID}
         self._test_create_with_persistency(vs_data, verify_func)
 
@@ -875,17 +889,49 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                 cookie_name='meh_cookie',
                 name=mock.ANY,
                 tags=mock.ANY,
-                persistence_profile_id=LB_POOL_ID)
+                persistence_profile_id="%s_cookie" % LB_PP_ID)
             mock_update_pp.assert_not_called()
             mock_delete_pp.assert_not_called()
             mock_vs_update.assert_called_once_with(
                 LB_VS_ID, pool_id=LB_POOL_ID,
-                lb_persistence_profile_id=LB_PP_ID)
+                lb_persistence_profile_id="%s_cookie" % LB_PP_ID)
 
         vs_data = {'id': LB_VS_ID}
         self._test_update_with_persistency(vs_data, self.pool,
                                            self.pool_persistency, verify_func,
                                            cookie=True)
+
+    def test_update_switch_persistency_type(self):
+
+        def verify_func(mock_create_pp, mock_update_pp,
+                        mock_delete_pp, mock_vs_update):
+            mock_create_pp.assert_called_once_with(
+                name=mock.ANY,
+                tags=mock.ANY,
+                persistence_profile_id="%s_sourceip" % LB_PP_ID)
+            mock_update_pp.assert_not_called()
+            mock_delete_pp.assert_called_once()
+            mock_vs_update.assert_called_once_with(
+                LB_VS_ID, pool_id=LB_POOL_ID,
+                lb_persistence_profile_id="%s_sourceip" % LB_PP_ID)
+
+        ip_sess_persistence = lb_models.SessionPersistence(
+            POOL_ID, 'SOURCE_IP')
+        pool_ip_persistency = lb_models.Pool(
+            POOL_ID, LB_TENANT_ID,
+            'pool1', '', None, 'HTTP',
+            'ROUND_ROBIN', loadbalancer_id=LB_ID,
+            listener=self.listener,
+            listeners=[self.listener],
+            loadbalancer=self.lb,
+            session_persistence=ip_sess_persistence)
+
+        vs_data = {'id': LB_VS_ID,
+                   'lb_persistence_profile_path': 'meh'}
+        self._test_update_with_persistency(vs_data,
+                                           self.pool_persistency,
+                                           pool_ip_persistency,
+                                           verify_func,)
 
     def test_update_remove_persistency(self):
         def verify_func(mock_create_pp, mock_update_pp,
@@ -940,14 +986,14 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                        mock_create_pp, mock_update_pp):
         if cookie_name:
             mock_create_pp.assert_called_once_with(
-                persistence_profile_id=POOL_ID,
+                persistence_profile_id="%s_cookie" % LB_PP_ID,
                 cookie_name=cookie_name,
                 cookie_mode=cookie_mode,
                 name=mock.ANY,
                 tags=mock.ANY)
         else:
             mock_create_pp.assert_called_once_with(
-                persistence_profile_id=POOL_ID,
+                persistence_profile_id="%s_sourceip" % LB_PP_ID,
                 name=mock.ANY,
                 tags=mock.ANY)
         # Compare tags - kw args are the last item of a mock call tuple
@@ -961,14 +1007,14 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                        mock_create_pp, mock_update_pp):
         if cookie_name:
             mock_update_pp.assert_called_once_with(
-                LB_PP_ID,
+                "%s_cookie" % LB_PP_ID,
                 cookie_name=cookie_name,
                 cookie_mode=cookie_mode,
                 name=mock.ANY,
                 tags=mock.ANY)
         else:
             mock_update_pp.assert_called_once_with(
-                LB_PP_ID,
+                "%s_sourceip" % LB_PP_ID,
                 name=mock.ANY,
                 tags=mock.ANY)
         # Compare tags - kw args are the last item of a mock call tuple
@@ -985,7 +1031,9 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
 
     def _test_setup_session_persistence(self, session_persistence,
                                         vs_data, verify_func,
-                                        cookie_name=None, cookie_mode=None):
+                                        cookie_name=None,
+                                        cookie_mode=None,
+                                        switch_type=False):
         with mock.patch.object(self.pp_client, 'create_or_overwrite'
                                ) as mock_create_pp, \
             mock.patch.object(self.pp_cookie_client, 'create_or_overwrite'
@@ -998,10 +1046,15 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.pool.session_persistence = session_persistence
             pool_dict = lb_translators.lb_pool_obj_to_dict(self.pool)
             pp_id, post_func = p_utils.setup_session_persistence(
-                self.nsxpolicy, pool_dict, [], self.listener_dict, vs_data)
-
+                self.nsxpolicy, pool_dict, [], switch_type,
+                self.listener_dict, vs_data)
+            pp_id_suffix = ""
             if session_persistence:
-                self.assertEqual(LB_PP_ID, pp_id)
+                if session_persistence.type == "SOURCE_IP":
+                    pp_id_suffix = "sourceip"
+                elif session_persistence.type in ["HTTP_COOKIE", "APP_COOKIE"]:
+                    pp_id_suffix = "cookie"
+                self.assertEqual("%s_%s" % (LB_PP_ID, pp_id_suffix), pp_id)
             else:
                 self.assertIsNone(pp_id)
                 self.assertEqual(
@@ -1014,20 +1067,21 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                         else mock_update_pp)
 
     def test_setup_session_persistence_sourceip_new_profile(self):
-        sess_persistence = lb_models.SessionPersistence(POOL_ID, 'SOURCE_IP')
+        sess_persistence = lb_models.SessionPersistence(
+            "%s_sourceip" % LB_PP_ID, 'SOURCE_IP')
         self._test_setup_session_persistence(
             sess_persistence, {'id': LB_VS_ID}, self._verify_create)
 
     def test_setup_session_persistence_httpcookie_new_profile(self):
         sess_persistence = lb_models.SessionPersistence(
-            POOL_ID, 'HTTP_COOKIE')
+            "%s_cookie" % LB_PP_ID, 'HTTP_COOKIE')
         self._test_setup_session_persistence(
             sess_persistence, {'id': LB_VS_ID},
             self._verify_create, 'default_cookie_name', 'INSERT')
 
     def test_setup_session_persistence_appcookie_new_profile(self):
         sess_persistence = lb_models.SessionPersistence(
-            POOL_ID, 'APP_COOKIE', 'whatever')
+            "%s_cookie" % LB_PP_ID, 'APP_COOKIE', 'whatever')
         self._test_setup_session_persistence(
             sess_persistence, {'id': LB_VS_ID},
             self._verify_create, 'whatever', 'REWRITE')
@@ -1036,30 +1090,36 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
         sess_persistence = None
         self._test_setup_session_persistence(
             sess_persistence,
-            {'id': LB_VS_ID, 'lb_persistence_profile_path': LB_PP_ID},
+            {'id': LB_VS_ID,
+             'lb_persistence_profile_path': "%s_sourceip" % LB_PP_ID},
             self._verify_delete)
 
     def test_setup_session_persistence_sourceip_from_existing(self):
-        sess_persistence = lb_models.SessionPersistence(POOL_ID, 'SOURCE_IP')
+        sess_persistence = lb_models.SessionPersistence(
+            "%s_sourceip" % LB_PP_ID, 'SOURCE_IP')
         self._test_setup_session_persistence(
             sess_persistence,
-            {'id': LB_VS_ID, 'lb_persistence_profile_path': LB_PP_ID},
+            {'id': LB_VS_ID,
+             'lb_persistence_profile_path': "%s_sourceip" % LB_PP_ID},
             self._verify_update)
 
     def test_setup_session_persistence_httpcookie_from_existing(self):
-        sess_persistence = lb_models.SessionPersistence(POOL_ID, 'HTTP_COOKIE')
+        sess_persistence = lb_models.SessionPersistence(
+            "%s_cookie" % LB_PP_ID, 'HTTP_COOKIE')
         self._test_setup_session_persistence(
             sess_persistence,
-            {'id': LB_VS_ID, 'lb_persistence_profile_path': LB_PP_ID},
+            {'id': LB_VS_ID,
+             'lb_persistence_profile_path': '%s_cookie' % LB_PP_ID},
             self._verify_update,
             'default_cookie_name', 'INSERT')
 
     def test_setup_session_persistence_appcookie_from_existing(self):
         sess_persistence = lb_models.SessionPersistence(
-            POOL_ID, 'APP_COOKIE', 'whatever')
+            "%s_cookie" % LB_PP_ID, 'APP_COOKIE', 'whatever')
         self._test_setup_session_persistence(
             sess_persistence,
-            {'id': LB_VS_ID, 'lb_persistence_profile_path': LB_PP_ID},
+            {'id': LB_VS_ID,
+             'lb_persistence_profile_path': '%s_cookie' % LB_PP_ID},
             self._verify_update,
             'whatever', 'REWRITE')
 

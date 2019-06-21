@@ -191,7 +191,8 @@ def delete_persistence_profile(nsxpolicy, lb_persistence_profile_path):
         pp_client.delete(persistence_profile_id)
 
 
-def setup_session_persistence(nsxpolicy, pool, pool_tags, listener, vs_data):
+def setup_session_persistence(nsxpolicy, pool, pool_tags, switch_type,
+                              listener, vs_data):
     sp = pool.get('session_persistence')
     pers_type = None
     cookie_name = None
@@ -203,6 +204,7 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, listener, vs_data):
     elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_HTTP_COOKIE:
         pp_client = lb_client.lb_cookie_persistence_profile
         pers_type = nsxlib_lb.PersistenceProfileTypes.COOKIE
+        pers_id_suffix = 'cookie'
         cookie_name = sp.get('cookie_name')
         if not cookie_name:
             cookie_name = lb_const.SESSION_PERSISTENCE_DEFAULT_COOKIE_NAME
@@ -210,12 +212,14 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, listener, vs_data):
     elif sp['type'] == lb_const.LB_SESSION_PERSISTENCE_APP_COOKIE:
         pp_client = lb_client.lb_cookie_persistence_profile
         pers_type = nsxlib_lb.PersistenceProfileTypes.COOKIE
+        pers_id_suffix = 'cookie'
         # In this case cookie name is mandatory
         cookie_name = sp['cookie_name']
         cookie_mode = "REWRITE"
     else:
         pp_client = lb_client.lb_source_ip_persistence_profile
         pers_type = nsxlib_lb.PersistenceProfileTypes.SOURCE_IP
+        pers_id_suffix = 'sourceip'
     if pers_type:
         # There is a profile to create or update
         pp_kwargs = {
@@ -230,7 +234,7 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, listener, vs_data):
 
     profile_path = vs_data.get('lb_persistence_profile_path', '')
     persistence_profile_id = p_utils.path_to_id(profile_path)
-    if persistence_profile_id:
+    if persistence_profile_id and not switch_type:
         # NOTE: removal of the persistence profile must be executed
         # after the virtual server has been updated
         if pers_type:
@@ -248,7 +252,7 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, listener, vs_data):
                                             nsxpolicy, profile_path))
     elif pers_type:
         # Create persistence profile
-        pp_id = pool['id']
+        pp_id = "%s_%s" % (pool['id'], pers_id_suffix)
         pp_kwargs['persistence_profile_id'] = pp_id
         pp_client.create_or_overwrite(**pp_kwargs)
         LOG.debug("Created persistence profile %(profile_id)s for "
@@ -256,5 +260,10 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, listener, vs_data):
                   {'profile_id': pp_id,
                    'listener_id': listener['id'],
                    'pool_id': pool['id']})
+        if switch_type:
+            # There is aso a persistence profile to remove!
+            return (pp_id, functools.partial(delete_persistence_profile,
+                                             nsxpolicy, profile_path))
+
         return pp_id, None
     return None, None

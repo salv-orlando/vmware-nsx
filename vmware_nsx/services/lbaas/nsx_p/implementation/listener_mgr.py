@@ -135,8 +135,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         return app_client
 
-    def _validate_default_pool(self, listener, completor,
-                               old_listener=None):
+    def _validate_default_pool(self, listener, completor):
         def_pool_id = listener.get('default_pool_id')
         if def_pool_id:
             vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
@@ -149,14 +148,8 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                              'listener') % listener['default_pool_id'])
                     raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
 
-            # Perform additional validation for session persistence before
-            # creating resources in the backend
-            old_pool = None
-            if old_listener:
-                old_pool = old_listener.get('default_pool')
             lb_common.validate_session_persistence(
-                listener.get('default_pool'), listener, completor,
-                old_pool=old_pool)
+                listener.get('default_pool'), listener, completor)
 
     @log_helpers.log_method_call
     def create(self, context, listener, completor,
@@ -183,12 +176,14 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    def _get_pool_tags(self, context, pool):
+    def _get_pool_tags(self, context, pool, listener_tenant_id):
         return lb_utils.get_tags(self.core_plugin, pool['id'],
-                                 lb_const.LB_POOL_TYPE, pool['tenant_id'],
+                                 lb_const.LB_POOL_TYPE,
+                                 pool.get('tenant_id', listener_tenant_id),
                                  context.project_name)
 
-    def _update_default_pool(self, context, listener, completor):
+    def _update_default_pool(self, context, listener,
+                             completor, old_listener=None):
         if not listener.get('default_pool_id'):
             return
         nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
@@ -196,13 +191,18 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         vs_data = vs_client.get(listener['id'])
         pool_id = listener['default_pool_id']
         pool = listener['default_pool']
+        old_pool = None
+        if old_listener:
+            old_pool = old_listener.get('default_pool')
         try:
+            switch_type = lb_common.session_persistence_type_changed(
+                pool, old_pool)
             (persistence_profile_id,
              post_process_func) = lb_utils.setup_session_persistence(
                 self.core_plugin.nsxpolicy,
                 pool,
-                self._get_pool_tags(context, pool),
-                listener, vs_data)
+                self._get_pool_tags(context, pool, listener.get('tenant_id')),
+                switch_type, listener, vs_data)
         except nsxlib_exc.ManagerError:
             with excutils.save_and_reraise_exception():
                 completor(success=False)
@@ -236,8 +236,8 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         vs_name = None
         tags = None
-        self._validate_default_pool(new_listener, completor,
-                                    old_listener=old_listener)
+        self._validate_default_pool(new_listener, completor)
+
         if new_listener['name'] != old_listener['name']:
             vs_name = utils.get_name_and_uuid(
                 new_listener['name'] or 'listener',
@@ -262,7 +262,8 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # Update default pool and session persistence
         if (old_listener.get('default_pool_id') !=
             new_listener.get('default_pool_id')):
-            self._update_default_pool(context, new_listener, completor)
+            self._update_default_pool(context, new_listener,
+                                      completor, old_listener)
         completor(success=True)
 
     @log_helpers.log_method_call

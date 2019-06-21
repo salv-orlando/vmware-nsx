@@ -20,7 +20,7 @@ from vmware_nsx.services.lbaas import lb_const
 
 
 @log_helpers.log_method_call
-def validate_session_persistence(pool, listener, completor, old_pool=None):
+def validate_session_persistence(pool, listener, completor):
     sp = pool.get('session_persistence')
     if not listener or not sp:
         # safety first!
@@ -35,23 +35,21 @@ def validate_session_persistence(pool, listener, completor, old_pool=None):
                 'lst_id': listener['id'],
                 'proto': listener['protocol']})
         raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
-    # Cannot switch (yet) on update from source IP to cookie based, and
-    # vice versa
+
+
+def session_persistence_type_changed(pool, old_pool):
     cookie_pers_types = (lb_const.LB_SESSION_PERSISTENCE_HTTP_COOKIE,
                          lb_const.LB_SESSION_PERSISTENCE_APP_COOKIE)
+    sp = pool.get('session_persistence')
+    if not sp:
+        return False
     if old_pool:
         oldsp = old_pool.get('session_persistence')
         if not oldsp:
-            return
+            return False
         if ((sp['type'] == lb_const.LB_SESSION_PERSISTENCE_SOURCE_IP and
              oldsp['type'] in cookie_pers_types) or
                 (sp['type'] in cookie_pers_types and
                  oldsp['type'] == lb_const.LB_SESSION_PERSISTENCE_SOURCE_IP)):
-            completor(success=False)
-            msg = (_("Cannot update session persistence type to "
-                     "%(sp_type)s for pool on listener %(lst_id)s "
-                     "from %(old_sp_type)s") %
-                   {'sp_type': sp['type'],
-                    'lst_id': listener['id'],
-                    'old_sp_type': oldsp['type']})
-            raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
+            return True
+    return False
