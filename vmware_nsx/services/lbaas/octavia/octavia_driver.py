@@ -173,7 +173,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                 if 'listeners' not in pool_dict:
                     pool_dict['listeners'] = []
 
-    def _get_pool_dict(self, pool_id, is_update):
+    def _get_pool_dict(self, pool_id, is_update, parent_project_id=None):
         if not pool_id:
             return {}
         db_pool = self.repositories.pool.get(db_apis.get_session(), id=pool_id)
@@ -192,6 +192,8 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
         # make sure this pool has a project id
         if 'project_id' not in pool_dict:
             project_id = self.get_obj_project_id('Pool', pool_dict)
+            if project_id is None:
+                project_id = parent_project_id
             pool_dict['tenant_id'] = pool_dict['project_id'] = project_id
 
         return pool_dict
@@ -289,6 +291,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                             pool['healthmonitor'] = self._get_hm_dict(
                                 pool['healthmonitor']['healthmonitor_id'],
                                 is_update)
+                        pool['tenant_id'] = project_id
 
         elif obj_type == 'Listener':
             if 'l7policies' in obj_dict:
@@ -300,7 +303,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
             if obj_dict.get('default_pool_id'):
                 # Generate the default pool object
                 obj_dict['default_pool'] = self._get_pool_dict(
-                    obj_dict['default_pool_id'], is_update)
+                    obj_dict['default_pool_id'], is_update, project_id)
             # TODO(asarfaty): add default_tls_container_id
 
         elif obj_type == 'Pool':
