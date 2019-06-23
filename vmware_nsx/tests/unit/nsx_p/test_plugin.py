@@ -1435,6 +1435,9 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
     def setUp(self, *args, **kwargs):
         super(NsxPTestL3NatTestCase, self).setUp(*args, **kwargs)
 
+        mock.patch.object(self.plugin.nsxpolicy, 'search_by_tags',
+                          return_value={'results': []}).start()
+
     def test__notify_gateway_port_ip_changed(self):
         self.skipTest('not supported')
 
