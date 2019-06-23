@@ -23,6 +23,7 @@ from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils as p_utils
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3.policy import utils as lib_p_utils
 from vmware_nsxlib.v3 import utils
@@ -68,9 +69,21 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                    {'lb_id': lb_id, 'subnet': lb['vip_subnet_id']})
             raise n_exc.BadRequest(resource='lbaas-subnet', msg=msg)
 
-        if router_id and not self.core_plugin.service_router_has_services(
+        if router_id:
+            # Validate that there is no other LB on this router
+            # as NSX does not allow it
+            if self.core_plugin.service_router_has_loadbalancers(
                 context.elevated(), router_id):
-            self.core_plugin.create_service_router(context, router_id)
+                completor(success=False)
+                msg = (_('Cannot create a loadbalancer %(lb_id)s on router '
+                         '%(router)s, as it already has a loadbalancer') %
+                       {'lb_id': lb_id, 'router': router_id})
+                raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
+
+            # Create the service router if it does not exist
+            if not self.core_plugin.service_router_has_services(
+                context.elevated(), router_id):
+                self.core_plugin.create_service_router(context, router_id)
 
         lb_name = utils.get_name_and_uuid(lb['name'] or 'lb',
                                           lb_id)
@@ -103,6 +116,14 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 LOG.error('Failed to create loadbalancer %(lb)s for lb with '
                           'exception %(e)s', {'lb': lb['id'], 'e': e})
 
+        # Make sure the vip port is marked with a device owner
+        port = self.core_plugin.get_port(
+            context.elevated(), lb['vip_port_id'])
+        if not port.get('device_owner'):
+            self.core_plugin.update_port(
+                context.elevated(), lb['vip_port_id'],
+                {'port': {'device_id': oct_const.DEVICE_ID_PREFIX + lb['id'],
+                          'device_owner': lb_const.VMWARE_LB_VIP_OWNER}})
         completor(success=True)
 
     @log_helpers.log_method_call
@@ -145,6 +166,15 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                     LOG.error('Failed to delete service router upon deletion '
                               'of loadbalancer %(lb)s with error %(err)s',
                               {'lb': lb['id'], 'err': e})
+
+        # Make sure the vip port is not marked with a vmware device owner
+        port = self.core_plugin.get_port(
+            context.elevated(), lb['vip_port_id'])
+        if port.get('device_owner') == lb_const.VMWARE_LB_VIP_OWNER:
+            self.core_plugin.update_port(
+                context.elevated(), lb['vip_port_id'],
+                {'port': {'device_id': '',
+                          'device_owner': ''}})
 
         completor(success=True)
 

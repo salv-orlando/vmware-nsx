@@ -35,6 +35,9 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
     @log_helpers.log_method_call
     def create(self, context, lb, completor):
+
+        # TODO(asarfaty): If the lb is created with a port_id,
+        # need to set octavia device owner & device id on it.
         if not lb_utils.validate_lb_subnet(context, self.core_plugin,
                                            lb['vip_subnet_id']):
             completor(success=False)
