@@ -1558,13 +1558,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         router_subnets = self._find_router_subnets(
             context.elevated(), router_id)
         sr_currently_exists = self.verify_sr_at_backend(router_id)
-        lb_exist = self.service_router_has_loadbalancers(context, router_id)
         fw_exist = self._router_has_edge_fw_rules(context, router)
-        # TODO(asarfaty): Add vpnaas check here
+        vpn_exist = self.service_router_has_vpnaas(context, router_id)
+        lb_exist = False
+        if not (fw_exist or vpn_exist):
+            # This is a backend call, so do it only if must
+            lb_exist = self.service_router_has_loadbalancers(
+                context, router_id)
+        tier1_services_exist = fw_exist or vpn_exist or lb_exist
         actions = self._get_update_router_gw_actions(
             org_tier0_uuid, orgaddr, org_enable_snat,
             new_tier0_uuid, newaddr, new_enable_snat,
-            lb_exist, fw_exist, sr_currently_exists)
+            tier1_services_exist, sr_currently_exists)
 
         if actions['add_service_router']:
             self.create_service_router(context, router_id, router=router)

@@ -1286,7 +1286,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         self,
         org_tier0_uuid, orgaddr, org_enable_snat,
         new_tier0_uuid, newaddr, new_enable_snat,
-        lb_exist, fw_exist, sr_currently_exists):
+        tier1_services_exist, sr_currently_exists):
         """Return a dictionary of flags indicating which actions should be
            performed on this router GW update.
         """
@@ -1357,22 +1357,22 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             # Should remove the service router if the GW was removed,
             # or no service needs it: SNAT, LBaaS or FWaaS
             actions['remove_service_router'] = (
-                not has_gw or not (fw_exist or lb_exist or new_with_snat))
+                not has_gw or not (tier1_services_exist or new_with_snat))
             if actions['remove_service_router']:
-                LOG.info("Removing service router [has GW: %s, FW %s, LB %s, "
+                LOG.info("Removing service router [has GW: %s, services %s, "
                          "SNAT %s]",
-                         has_gw, fw_exist, lb_exist, new_with_snat)
+                         has_gw, tier1_services_exist, new_with_snat)
         else:
             # currently there is no service router on the backend
             actions['remove_service_router'] = False
             # Should add service router if there is a GW
             # and there is a service that needs it: SNAT, LB or FWaaS
             actions['add_service_router'] = (
-                has_gw is not None and (new_with_snat or fw_exist or lb_exist))
+                has_gw is not None and (new_with_snat or tier1_services_exist))
             if actions['add_service_router']:
-                LOG.info("Adding service router [has GW: %s, FW %s, LB %s, "
+                LOG.info("Adding service router [has GW: %s, services %s, "
                          "SNAT %s]",
-                         has_gw, fw_exist, lb_exist, new_with_snat)
+                         has_gw, tier1_services_exist, new_with_snat)
 
         return actions
 

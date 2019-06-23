@@ -2182,12 +2182,13 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         lb_exist = nsx_db.has_nsx_lbaas_loadbalancer_binding_by_router(
             context.session, nsx_router_id)
         fw_exist = self._router_has_edge_fw_rules(context, router)
+        tier1_services_exist = lb_exist or fw_exist
         sr_currently_exists = self.verify_sr_at_backend(context, router_id)
 
         actions = self._get_update_router_gw_actions(
             org_tier0_uuid, orgaddr, org_enable_snat,
             new_tier0_uuid, newaddr, new_enable_snat,
-            lb_exist, fw_exist, sr_currently_exists)
+            tier1_services_exist, sr_currently_exists)
 
         if actions['add_service_router']:
             self.create_service_router(context, router_id, router=router)
