@@ -259,7 +259,7 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 hm_binding = nsx_db.get_nsx_lbaas_monitor_binding(
                     context.session, lb_id, pool['id'], hm['id'])
                 if hm_binding:
-                    lb_monitor_id = binding['lb_monitor_id']
+                    lb_monitor_id = hm_binding['lb_monitor_id']
                     try:
                         monitor_client.delete(lb_monitor_id)
                     except nsxlib_exc.ResourceNotFound:
