@@ -190,7 +190,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
         if 'listener' not in pool_dict:
             self._get_listener_in_pool_dict(pool_dict, is_update)
         # make sure this pool has a project id
-        if 'project_id' not in pool_dict:
+        if not pool_dict.get('project_id'):
             project_id = self.get_obj_project_id('Pool', pool_dict)
             if project_id is None:
                 project_id = parent_project_id

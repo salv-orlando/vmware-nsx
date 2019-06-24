@@ -39,7 +39,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     def _get_listener_tags(self, context, listener):
         tags = lb_utils.get_tags(self.core_plugin, listener['id'],
                                  lb_const.LB_LISTENER_TYPE,
-                                 listener['tenant_id'],
+                                 listener.get('tenant_id'),
                                  context.project_name)
         tags.append({
             'scope': lb_const.LB_LB_NAME,
