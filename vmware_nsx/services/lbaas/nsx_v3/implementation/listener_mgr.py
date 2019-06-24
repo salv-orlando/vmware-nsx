@@ -123,17 +123,11 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                          'listener') % listener['default_pool_id'])
                 raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
 
-            # Perform additional validation for session persistence before
-            # creating resources in the backend
-            old_pool = None
-            if old_listener:
-                old_pool = old_listener.get('default_pool')
             lb_common.validate_session_persistence(
-                listener.get('default_pool'), listener, completor,
-                old_pool=old_pool)
+                listener.get('default_pool'), listener, completor)
 
     def _update_default_pool_and_binding(self, context, listener, vs_data,
-                                         completor):
+                                         completor, old_listener=None):
         vs_client = self.core_plugin.nsxlib.load_balancer.virtual_server
         if listener.get('default_pool_id'):
             vs_id = vs_data['id']
@@ -141,13 +135,18 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                      listener.get('loadbalancer', {}).get('id'))
             pool_id = listener['default_pool_id']
             pool = listener['default_pool']
+            old_pool = None
+            if old_listener:
+                old_pool = old_listener.get('default_pool')
             try:
+                switch_type = lb_common.session_persistence_type_changed(
+                    pool, old_pool)
                 (persistence_profile_id,
                  post_process_func) = lb_utils.setup_session_persistence(
                     self.core_plugin.nsxlib,
                     pool,
                     lb_utils.get_pool_tags(context, self.core_plugin, pool),
-                    listener, vs_data)
+                    switch_type, listener, vs_data)
             except nsxlib_exc.ManagerError:
                 with excutils.save_and_reraise_exception():
                     completor(success=False)
@@ -301,7 +300,8 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             new_listener.get('default_pool_id')):
             self._remove_default_pool_binding(context, old_listener)
             self._update_default_pool_and_binding(context, new_listener,
-                                                  vs_data, completor)
+                                                  vs_data, completor,
+                                                  old_listener)
 
         completor(success=True)
 

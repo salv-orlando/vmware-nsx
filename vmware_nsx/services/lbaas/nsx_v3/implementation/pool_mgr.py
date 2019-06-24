@@ -49,7 +49,7 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         kwargs['snat_translation'] = {'type': "LbSnatAutoMap"}
         return kwargs
 
-    def _process_vs_update(self, context, pool, listener,
+    def _process_vs_update(self, context, pool, switch_type, listener,
                            nsx_pool_id, nsx_vs_id, completor):
         LOG.debug("Processing NSX virtual server update for pool %(pool_id)s. "
                   "Will update VS %(nsx_vs_id)s", {'pool_id': pool['id'],
@@ -64,7 +64,7 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                  post_process_func) = lb_utils.setup_session_persistence(
                     self.core_plugin.nsxlib,
                     pool, self._get_pool_tags(context, pool),
-                    listener, vs_data)
+                    switch_type, listener, vs_data)
             else:
                 post_process_func = functools.partial(
                     lb_utils.delete_persistence_profile,
@@ -146,7 +146,7 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 vs_id = binding['lb_vs_id']
                 # Updae the virtual server only if it exists
                 if vs_id:
-                    self._process_vs_update(context, pool, listener,
+                    self._process_vs_update(context, pool, False, listener,
                                             lb_pool['id'], vs_id, completor)
                     nsx_db.update_nsx_lbaas_pool_binding(
                         context.session, lb_id, pool['id'], vs_id)
@@ -194,9 +194,7 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
         # Perform additional validation for session persistence before
         # operating on resources in the backend
-        lb_common.validate_session_persistence(new_pool, listener, completor,
-                                               old_pool=old_pool)
-
+        lb_common.validate_session_persistence(new_pool, listener, completor)
         try:
             lb_pool_id = binding['lb_pool_id']
             kwargs = self._get_pool_kwargs(pool_name, tags, lb_algorithm,
@@ -206,9 +204,11 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             # in session persistence
             if (listener and new_pool['session_persistence'] !=
                 old_pool['session_persistence'] and binding['lb_vs_id']):
-                self._process_vs_update(context, new_pool, listener,
-                                        lb_pool_id, binding['lb_vs_id'],
-                                        completor)
+                switch_type = lb_common.session_persistence_type_changed(
+                    new_pool, old_pool)
+                self._process_vs_update(context, new_pool, switch_type,
+                                        listener, lb_pool_id,
+                                        binding['lb_vs_id'], completor)
             completor(success=True)
         except Exception as e:
             with excutils.save_and_reraise_exception():
@@ -236,7 +236,7 @@ class EdgePoolManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                     # If listeners is an empty list we hit this exception
                     listener = None
                 if listener:
-                    self._process_vs_update(context, pool, listener,
+                    self._process_vs_update(context, pool, False, listener,
                                             None, vs_id, completor)
 
             try:

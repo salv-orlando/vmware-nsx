@@ -282,7 +282,8 @@ def get_pool_tags(context, core_plugin, pool):
 
 
 @log_helpers.log_method_call
-def setup_session_persistence(nsxlib, pool, pool_tags, listener, vs_data):
+def setup_session_persistence(nsxlib, pool, pool_tags,
+                              switch_type, listener, vs_data):
     sp = pool.get('session_persistence')
     pers_type = None
     cookie_name = None
@@ -317,7 +318,7 @@ def setup_session_persistence(nsxlib, pool, pool_tags, listener, vs_data):
 
     pp_client = nsxlib.load_balancer.persistence_profile
     persistence_profile_id = vs_data.get('persistence_profile_id')
-    if persistence_profile_id:
+    if persistence_profile_id and not switch_type:
         # NOTE: removal of the persistence profile must be executed
         # after the virtual server has been updated
         if pers_type:
@@ -341,5 +342,10 @@ def setup_session_persistence(nsxlib, pool, pool_tags, listener, vs_data):
                   {'profile_id': pp_data['id'],
                    'listener_id': listener['id'],
                    'pool_id': pool['id']})
+        if switch_type:
+            # There is also a persistence profile to remove!
+            return (pp_data['id'],
+                    functools.partial(delete_persistence_profile,
+                                      nsxlib, persistence_profile_id))
         return pp_data['id'], None
     return None, None

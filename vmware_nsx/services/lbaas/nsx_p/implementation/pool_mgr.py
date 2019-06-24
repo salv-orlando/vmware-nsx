@@ -56,7 +56,8 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             self.core_plugin.nsxpolicy,
             vs_data.get('lb_persistence_profile_path', ''))
 
-    def _process_vs_update(self, context, pool, pool_id, listener, completor):
+    def _process_vs_update(self, context, pool, pool_id, switch_type,
+                           listener, completor):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         try:
             # Process pool persistence profile and
@@ -67,7 +68,7 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                  post_process_func) = lb_utils.setup_session_persistence(
                     self.core_plugin.nsxpolicy, pool,
                     self._get_pool_tags(context, pool),
-                    listener, vs_data)
+                    switch_type, listener, vs_data)
             else:
                 post_process_func = functools.partial(
                     self._remove_persistence, vs_data)
@@ -139,8 +140,8 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # FIXME(salv-orlando): This two-step process can leave a zombie pool on
         # NSX if the VS update operation fails
         if listener:
-            self._process_vs_update(context, pool, pool['id'], listener,
-                                    completor)
+            self._process_vs_update(context, pool, pool['id'], False,
+                                    listener, completor)
         completor(success=True)
 
     @log_helpers.log_method_call
@@ -174,17 +175,17 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             listener = None
             # Perform additional validation for session persistence before
             # operating on resources in the backend
-        lb_common.validate_session_persistence(new_pool, listener, completor,
-                                               old_pool=old_pool)
-
+        lb_common.validate_session_persistence(new_pool, listener, completor)
         try:
             kwargs = self._get_pool_kwargs(pool_name, tags, lb_algorithm,
                                            description)
             pool_client.update(lb_pool_id=new_pool['id'], **kwargs)
             if (listener and new_pool['session_persistence'] !=
                 old_pool['session_persistence']):
+                switch_type = lb_common.session_persistence_type_changed(
+                    new_pool, old_pool)
                 self._process_vs_update(context, new_pool, new_pool['id'],
-                                        listener, completor)
+                                        switch_type, listener, completor)
             completor(success=True)
         except Exception as e:
             with excutils.save_and_reraise_exception():
@@ -206,7 +207,7 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         if listener:
             try:
                 self._process_vs_update(
-                    context, pool, None, listener, completor)
+                    context, pool, None, False, listener, completor)
             except Exception as e:
                 LOG.error('Disassociation of listener %(lsn)s from pool '
                           '%(pool)s failed with error %(err)s',
