@@ -282,14 +282,16 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         return net_id
 
     def _fix_sg_rule_dict_ips(self, sg_rule):
-        # 0.0.0.0/# is not a valid entry for local and remote so we need
-        # to change this to None
+        # 0.0.0.0/# and ::/ are not valid entries for local and remote so we
+        # need to change this to None
         if (sg_rule.get('remote_ip_prefix') and
-            sg_rule['remote_ip_prefix'].startswith('0.0.0.0/')):
+            (sg_rule['remote_ip_prefix'].startswith('0.0.0.0/') or
+             sg_rule['remote_ip_prefix'].startswith('::/'))):
             sg_rule['remote_ip_prefix'] = None
         if (sg_rule.get(sg_prefix.LOCAL_IP_PREFIX) and
             validators.is_attr_set(sg_rule[sg_prefix.LOCAL_IP_PREFIX]) and
-            sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('0.0.0.0/')):
+            (sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('0.0.0.0/') or
+             sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('::/'))):
             sg_rule[sg_prefix.LOCAL_IP_PREFIX] = None
 
     def _validate_interface_address_scope(self, context,
