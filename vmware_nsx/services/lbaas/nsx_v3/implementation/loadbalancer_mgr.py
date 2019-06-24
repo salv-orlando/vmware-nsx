@@ -25,6 +25,7 @@ from vmware_nsx.db import db as nsx_db
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import utils
 
@@ -35,9 +36,6 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
     @log_helpers.log_method_call
     def create(self, context, lb, completor):
-
-        # TODO(asarfaty): If the lb is created with a port_id,
-        # need to set octavia device owner & device id on it.
         if not lb_utils.validate_lb_subnet(context, self.core_plugin,
                                            lb['vip_subnet_id']):
             completor(success=False)
@@ -81,6 +79,15 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         nsx_db.add_nsx_lbaas_loadbalancer_binding(
             context.session, lb['id'], lb_service['id'],
             nsx_router_id, lb['vip_address'])
+
+        # Make sure the vip port is marked with a device owner
+        port = self.core_plugin.get_port(
+            context.elevated(), lb['vip_port_id'])
+        if not port.get('device_owner'):
+            self.core_plugin.update_port(
+                context.elevated(), lb['vip_port_id'],
+                {'port': {'device_id': oct_const.DEVICE_ID_PREFIX + lb['id'],
+                          'device_owner': lb_const.VMWARE_LB_VIP_OWNER}})
 
         completor(success=True)
 
@@ -215,6 +222,15 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                         router_id):
                     self.core_plugin.delete_service_router(context,
                                                            router_id)
+        # Make sure the vip port is not marked with a vmware device owner
+        port = self.core_plugin.get_port(
+            context.elevated(), lb['vip_port_id'])
+        if port.get('device_owner') == lb_const.VMWARE_LB_VIP_OWNER:
+            self.core_plugin.update_port(
+                context.elevated(), lb['vip_port_id'],
+                {'port': {'device_id': '',
+                          'device_owner': ''}})
+
         completor(success=True)
 
     @log_helpers.log_method_call

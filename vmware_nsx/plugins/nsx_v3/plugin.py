@@ -93,6 +93,7 @@ from vmware_nsx.plugins.nsx_v3 import availability_zones as nsx_az
 from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
 from vmware_nsx.services.fwaas.common import utils as fwaas_utils
 from vmware_nsx.services.fwaas.nsx_v3 import fwaas_callbacks_v2
+from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import healthmonitor_mgr
 from vmware_nsx.services.lbaas.nsx_v3.implementation import l7policy_mgr
 from vmware_nsx.services.lbaas.nsx_v3.implementation import l7rule_mgr
@@ -2953,7 +2954,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             device_owner = port_data.get('device_owner')
             fip_address = new_fip['floating_ip_address']
             if (device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
-                device_owner == oct_const.DEVICE_OWNER_OCTAVIA):
+                device_owner == oct_const.DEVICE_OWNER_OCTAVIA or
+                device_owner == lb_const.VMWARE_LB_VIP_OWNER):
                 try:
                     self._update_lb_vip(port_data, fip_address)
                 except nsx_lib_exc.ManagerError:
@@ -2983,7 +2985,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             device_owner = port_data.get('device_owner')
             fixed_ip_address = fip['fixed_ip_address']
             if (device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
-                device_owner == oct_const.DEVICE_OWNER_OCTAVIA):
+                device_owner == oct_const.DEVICE_OWNER_OCTAVIA or
+                device_owner == lb_const.VMWARE_LB_VIP_OWNER):
                 # If the port is LB VIP port, after deleting the FIP,
                 # update the virtual server VIP back to fixed IP.
                 is_lb_port = True
@@ -3035,7 +3038,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 old_device_owner = old_port_data['device_owner']
                 old_fixed_ip = old_fip['fixed_ip_address']
                 if (old_device_owner == const.DEVICE_OWNER_LOADBALANCERV2 or
-                    old_device_owner == oct_const.DEVICE_OWNER_OCTAVIA):
+                    old_device_owner == oct_const.DEVICE_OWNER_OCTAVIA or
+                    old_device_owner == lb_const.VMWARE_LB_VIP_OWNER):
                     is_lb_port = True
                     self._update_lb_vip(old_port_data, old_fixed_ip)
 
@@ -3063,7 +3067,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 new_dev_own = new_port_data['device_owner']
                 new_fip_address = new_fip['floating_ip_address']
                 if (new_dev_own == const.DEVICE_OWNER_LOADBALANCERV2 or
-                    new_dev_own == oct_const.DEVICE_OWNER_OCTAVIA):
+                    new_dev_own == oct_const.DEVICE_OWNER_OCTAVIA or
+                    new_dev_own == lb_const.VMWARE_LB_VIP_OWNER):
                     is_lb_port = True
                     self._update_lb_vip(new_port_data, new_fip_address)
 
