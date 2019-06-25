@@ -53,7 +53,7 @@ netifaces==0.10.4
 neutron-lib==1.18.0
 openstackdocstheme==1.18.1
 os-client-config==1.28.0
-os-service-types==1.2.0
+os-service-types==1.7.0
 os-testr==1.0.0
 osc-lib==1.10.0
 oslo.cache==1.26.0
