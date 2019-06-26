@@ -302,7 +302,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                               return_value=[]),\
             mock.patch.object(self.core_plugin,
                               'service_router_has_loadbalancers',
-                              return_value=False),\
+                              return_value=False) as plugin_has_lb,\
             mock.patch.object(self.service_client, 'get_router_lb_service',
                               return_value=None),\
             mock.patch.object(self.service_client, 'create_or_overwrite'
@@ -318,6 +318,31 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                 description=self.lb_dict['description'],
                 tags=mock.ANY, size='SMALL',
                 connectivity_path=mock.ANY)
+            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+
+    def test_create_same_router_fail(self):
+        neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
+                          'external_gateway_info': {'external_fixed_ips': []}}
+        with mock.patch.object(lb_utils, 'get_network_from_subnet',
+                               return_value=LB_NETWORK), \
+            mock.patch.object(lb_utils, 'get_router_from_network',
+                              return_value=ROUTER_ID),\
+            mock.patch.object(self.core_plugin, 'get_router',
+                              return_value=neutron_router), \
+            mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
+                              return_value=[]),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=True) as plugin_has_lb,\
+            mock.patch.object(self.service_client, 'get_router_lb_service',
+                              return_value=None):
+            self.assertRaises(
+                n_exc.BadRequest,
+                self.edge_driver.loadbalancer.create,
+                self.context, self.lb_dict, self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
+            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
 
     def test_create_external_vip(self):
         with mock.patch.object(lb_utils, 'get_router_from_network',
@@ -1176,15 +1201,23 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                               ) as mock_get_router, \
             mock.patch.object(self.service_client, 'get_router_lb_service'
                               ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'get',
+                              return_value={}), \
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=False) as plugin_has_lb,\
             mock.patch.object(self.pool_client, 'get'
                               ) as mock_get_pool, \
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
                               return_value=[]),\
+            mock.patch.object(self.core_plugin, 'get_floatingips',
+                              return_value=[{
+                                  'fixed_ip_address': MEMBER_ADDRESS}]),\
             mock.patch.object(self.pool_client,
                               'create_pool_member_and_add_to_pool'
                               ) as mock_update_pool_with_members:
             mock_get_pool_members.return_value = [self.member]
-            mock_get_network.return_value = LB_NETWORK
+            mock_get_network.return_value = EXT_LB_NETWORK
             mock_get_router.return_value = LB_ROUTER_ID
             mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
             mock_get_pool.return_value = LB_POOL
@@ -1200,6 +1233,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                 admin_state='ENABLED')
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
+            plugin_has_lb.assert_called_once_with(mock.ANY, LB_ROUTER_ID)
 
     def test_update(self):
         new_member = lb_models.Member(MEMBER_ID, LB_TENANT_ID, POOL_ID,

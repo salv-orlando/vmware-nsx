@@ -36,6 +36,7 @@ from neutron_lib.api.definitions import portbindings
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api.definitions import vlantransparent as vlan_apidef
 from neutron_lib.callbacks import events
+from neutron_lib.callbacks import exceptions as nc_exc
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib import constants
@@ -48,6 +49,8 @@ from vmware_nsx.common import utils
 from vmware_nsx.extensions import providersecuritygroup as provider_sg
 from vmware_nsx.plugins.common import plugin as com_plugin
 from vmware_nsx.plugins.nsx_p import plugin as nsx_plugin
+from vmware_nsx.services.lbaas.nsx_p.implementation import loadbalancer_mgr
+from vmware_nsx.services.lbaas.octavia import octavia_listener
 
 from vmware_nsx.tests import unit as vmware
 from vmware_nsx.tests.unit.common_plugin import common_v3
@@ -2171,3 +2174,42 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                 self._update('floatingips', fip['floatingip'][
                     'id'], {'floatingip': {'port_id': port_id}},
                             expected_code=exc.HTTPBadRequest.code)
+
+    def test_router_delete_with_lb_service(self):
+        self.lb_mock1.stop()
+        self.lb_mock2.stop()
+        # Create the LB object - here the delete callback is registered
+        loadbalancer = loadbalancer_mgr.EdgeLoadBalancerManagerFromDict()
+        oct_listener = octavia_listener.NSXOctaviaListenerEndpoint(
+            loadbalancer=loadbalancer)
+        with self.router() as router:
+            with mock.patch.object(
+                self.plugin.nsxpolicy, 'search_by_tags',
+                return_value={'results': [{'id': 'dummy'}]}):
+                self.assertRaises(nc_exc.CallbackFailure,
+                                  self.plugin_instance.delete_router,
+                                  context.get_admin_context(),
+                                  router['router']['id'])
+        # Unregister callback
+        oct_listener._unsubscribe_router_delete_callback()
+        self.lb_mock1.start()
+        self.lb_mock2.start()
+
+    def test_router_delete_with_no_lb_service(self):
+        self.lb_mock1.stop()
+        self.lb_mock2.stop()
+        # Create the LB object - here the delete callback is registered
+        loadbalancer = loadbalancer_mgr.EdgeLoadBalancerManagerFromDict()
+        oct_listener = octavia_listener.NSXOctaviaListenerEndpoint(
+            loadbalancer=loadbalancer)
+        with self.router() as router:
+            with mock.patch.object(
+                self.plugin.nsxpolicy, 'search_by_tags',
+                return_value={'results': []}):
+                self.plugin_instance.delete_router(
+                    context.get_admin_context(),
+                    router['router']['id'])
+        # Unregister callback
+        oct_listener._unsubscribe_router_delete_callback()
+        self.lb_mock1.start()
+        self.lb_mock2.start()
