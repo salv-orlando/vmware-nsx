@@ -619,6 +619,10 @@ NSX Policy Plugin
 
     nsxadmin -r routers -o list
 
+- Set intent realization and purge cycle interval (in minutes) on policy manager::
+
+    nsxadmin -r system -o set -p realization_interval=1
+
 
 Client Certificate
 ~~~~~~~~~~~~~~~~~~

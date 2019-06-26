@@ -32,6 +32,7 @@ LOG = logging.getLogger(__name__)
 
 class Operations(enum.Enum):
     LIST = 'list'
+    SET = 'set'
     CLEAN = 'clean'
     CLEAN_ALL = 'clean-all'
     CREATE = 'create'
@@ -263,6 +264,8 @@ nsxp_resources = {
                                      Operations.CLEAN.value,
                                      Operations.IMPORT.value,
                                      Operations.NSX_LIST.value]),
+    constants.SYSTEM: Resource(constants.SYSTEM,
+                               [Operations.SET.value]),
 }
 
 nsxv3_resources_names = list(nsxv3_resources.keys())

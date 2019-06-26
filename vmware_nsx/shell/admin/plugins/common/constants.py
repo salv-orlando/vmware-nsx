@@ -36,6 +36,7 @@ SECURITY_GROUPS = 'security-groups'
 CONFIG = 'config'
 ORPHANED_NETWORKS = 'orphaned-networks'
 ORPHANED_ROUTERS = 'orphaned-routers'
+SYSTEM = 'system'
 
 # NSXV3 only Resource Constants
 PORTS = 'ports'
