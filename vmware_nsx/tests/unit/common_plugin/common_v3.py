@@ -272,6 +272,11 @@ class NsxV3TestSubnets(NsxV3SubnetMixin,
               self).test_list_subnets_filtering_by_project_id()
 
     @with_disable_dhcp
+    def test_list_subnets_filtering_by_cidr_used_on_create(self):
+        super(NsxV3TestSubnets,
+              self).test_list_subnets_filtering_by_cidr_used_on_create()
+
+    @with_disable_dhcp
     def test_list_subnets(self):
         super(NsxV3TestSubnets, self).test_list_subnets()
 
