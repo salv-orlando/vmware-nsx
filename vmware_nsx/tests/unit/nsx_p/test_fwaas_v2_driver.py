@@ -337,20 +337,10 @@ class NsxpFwaasTestCase(test_p_plugin.NsxPPluginTestCaseMixin):
                               return_value={'project_id': self.project_id}),\
             mock.patch.object(self.plugin, 'service_router_has_services',
                               return_value=True), \
-            mock.patch(GW_POLICY_PATH + ".update_entries") as update_fw:
+            mock.patch(GW_POLICY_PATH + ".delete") as delete_fw:
             self.firewall.delete_firewall_group('nsx', apply_list, firewall)
-
-            # expecting only the default allow-all rule
-            expected_rules = [self._default_rule(0)]
-            update_fw.assert_called_once_with(
-                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY,
-                category=policy_constants.CATEGORY_LOCAL_GW)
-            # compare rules one by one
-            actual_rules = update_fw.call_args[0][2]
-            self.assertEqual(len(expected_rules), len(actual_rules))
-            for index in range(len(actual_rules)):
-                self.assertEqual(expected_rules[index],
-                                 actual_rules[index].get_obj_dict())
+            delete_fw.assert_called_once_with(
+                policy_constants.DEFAULT_DOMAIN, map_id=FAKE_ROUTER_ID)
 
     def test_create_firewall_with_admin_down(self):
         apply_list = self._fake_apply_list()
@@ -360,17 +350,6 @@ class NsxpFwaasTestCase(test_p_plugin.NsxPPluginTestCaseMixin):
                                return_value=True), \
             mock.patch.object(self.plugin, '_get_router',
                               return_value={'project_id': self.project_id}),\
-            mock.patch(GW_POLICY_PATH + ".update_entries") as update_fw:
+            mock.patch(GW_POLICY_PATH + ".create_with_entries") as update_fw:
             self.firewall.create_firewall_group('nsx', apply_list, firewall)
-
-            # expecting only the default allow-all rule
-            expected_rules = [self._default_rule(0)]
-            update_fw.assert_called_once_with(
-                policy_constants.DEFAULT_DOMAIN, FAKE_ROUTER_ID, mock.ANY,
-                category=policy_constants.CATEGORY_LOCAL_GW)
-            # compare rules one by one
-            actual_rules = update_fw.call_args[0][2]
-            self.assertEqual(len(expected_rules), len(actual_rules))
-            for index in range(len(actual_rules)):
-                self.assertEqual(expected_rules[index],
-                                 actual_rules[index].get_obj_dict())
+            update_fw.assert_not_called()
