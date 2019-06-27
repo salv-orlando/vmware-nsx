@@ -817,6 +817,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 LOG.exception("Unable to update NSX backend, rolling "
                               "back changes on neutron")
                 with excutils.save_and_reraise_exception():
+                    # remove the AZ from the network before rollback because
+                    # it is read only, and breaks the rollback
+                    if 'availability_zone_hints' in original_net:
+                        del original_net['availability_zone_hints']
                     super(NsxPolicyPlugin, self).update_network(
                         context, network_id, {'network': original_net})
 
