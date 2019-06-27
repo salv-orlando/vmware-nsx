@@ -1524,9 +1524,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # remove the edge cluster from the tier1 router
         self.nsxpolicy.tier1.remove_edge_cluster(router_id)
 
-    def _update_router_gw_info(self, context, router_id, info):
+    def _get_router_gw_info(self, context, router_id):
+        router = self.get_router(context, router_id)
+        return router.get(l3_apidef.EXTERNAL_GW_INFO, {})
+
+    def _update_router_gw_info(self, context, router_id, info,
+                               called_from=None):
         # Get the original data of the router GW
         router = self._get_router(context, router_id)
+        orig_info = self._get_router_gw_info(context, router_id)
         org_tier0_uuid = self._get_tier0_uuid_by_router(context, router)
         org_enable_snat = router.enable_snat
         orgaddr, orgmask, _orgnexthop = (
@@ -1562,72 +1568,85 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             lb_exist = self.service_router_has_loadbalancers(
                 context, router_id)
         tier1_services_exist = fw_exist or vpn_exist or lb_exist
+
         actions = self._get_update_router_gw_actions(
             org_tier0_uuid, orgaddr, org_enable_snat,
             new_tier0_uuid, newaddr, new_enable_snat,
             tier1_services_exist, sr_currently_exists)
 
-        if actions['add_service_router']:
-            self.create_service_router(context, router_id, router=router)
+        try:
+            if actions['add_service_router']:
+                self.create_service_router(context, router_id, router=router)
 
-        if actions['remove_snat_rules']:
-            for subnet in router_subnets:
-                self._del_subnet_snat_rule(router_id, subnet)
-        if actions['remove_no_dnat_rules']:
-            for subnet in router_subnets:
-                self._del_subnet_no_dnat_rule(router_id, subnet)
+            if actions['remove_snat_rules']:
+                for subnet in router_subnets:
+                    self._del_subnet_snat_rule(router_id, subnet)
+            if actions['remove_no_dnat_rules']:
+                for subnet in router_subnets:
+                    self._del_subnet_no_dnat_rule(router_id, subnet)
 
-        if (actions['remove_router_link_port'] or
-            actions['add_router_link_port']):
-            # GW was changed. update GW and route advertisement
-            # pylint: disable=unexpected-keyword-arg
-            self.nsxpolicy.tier1.update_route_advertisement(
-                router_id,
-                static_routes=not new_enable_snat,
-                nat=actions['advertise_route_nat_flag'],
-                subnets=actions['advertise_route_connected_flag'],
-                tier0=new_tier0_uuid)
+            if (actions['remove_router_link_port'] or
+                actions['add_router_link_port']):
+                # GW was changed. update GW and route advertisement
+                # pylint: disable=unexpected-keyword-arg
+                self.nsxpolicy.tier1.update_route_advertisement(
+                    router_id,
+                    static_routes=not new_enable_snat,
+                    nat=actions['advertise_route_nat_flag'],
+                    subnets=actions['advertise_route_connected_flag'],
+                    tier0=new_tier0_uuid)
 
-            # Set/Unset the router TZ to allow vlan switches traffic
-            if cfg.CONF.nsx_p.allow_passthrough:
-                if new_tier0_uuid:
-                    tz_uuid = self.nsxpolicy.tier0.get_overlay_transport_zone(
-                        new_tier0_uuid)
+                # Set/Unset the router TZ to allow vlan switches traffic
+                if cfg.CONF.nsx_p.allow_passthrough:
+                    if new_tier0_uuid:
+                        tier0_client = self.nsxpolicy.tier0
+                        tz_uuid = tier0_client.get_overlay_transport_zone(
+                            new_tier0_uuid)
+                    else:
+                        tz_uuid = None
+                    self.nsxpolicy.tier1.update_transport_zone(
+                        router_id, tz_uuid)
                 else:
-                    tz_uuid = None
-                self.nsxpolicy.tier1.update_transport_zone(
-                    router_id, tz_uuid)
+                    LOG.debug("Not adding transport-zone to tier1 router %s "
+                              "as passthrough api is disabled", router_id)
             else:
-                LOG.debug("Not adding transport-zone to tier1 router %s as "
-                          "passthrough api is disabled", router_id)
-        else:
-            # Only update route advertisement
-            self.nsxpolicy.tier1.update_route_advertisement(
-                router_id,
-                static_routes=not new_enable_snat,
-                nat=actions['advertise_route_nat_flag'],
-                subnets=actions['advertise_route_connected_flag'])
+                # Only update route advertisement
+                self.nsxpolicy.tier1.update_route_advertisement(
+                    router_id,
+                    static_routes=not new_enable_snat,
+                    nat=actions['advertise_route_nat_flag'],
+                    subnets=actions['advertise_route_connected_flag'])
 
-        if actions['add_snat_rules']:
-            # Add SNAT rules for all the subnets which are in different scope
-            # than the GW
-            gw_address_scope = self._get_network_address_scope(
-                context, router.gw_port.network_id)
-            for subnet in router_subnets:
-                self._add_subnet_snat_rule(context, router_id,
-                                           subnet, gw_address_scope, newaddr)
+            if actions['add_snat_rules']:
+                # Add SNAT rules for all the subnets which are in different
+                # scope than the GW
+                gw_address_scope = self._get_network_address_scope(
+                    context, router.gw_port.network_id)
+                for subnet in router_subnets:
+                    self._add_subnet_snat_rule(context, router_id,
+                                               subnet, gw_address_scope,
+                                               newaddr)
 
-        if actions['add_no_dnat_rules']:
-            for subnet in router_subnets:
-                self._add_subnet_no_dnat_rule(context, router_id, subnet)
+            if actions['add_no_dnat_rules']:
+                for subnet in router_subnets:
+                    self._add_subnet_no_dnat_rule(context, router_id, subnet)
 
-        # always advertise ipv6 subnets if gateway is set
-        advertise_ipv6_subnets = True if info else False
-        self._update_router_advertisement_rules(router_id,
-                                                router_subnets,
-                                                advertise_ipv6_subnets)
-        if actions['remove_service_router']:
-            self.delete_service_router(router_id)
+            # always advertise ipv6 subnets if gateway is set
+            advertise_ipv6_subnets = True if info else False
+            self._update_router_advertisement_rules(router_id,
+                                                    router_subnets,
+                                                    advertise_ipv6_subnets)
+            if actions['remove_service_router']:
+                self.delete_service_router(router_id)
+        except nsx_lib_exc.NsxLibException as e:
+            # GW updates failed on the NSX. Rollback the change,
+            # unless it is during create or delete of a router
+            with excutils.save_and_reraise_exception():
+                if not called_from:
+                    LOG.error("Rolling back router %s GW info update because "
+                              "of NSX failure %s", router_id, e)
+                    super(NsxPolicyPlugin, self)._update_router_gw_info(
+                        context, router_id, orig_info, router=router)
 
     def _update_router_advertisement_rules(self, router_id, subnets,
                                            advertise_ipv6):
@@ -1683,8 +1702,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         if gw_info and gw_info != const.ATTR_NOT_SPECIFIED:
             try:
-                self._update_router_gw_info(context, router['id'], gw_info)
-            except (db_exc.DBError, nsx_lib_exc.ManagerError):
+                self._update_router_gw_info(context, router['id'], gw_info,
+                                            called_from="create")
+            except (db_exc.DBError, nsx_lib_exc.NsxLibException):
                 with excutils.save_and_reraise_exception():
                     LOG.error("Failed to set gateway info for router "
                               "being created: %s - removing router",
@@ -1700,7 +1720,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def delete_router(self, context, router_id):
         router = self.get_router(context, router_id)
         if router.get(l3_apidef.EXTERNAL_GW_INFO):
-            self._update_router_gw_info(context, router_id, {})
+            try:
+                self._update_router_gw_info(context, router_id, {},
+                                            called_from="delete")
+            except nsx_lib_exc.NsxLibException as e:
+                LOG.error("Failed to remove router %s gw info before "
+                          "deletion, but going on with the deletion anyway: "
+                          "%s", router_id, e)
+
         ret_val = super(NsxPolicyPlugin, self).delete_router(
             context, router_id)
 
