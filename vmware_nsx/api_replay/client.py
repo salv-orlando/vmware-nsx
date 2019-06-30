@@ -38,7 +38,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  source_os_password, source_os_auth_url,
                  dest_os_username, dest_os_user_domain_id,
                  dest_os_tenant_name, dest_os_tenant_domain_id,
-                 dest_os_password, dest_os_auth_url,
+                 dest_os_password, dest_os_auth_url, dest_plugin,
                  use_old_keystone, logfile):
 
         if logfile:
@@ -80,8 +80,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_domain_id=dest_os_tenant_domain_id,
                 password=dest_os_password,
                 auth_url=dest_os_auth_url)
+        self.dest_plugin = dest_plugin
 
-        LOG.info("Starting NSX migration.")
+        LOG.info("Starting NSX migration to %s.", self.dest_plugin)
         # Migrate all the objects
         self.migrate_security_groups()
         self.migrate_qos_policies()
@@ -269,6 +270,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                         # is raised here but that's okay.
                         pass
 
+    def get_dest_availablity_zones(self, resource):
+        azs = self.dest_neutron.list_availability_zones()['availability_zones']
+        az_names = [az['name'] for az in azs if az['resource'] == resource]
+        return az_names
+
     def migrate_routers(self):
         """Migrates routers from source to dest neutron.
 
@@ -284,6 +290,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             source_routers = []
 
         dest_routers = self.dest_neutron.list_routers()['routers']
+        dest_azs = self.get_dest_availablity_zones('router')
         update_routes = {}
         gw_info = {}
 
@@ -304,7 +311,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
             dest_router = self.have_id(router['id'], dest_routers)
             if dest_router is False:
-                body = self.prepare_router(router)
+                body = self.prepare_router(router, dest_azs=dest_azs)
                 try:
                     new_router = (self.dest_neutron.create_router(
                         {'router': body}))
@@ -390,6 +397,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 dest_default_public_net = True
 
         subnetpools_map = self.migrate_subnetpools()
+        dest_azs = self.get_dest_availablity_zones('network')
 
         total_num = len(source_networks)
         LOG.info("Migrating %(nets)s networks, %(subnets)s subnets and "
@@ -400,7 +408,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             external_net = network.get('router:external')
             body = self.prepare_network(
                 network, remove_qos=remove_qos,
-                dest_default_public_net=dest_default_public_net)
+                dest_default_public_net=dest_default_public_net,
+                dest_azs=dest_azs)
 
             # only create network if the dest server doesn't have it
             if self.have_id(network['id'], dest_networks):
@@ -450,7 +459,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     body['enable_dhcp'] = False
                     if count_dhcp_subnet > 1:
                         # Do not allow dhcp on the subnet if there is already
-                        # another subnet with DHCP as the v3 plugin supports
+                        # another subnet with DHCP as the v3 plugins supports
                         # only one
                         LOG.warning("Disabling DHCP for subnet on net %s: "
                                     "The plugin doesn't support multiple "
@@ -561,7 +570,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                             # script multiple times as we don't track this.
                             # Note(asarfaty): also if the same network in
                             # source is attached to 2 routers, which the v3
-                            # plugin does not support.
+                            # plugins does not support.
                             LOG.error("Failed to add router interface port"
                                       "(%(port)s): %(e)s",
                                       {'port': port, 'e': e})

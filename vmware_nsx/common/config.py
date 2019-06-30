@@ -246,7 +246,7 @@ nsx_common_opts = [
                 help=_("If true, the server then allows the caller to "
                        "specify the id of resources. This should only "
                        "be enabled in order to allow one to migrate an "
-                       "existing install of neutron to the NSX-T plugin.")),
+                       "existing install of neutron to a new VMWare plugin.")),
     cfg.ListOpt('nsx_extension_drivers',
                 default=[],
                 help=_("An ordered list of extension driver "

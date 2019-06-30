@@ -46,10 +46,10 @@ def _fixup_res_dict(context, attr_name, res_dict, check_allow_post=True):
 
 
 class PrepareObjectForMigration(object):
-    """Helper class to modify V objects before creating them in T"""
+    """Helper class to modify source objects before creating them in dest"""
     # Remove some fields before creating the new object.
     # Some fields are not supported for a new object, and some are not
-    # supported by the nsx-v3 plugin
+    # supported by the destination plugin
     basic_ignore_fields = ['updated_at',
                            'created_at',
                            'tags',
@@ -64,7 +64,6 @@ class PrepareObjectForMigration(object):
         'ha',
         'external_gateway_info',
         'router_type',
-        'availability_zone_hints',
         'availability_zones',
         'distributed',
         'flavor_id']
@@ -89,7 +88,6 @@ class PrepareObjectForMigration(object):
         'status',
         'subnets',
         'availability_zones',
-        'availability_zone_hints',
         'ipv4_address_scope',
         'ipv6_address_scope',
         'mtu']
@@ -124,10 +122,18 @@ class PrepareObjectForMigration(object):
         self.fix_description(sg)
         return self.drop_fields(sg, self.drop_sg_fields)
 
-    def prepare_router(self, rtr, direct_call=False):
+    def prepare_router(self, rtr, dest_azs=None, direct_call=False):
         self.fix_description(rtr)
         body = self.drop_fields(rtr, self.drop_router_fields)
-        if direct_call:
+        if dest_azs:
+            if body.get('availability_zone_hints'):
+                az = body['availability_zone_hints'][0]
+                if az not in dest_azs:
+                    if az != 'default':
+                        LOG.warning("Ignoring AZ %s in router %s as it is not "
+                                    "defined in destination", az, rtr['id'])
+                    body['availability_zone_hints'] = []
+        elif direct_call:
             body['availability_zone_hints'] = []
         return body
 
@@ -136,7 +142,7 @@ class PrepareObjectForMigration(object):
         return self.drop_fields(pool, self.drop_subnetpool_fields)
 
     def prepare_network(self, net, dest_default_public_net=True,
-                        remove_qos=False, direct_call=False):
+                        remove_qos=False, dest_azs=None, direct_call=False):
         self.fix_description(net)
         body = self.drop_fields(net, self.drop_network_fields)
 
@@ -151,13 +157,13 @@ class PrepareObjectForMigration(object):
                 del body[field]
 
         # vxlan network with segmentation id should be translated to a regular
-        # network in nsx-v3.
+        # network in nsx-v3/P.
         if (body.get('provider:network_type') == 'vxlan' and
             body.get('provider:segmentation_id') is not None):
             del body['provider:network_type']
             del body['provider:segmentation_id']
 
-        # flat network should be translated to a regular network in nsx-v3.
+        # flat network should be translated to a regular network in nsx-v3/P.
         if (body.get('provider:network_type') == 'flat'):
             del body['provider:network_type']
             if 'provider:physical_network' in body:
@@ -179,7 +185,15 @@ class PrepareObjectForMigration(object):
                 body['is_default'] = False
                 LOG.warning("Public network %s was set to non default network",
                             body['id'])
-        if direct_call:
+        if dest_azs:
+            if body.get('availability_zone_hints'):
+                az = body['availability_zone_hints'][0]
+                if az not in dest_azs:
+                    if az != 'default':
+                        LOG.warning("Ignoring AZ %s in net %s as it is not "
+                                    "defined in destination", az, body['id'])
+                    body['availability_zone_hints'] = []
+        elif direct_call:
             body['availability_zone_hints'] = []
         return body
 

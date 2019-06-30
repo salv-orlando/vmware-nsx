@@ -68,6 +68,7 @@ from vmware_nsx.common import locking
 from vmware_nsx.common import managers
 from vmware_nsx.common import utils
 from vmware_nsx.db import db as nsx_db
+from vmware_nsx.extensions import api_replay
 from vmware_nsx.extensions import maclearning as mac_ext
 from vmware_nsx.extensions import projectpluginmap
 from vmware_nsx.extensions import providersecuritygroup as provider_sg
@@ -213,6 +214,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # vlan_transparent is True
         if cfg.CONF.vlan_transparent:
             self.supported_extension_aliases.append(vlan_apidef.ALIAS)
+
+        # Support api-reply for migration environments to the policy plugin
+        if cfg.CONF.api_replay_mode:
+            self.supported_extension_aliases.append(api_replay.ALIAS)
 
         nsxlib_utils.set_inject_headers_callback(v3_utils.inject_headers)
         self._validate_nsx_policy_version()
@@ -1787,6 +1792,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 router_id,
                 static_route_id=self._get_static_route_id(route))
 
+    @nsx_plugin_common.api_replay_mode_wrapper
     def update_router(self, context, router_id, router):
         gw_info = self._extract_external_gw(context, router, is_extract=False)
         router_data = router['router']
@@ -1857,6 +1863,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         cidr_prefix = int(subnet['cidr'].split('/')[1])
         return "%s/%s" % (subnet['gateway_ip'], cidr_prefix)
 
+    @nsx_plugin_common.api_replay_mode_wrapper
     def add_router_interface(self, context, router_id, interface_info):
         network_id = self._get_interface_network(context, interface_info)
         extern_net = self._network_is_external(context, network_id)
@@ -2131,10 +2138,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self._assert_on_assoc_floatingip_to_special_ports(
                 fip_data, port_data)
 
-        new_fip = super(NsxPolicyPlugin, self).create_floatingip(
-                context, floatingip, initial_status=(
-                    const.FLOATINGIP_STATUS_ACTIVE
-                    if port_id else const.FLOATINGIP_STATUS_DOWN))
+        new_fip = self._create_floating_ip_wrapper(context, floatingip)
         router_id = new_fip['router_id']
         if not router_id:
             return new_fip
@@ -2638,6 +2642,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                                            secgroup_db,
                                                            secgroup,
                                                            default_sg)
+
+            if cfg.CONF.api_replay_mode:
+                self._handle_api_replay_default_sg(context, secgroup_db)
 
         try:
             # Create Group & communication map on the NSX
