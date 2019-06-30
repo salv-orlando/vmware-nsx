@@ -21,6 +21,7 @@ from neutronclient.v2_0 import client
 from oslo_utils import excutils
 
 from vmware_nsx.api_replay import utils
+from vmware_nsx.common import nsxv_constants
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -295,6 +296,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             if router.get('external_gateway_info'):
                 gw_info[router['id']] = router['external_gateway_info']
 
+            # Ignore internal NSXV objects
+            if router['project_id'] == nsxv_constants.INTERNAL_TENANT_ID:
+                LOG.info("Skip router %s: Internal NSX-V router",
+                         router['id'])
+                continue
+
             dest_router = self.have_id(router['id'], dest_routers)
             if dest_router is False:
                 body = self.prepare_router(router)
@@ -397,6 +404,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
             # only create network if the dest server doesn't have it
             if self.have_id(network['id'], dest_networks):
+                LOG.info("Skip network %s: Already exists on the destination",
+                         network['id'])
+                continue
+
+            # Ignore internal NSXV objects
+            if network['project_id'] == nsxv_constants.INTERNAL_TENANT_ID:
+                LOG.info("Skip network %s: Internal NSX-V network",
+                         network['id'])
                 continue
 
             try:
@@ -505,7 +520,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                       'net': port['network_id']})
 
                         except Exception as e:
-                            LOG.error("Failed to add router gateway "
+                            LOG.error("Failed to add router gateway with port "
                                       "(%(port)s): %(e)s",
                                       {'port': port, 'e': e})
                         continue
