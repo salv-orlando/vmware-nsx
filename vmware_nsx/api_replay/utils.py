@@ -25,13 +25,10 @@ LOG = logging.getLogger(__name__)
 
 def _fixup_res_dict(context, attr_name, res_dict, check_allow_post=True):
     # This method is a replacement of _fixup_res_dict which is used in
-    # neutron.plugin.common.utils. All this mock does is insert a uuid
+    # neutron_lib.plugin.utils. All this mock does is insert a uuid
     # for the id field if one is not found ONLY if running in api_replay_mode.
     if cfg.CONF.api_replay_mode and 'id' not in res_dict:
-        # exclude gateway ports from this
-        if (attr_name != 'ports' or
-            res_dict.get('device_owner') != 'network:router_gateway'):
-            res_dict['id'] = uuidutils.generate_uuid()
+        res_dict['id'] = uuidutils.generate_uuid()
     attr_info = lib_attrs.RESOURCES[attr_name]
     attr_ops = lib_attrs.AttributeInfo(attr_info)
     try:
