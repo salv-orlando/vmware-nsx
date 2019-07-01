@@ -1773,23 +1773,38 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         # User requires port-security-enabled set to True and thus requires
         # spoofguard installed for this network
         else:
-            # Verifying that all ports are legal, i.e. not CIDR/subnet
+            # Verifying that all ports are legal, i.e. not CIDR/subnet, and
+            # that the same IP address is not used multiple times for a given
+            # neutron network
             filters = {'network_id': [id]}
             ports = self.get_ports(context, filters=filters)
             valid_ports = []
+            ip_addresses = set()
             if ports:
                 for port in ports:
-                    if self._is_compute_port(port):
-                        for ap in port[addr_apidef.ADDRESS_PAIRS]:
-                            if len(ap['ip_address'].split('/')) > 1:
-                                msg = _('Port %s contains CIDR/subnet, '
-                                        'which is not supported at the '
-                                        'backend ') % port['id']
+                    for ap in port[addr_apidef.ADDRESS_PAIRS]:
+                        if len(ap['ip_address'].split('/')) > 1:
+                            msg = _('Port %s contains CIDR/subnet, '
+                                    'which is not supported at the '
+                                    'backend ') % port['id']
+                            raise n_exc.BadRequest(
+                                    resource='networks',
+                                    msg=msg)
+                        else:
+                            set_len = len(ip_addresses)
+                            ip_addresses.add(ap['ip_address'])
+                            if len(ip_addresses) == set_len:
+                                msg = _('IP address %s is allowed '
+                                        'by more than 1 logical port. '
+                                        'This is not supported by the '
+                                        'backend. Port security cannot '
+                                        'be enabled for network '
+                                        '%s') % (ap['ip_address'], id)
+                                LOG.error(msg)
                                 raise n_exc.BadRequest(
-                                        resource='ports',
-                                        msg=msg)
-                            else:
-                                valid_ports.append(port)
+                                    resource='networks',
+                                    msg=msg)
+                            valid_ports.append(port)
             try:
                 sg_policy_id, predefined = (
                         self._prepare_spoofguard_policy(
@@ -1999,8 +2014,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
     def _validate_address_pairs(self, context, attrs, db_port):
         network_port_security = self._get_network_security_binding(
             context, db_port['network_id'])
-        if not (cfg.CONF.nsxv.allow_multiple_ip_addresses and
-                not network_port_security):
+        if (not cfg.CONF.nsxv.allow_multiple_ip_addresses or
+            network_port_security):
             self._validate_unique_address_pair_across_network(
                  context, db_port, attrs[addr_apidef.ADDRESS_PAIRS])
             for ap in attrs[addr_apidef.ADDRESS_PAIRS]:
