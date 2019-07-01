@@ -429,11 +429,11 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
     def get_housekeeper(self, context, name, fields=None):
         # run the job in readonly mode and get the results
         self.housekeeper.run(context, name, readonly=True)
-        return self.housekeeper.get(name)
+        return self.housekeeper.get(name) if self.housekeeper else None
 
     def get_housekeepers(self, context, filters=None, fields=None, sorts=None,
                          limit=None, marker=None, page_reverse=False):
-        return self.housekeeper.list()
+        return self.housekeeper.list() if self.housekeeper else []
 
     def update_housekeeper(self, context, name, housekeeper):
         # run the job in non-readonly mode and get the results
@@ -444,8 +444,8 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
         self.housekeeper.run(context, name, readonly=False)
         return self.housekeeper.get(name)
 
-    def get_housekeeper_count(self, context, filters=None):
-        return len(self.housekeeper.list())
+    def get_housekeepers_count(self, context, filters=None):
+        return len(self.housekeeper.list()) if self.housekeeper else 0
 
 
 # Register the callback
