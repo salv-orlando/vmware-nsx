@@ -90,6 +90,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.migrate_networks_subnets_ports(routers_gw_info)
         self.migrate_floatingips()
         self.migrate_routers_routes(routers_routes)
+        self.migrate_fwaas()
         LOG.info("NSX migration is Done.")
 
     def connect_to_client(self, username, user_domain_id,
@@ -621,3 +622,68 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             except Exception as e:
                 LOG.error("Failed to create floating ip (%(fip)s) : %(e)s",
                           {'fip': source_fip, 'e': e})
+
+    def _migrate_fwaas_resource(self, resource_type, source_objects,
+                                dest_objects, prepare_method, create_method):
+        total_num = len(source_objects)
+        for count, source_obj in enumerate(source_objects, 1):
+            # Check if the object already exists
+            if self.have_id(source_obj['id'], dest_objects):
+                LOG.info("Skipping %s %s as it already exists on the "
+                         "destination server", resource_type, source_obj['id'])
+                continue
+            body = prepare_method(source_obj)
+            try:
+                new_obj = create_method({resource_type: body})
+                LOG.info("Created %(resource)s %(count)s/%(total)s : %(obj)s",
+                         {'resource': resource_type, 'count': count,
+                          'total': total_num, 'obj': new_obj})
+            except Exception as e:
+                LOG.error("Failed to create %(resource)s (%(obj)s) : %(e)s",
+                          {'resource': resource_type, 'obj': source_obj,
+                           'e': e})
+
+    def migrate_fwaas(self):
+        """Migrates FWaaS V2 objects from source to dest neutron."""
+        try:
+            source_rules = self.source_neutron.\
+                list_fwaas_firewall_rules()['firewall_rules']
+            source_polices = self.source_neutron.\
+                list_fwaas_firewall_policies()['firewall_policies']
+            source_groups = self.source_neutron.\
+                list_fwaas_firewall_groups()['firewall_groups']
+        except Exception as e:
+            # FWaaS might be disabled in the source
+            LOG.info("FWaaS V2 was not found on the source server: %s", e)
+            return
+
+        try:
+            dest_rules = self.dest_neutron.\
+                list_fwaas_firewall_rules()['firewall_rules']
+            dest_polices = self.dest_neutron.\
+                list_fwaas_firewall_policies()['firewall_policies']
+            dest_groups = self.dest_neutron.\
+                list_fwaas_firewall_groups()['firewall_groups']
+        except Exception as e:
+            # FWaaS might be disabled in the destination
+            LOG.warning("Skipping FWaaS V2 migration. FWaaS V2 was not found "
+                        "on the destination server: %s", e)
+            return
+
+        # Migrate all FWaaS objects:
+        self._migrate_fwaas_resource(
+            'firewall_rule', source_rules, dest_rules,
+            self.prepare_fwaas_rule,
+            self.dest_neutron.create_fwaas_firewall_rule)
+
+        self._migrate_fwaas_resource(
+            'firewall_policy', source_polices, dest_polices,
+            self.prepare_fwaas_policy,
+            self.dest_neutron.create_fwaas_firewall_policy)
+
+        self._migrate_fwaas_resource(
+            'firewall_group', source_groups, dest_groups,
+            self.prepare_fwaas_group,
+            self.dest_neutron.create_fwaas_firewall_group)
+
+        LOG.info("FWaaS V2 migration done")

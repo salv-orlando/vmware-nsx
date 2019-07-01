@@ -98,6 +98,10 @@ class PrepareObjectForMigration(object):
     drop_qos_rule_fields = ['revision', 'type', 'qos_policy_id', 'id']
     drop_qos_policy_fields = ['revision']
 
+    drop_fwaas_rule_fields = ['firewall_policy_id']
+    drop_fwaas_policy_fields = []
+    drop_fwaas_group_fields = ['status']
+
     def drop_fields(self, item, drop_fields):
         body = {}
         for k, v in item.items():
@@ -248,3 +252,15 @@ class PrepareObjectForMigration(object):
     def prepare_qos_policy(self, policy, direct_call=False):
         self.fix_description(policy)
         return self.drop_fields(policy, self.drop_qos_policy_fields)
+
+    def prepare_fwaas_rule(self, rule):
+        self.fix_description(rule)
+        return self.drop_fields(rule, self.drop_fwaas_rule_fields)
+
+    def prepare_fwaas_policy(self, policy):
+        self.fix_description(policy)
+        return self.drop_fields(policy, self.drop_fwaas_policy_fields)
+
+    def prepare_fwaas_group(self, group):
+        self.fix_description(group)
+        return self.drop_fields(group, self.drop_fwaas_group_fields)
