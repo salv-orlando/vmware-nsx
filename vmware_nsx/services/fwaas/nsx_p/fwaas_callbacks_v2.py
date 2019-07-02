@@ -57,7 +57,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
     def _get_default_backend_rule(self, router_id):
         """Return the default allow-all rule entry
 
-        This rule enrty will be added to the end of the rules list
+        This rule entry will be added to the end of the rules list
         """
         return self.nsxpolicy.gateway_policy.build_entry(
             DEFAULT_RULE_NAME,
@@ -363,17 +363,19 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
                     sr_exists_on_backend = False
 
         if sr_exists_on_backend:
-            # update the edge firewall
-            self.create_router_gateway_policy(context, router_id,
-                                              router, fw_rules)
+            if router_with_fw:
+                self.create_or_update_router_gateway_policy(context, router_id,
+                                                            router, fw_rules)
+            else:
+                # Do all the cleanup once the router has no more FW rules
+                # create or update the edge firewall
+                # TODO(asarfaty): Consider keeping the FW with default allow
+                # rule instead of deletion as it may be created again soon
+                self.delete_router_gateway_policy(router_id)
+                self.cleanup_router_fw_resources(router_id)
 
-        if not router_with_fw:
-            # Do all the cleanup once the router has no more FW rules
-            self.delete_router_gateway_policy(router_id)
-            self.cleanup_router_fw_resources(router_id)
-
-    def create_router_gateway_policy(self, context, router_id,
-                                     router, fw_rules):
+    def create_or_update_router_gateway_policy(self, context, router_id,
+                                               router, fw_rules):
         """Create/Overwrite gateway policy for a router with firewall rules"""
         # Check if the gateway policy already exists
         try:
