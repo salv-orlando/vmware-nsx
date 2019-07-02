@@ -2386,7 +2386,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _update_router_wrapper(self, context, router_id, router):
         if cfg.CONF.api_replay_mode:
             # NOTE(arosen): the mock.patch here is needed for api_replay_mode
-            with mock.patch("neutron.plugins.common.utils._fixup_res_dict",
+            with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
                             side_effect=api_replay_utils._fixup_res_dict):
                 return super(NsxV3Plugin, self).update_router(
                     context, router_id, router)
@@ -2674,7 +2674,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                                       interface_info):
         if cfg.CONF.api_replay_mode:
             # NOTE(arosen): the mock.patch here is needed for api_replay_mode
-            with mock.patch("neutron.plugins.common.utils._fixup_res_dict",
+            with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
                             side_effect=api_replay_utils._fixup_res_dict):
                 return super(NsxV3Plugin, self).add_router_interface(
                     context, router_id, interface_info)
@@ -2922,7 +2922,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _create_floating_ip_wrapper(self, context, floatingip):
         if cfg.CONF.api_replay_mode:
             # NOTE(arosen): the mock.patch here is needed for api_replay_mode
-            with mock.patch("neutron.plugins.common.utils._fixup_res_dict",
+            with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
                             side_effect=api_replay_utils._fixup_res_dict):
                 return super(NsxV3Plugin, self).create_floatingip(
                     context, floatingip, initial_status=(
