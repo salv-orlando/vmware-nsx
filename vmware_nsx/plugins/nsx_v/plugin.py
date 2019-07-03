@@ -1763,6 +1763,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             if sg_policy:
                 try:
                     self.nsx_v.vcns.delete_spoofguard_policy(sg_policy)
+                    nsxv_db.del_nsxv_spoofguard_binding(context.session,
+                                                        sg_policy)
                 except Exception as e:
                     LOG.error('Unable to delete spoofguard policy '
                               '%(sg_policy)s. Error: %(e)s',

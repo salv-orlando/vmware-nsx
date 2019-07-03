@@ -683,6 +683,11 @@ def get_nsxv_spoofguard_policy_network_mappings(session, filters=None,
                filters, like_filters).all()
 
 
+def del_nsxv_spoofguard_binding(session, policy_id):
+    return (session.query(nsxv_models.NsxvSpoofGuardPolicyNetworkMapping).
+            filter_by(policy_id=policy_id).delete())
+
+
 def add_nsxv_lbaas_loadbalancer_binding(
         session, loadbalancer_id, edge_id, edge_fw_rule_id, vip_address):
     with session.begin(subtransactions=True):
