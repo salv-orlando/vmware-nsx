@@ -9,7 +9,7 @@ hacking==1.1.0
 httplib2==0.9.1
 mock==2.0.0
 netaddr==0.7.18
-neutron-lib==1.27.0
+neutron-lib==1.28.0
 octavia-lib==1.1.1
 openstackdocstheme==1.18.1
 oslo.concurrency==3.26.0
