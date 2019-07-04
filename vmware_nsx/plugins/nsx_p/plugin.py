@@ -134,6 +134,8 @@ NAT_RULE_PRIORITY_GW = 3000
 
 NSX_P_CLIENT_SSL_PROFILE = 'neutron-client-ssl-profile'
 
+NET_NSX_ID_CACHE = {}
+
 
 @resource_extend.has_resource_extenders
 class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
@@ -759,6 +761,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                        {'id': network_id, 'e': e})
                 raise nsx_exc.NsxPluginException(err_msg=msg)
 
+        # Remove from cache
+        if network_id in NET_NSX_ID_CACHE:
+            del NET_NSX_ID_CACHE[network_id]
+
     def update_network(self, context, network_id, network):
         original_net = super(NsxPolicyPlugin, self).get_network(
             context, network_id)
@@ -913,13 +919,23 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         If it was not realized or timed out retrying, it will return None
         The nova api will use this to attach to the instance.
         """
+        if network_id in NET_NSX_ID_CACHE:
+            return NET_NSX_ID_CACHE[network_id]
+
         if not self._network_is_external(context, network_id):
             segment_id = self._get_network_nsx_segment_id(context, network_id)
             try:
-                return self.nsxpolicy.segment.get_realized_logical_switch_id(
+                nsx_id = self.nsxpolicy.segment.get_realized_logical_switch_id(
                     segment_id)
+                # Add result to cache
+                NET_NSX_ID_CACHE[network_id] = nsx_id
+                return nsx_id
             except nsx_lib_exc.ManagerError:
                 LOG.error("Network %s was not realized", network_id)
+                # Do not cache this result
+        else:
+            # Add empty result to cache
+            NET_NSX_ID_CACHE[network_id] = None
 
     def _get_network_nsx_segment_id(self, context, network_id):
         """Return the NSX segment ID matching the neutron network id
