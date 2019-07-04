@@ -114,6 +114,11 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                                                attachment=attachment,
                                                size=lb_size)
         except nsxlib_exc.ManagerError as e:
+            # If it failed, it is probably because the service was already
+            # created by another loadbalancer simultaneously
+            lb_service = service_client.get_router_lb_service(nsx_router_id)
+            if lb_service:
+                return lb_service
             LOG.error("Failed to create LB service: %s", e)
             return
 
