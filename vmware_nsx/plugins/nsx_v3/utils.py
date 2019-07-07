@@ -14,6 +14,7 @@
 #    under the License.
 import os
 import random
+import re
 
 from oslo_config import cfg
 from oslo_context import context as context_utils
@@ -535,7 +536,10 @@ def inject_headers():
     ctx = context_utils.get_current()
     if ctx:
         ctx_dict = ctx.to_dict()
-        return {'X-NSX-EUSER': ctx_dict.get('user_identity'),
+        # Remove unsupported characters from the user-id
+        user_id = ctx_dict.get('user_identity')
+        re.sub('[^A-Za-z0-9]+', '', user_id)
+        return {'X-NSX-EUSER': user_id,
                 'X-NSX-EREQID': ctx_dict.get('request_id')}
     return {}
 
