@@ -1502,9 +1502,6 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
     def test_router_add_gateway_no_subnet(self):
         self.skipTest('No support for no subnet gateway set')
 
-    def test_create_router_gateway_fails(self):
-        self.skipTest('not supported')
-
     def test_router_remove_ipv6_subnet_from_interface(self):
         self.skipTest('not supported')
 
@@ -2211,3 +2208,79 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
         oct_listener._unsubscribe_router_delete_callback()
         self.lb_mock1.start()
         self.lb_mock2.start()
+
+    def test_router_gw_info_rollback(self):
+        """Fail the GW addition and verify rollback was performed"""
+        with self.router() as r,\
+            self.external_network() as public_net,\
+            self.subnet(network=public_net, cidr='12.0.0.0/24',
+                        enable_dhcp=False) as s1,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.update_route_advertisement",
+                       side_effect=nsxlib_exc.NsxLibException):
+            # Make sure creation fails
+            self._add_external_gateway_to_router(
+                r['router']['id'],
+                s1['subnet']['network_id'],
+                expected_code=exc.HTTPInternalServerError.code)
+            # Make sure there is no GW configured
+            body = self._show('routers', r['router']['id'])
+            self.assertIsNone(body['router']['external_gateway_info'])
+
+    def test_router_create_with_gw_info_failed(self):
+        """Fail the GW addition during router creation
+        and verify rollback was performed
+        """
+        with self.router() as r,\
+            self.external_network() as public_net,\
+            self.subnet(network=public_net, cidr='12.0.0.0/24',
+                        enable_dhcp=False) as s1,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.update_route_advertisement",
+                       side_effect=nsxlib_exc.NsxLibException):
+            # Make sure creation fails
+            self._add_external_gateway_to_router(
+                r['router']['id'],
+                s1['subnet']['network_id'],
+                expected_code=exc.HTTPInternalServerError.code)
+            # Make sure there is no GW configured
+            body = self._show('routers', r['router']['id'])
+            self.assertIsNone(body['router']['external_gateway_info'])
+
+    def test_create_router_gateway_fails(self):
+        with self.external_network() as public_net,\
+            self.subnet(network=public_net, cidr='12.0.0.0/24',
+                        enable_dhcp=False),\
+            mock.patch.object(self.plugin.nsxpolicy.tier1,
+                              "get_edge_cluster_path",
+                              return_value=False),\
+            mock.patch.object(self.plugin.nsxpolicy.tier1,
+                              "set_edge_cluster_path",
+                              side_effect=nsxlib_exc.NsxLibException):
+            data = {'router': {
+                'name': 'router1', 'admin_state_up': True,
+                'tenant_id': self._tenant_id,
+                'external_gateway_info': {
+                    'network_id': public_net['network']['id']}}}
+
+            self.assertRaises(nsxlib_exc.NsxLibException,
+                              self.plugin.create_router, self.ctx, data)
+            # Verify router doesn't persist on failure
+            routers = self.plugin.get_routers(self.ctx)
+            self.assertEqual(0, len(routers))
+
+    def test_delete_router_gateway_fails(self):
+        """Verify that router deletion continues even if gw update fails"""
+        with self.router() as r,\
+            self.external_network() as public_net,\
+            self.subnet(network=public_net, cidr='12.0.0.0/24',
+                        enable_dhcp=False) as s1:
+            self._add_external_gateway_to_router(
+                r['router']['id'],
+                s1['subnet']['network_id'])
+            with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                            "NsxPolicyTier1Api.update_route_advertisement",
+                            side_effect=nsxlib_exc.NsxLibException):
+                self._delete('routers', r['router']['id'])
+                routers = self.plugin.get_routers(self.ctx)
+                self.assertEqual(0, len(routers))
