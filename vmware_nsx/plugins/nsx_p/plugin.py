@@ -1611,20 +1611,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     nat=actions['advertise_route_nat_flag'],
                     subnets=actions['advertise_route_connected_flag'],
                     tier0=new_tier0_uuid)
-
-                # Set/Unset the router TZ to allow vlan switches traffic
-                if cfg.CONF.nsx_p.allow_passthrough:
-                    if new_tier0_uuid:
-                        tier0_client = self.nsxpolicy.tier0
-                        tz_uuid = tier0_client.get_overlay_transport_zone(
-                            new_tier0_uuid)
-                    else:
-                        tz_uuid = None
-                    self.nsxpolicy.tier1.update_transport_zone(
-                        router_id, tz_uuid)
-                else:
-                    LOG.debug("Not adding transport-zone to tier1 router %s "
-                              "as passthrough api is disabled", router_id)
             else:
                 # Only update route advertisement
                 self.nsxpolicy.tier1.update_route_advertisement(
