@@ -123,7 +123,7 @@ NO_SEG_SECURITY_PROFILE_ID = 'neutron-no-segment-security-profile'
 SEG_SECURITY_PROFILE_ID = (
     policy_defs.SegmentSecurityProfileDef.DEFAULT_PROFILE)
 SLAAC_NDRA_PROFILE_ID = 'neutron-slaac-profile'
-DEFAULT_NDRA_PROFILE_ID = 'default'
+NO_SLAAC_NDRA_PROFILE_ID = 'neutron-no-slaac-profile'
 
 IPV6_RA_SERVICE = 'neutron-ipv6-ra'
 IPV6_ROUTER_ADV_RULE_NAME = 'all-ipv6'
@@ -421,7 +421,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                    SEG_SECURITY_PROFILE_ID)
             raise nsx_exc.NsxPluginException(err_msg=msg)
 
-        # Ipv6 NDRA profile (find it or create)
+        # Ipv6 SLAAC NDRA profile (find it or create)
         try:
             self.nsxpolicy.ipv6_ndra_profile.get(SLAAC_NDRA_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
@@ -431,13 +431,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 ra_mode=policy_constants.IPV6_RA_MODE_SLAAC_RA,
                 tags=self.nsxpolicy.build_v3_api_version_tag())
 
-        # Verify default NDRA profile exists
+        # Verify NO SLAAC NDRA profile (find it or create)
         try:
-            self.nsxpolicy.ipv6_ndra_profile.get(DEFAULT_NDRA_PROFILE_ID)
+            self.nsxpolicy.ipv6_ndra_profile.get(NO_SLAAC_NDRA_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
-            msg = (_("Cannot find ipv6 ndra profile %s") %
-                   DEFAULT_NDRA_PROFILE_ID)
-            raise nsx_exc.NsxPluginException(err_msg=msg)
+            self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
+                NO_SLAAC_NDRA_PROFILE_ID,
+                profile_id=NO_SLAAC_NDRA_PROFILE_ID,
+                ra_mode=policy_constants.IPV6_RA_MODE_DISABLED,
+                tags=self.nsxpolicy.build_v3_api_version_tag())
 
         self.client_ssl_profile = None
 
@@ -865,7 +867,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if not slaac_subnets and slaac_subnet:
                 # this was the last slaac subnet connected -
                 # need to disable slaac on router
-                profile_id = DEFAULT_NDRA_PROFILE_ID
+                profile_id = NO_SLAAC_NDRA_PROFILE_ID
 
         if profile_id:
             self.nsxpolicy.tier1.update(router_id,
@@ -1704,6 +1706,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.nsxpolicy.tier1.create_or_overwrite(
                 router_name, router['id'],
                 tier0=None,
+                ipv6_ndra_profile_id=NO_SLAAC_NDRA_PROFILE_ID,
                 tags=tags)
             # Also create the empty locale-service as it must always exist
             self.nsxpolicy.tier1.create_locale_service(router['id'])
@@ -1942,7 +1945,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
                 slaac_subnet = (subnet.get('ipv6_address_mode') == 'slaac')
                 ndra_profile_id = (SLAAC_NDRA_PROFILE_ID if slaac_subnet
-                                   else DEFAULT_NDRA_PROFILE_ID)
+                                   else NO_SLAAC_NDRA_PROFILE_ID)
                 self.nsxpolicy.tier1.add_segment_interface(
                     router_id, segment_id,
                     segment_id, pol_subnets,
