@@ -493,6 +493,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             ports = self.get_ports_on_network(network['id'], source_ports)
             for port in ports:
 
+                # Ignore internal NSXV objects
+                if port['project_id'] == nsxv_constants.INTERNAL_TENANT_ID:
+                    LOG.info("Skip router %s: Internal NSX-V port",
+                             port['id'])
+                    continue
+
                 body = self.prepare_port(port, remove_qos=remove_qos)
 
                 # specify the network_id that we just created above
@@ -586,12 +592,15 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                         LOG.error("Failed to create port (%(port)s) : %(e)s",
                                   {'port': port, 'e': e})
                     else:
+                        ip_addr = None
+                        if created_port.get('fixed_ips'):
+                            ip_addr = created_port['fixed_ips'][0].get(
+                                'ip_address')
                         LOG.info("Created port %(port)s (subnet "
                                  "%(subnet)s, ip %(ip)s, mac %(mac)s)",
                                  {'port': created_port['id'],
                                   'subnet': subnet_id,
-                                  'ip': created_port['fixed_ips'][0][
-                                        'ip_address'],
+                                  'ip': ip_addr,
                                   'mac': created_port['mac_address']})
 
             # Enable dhcp on the relevant subnets:
