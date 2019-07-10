@@ -3,7 +3,7 @@
       - build-openstack-docs-pti
       - check-requirements
       - openstack-python-jobs-neutron
-      - openstack-python36-jobs
+      - openstack-python3-train-jobs
     check:
       jobs:
         - vmware-tox-lower-constraints
@@ -31,6 +31,18 @@
               - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py36:
+            timeout: 5400
+            required-projects:
+              - openstack/neutron
+              - openstack/networking-l2gw
+              - openstack/networking-sfc
+              - x/vmware-nsxlib
+              - openstack/neutron-fwaas
+              - openstack/neutron-dynamic-routing
+              - openstack/neutron-vpnaas
+              - x/tap-as-a-service
+              - openstack/octavia
+        - openstack-tox-py37:
             timeout: 5400
             required-projects:
               - openstack/neutron
@@ -70,6 +82,18 @@
               - x/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py36:
+            timeout: 5400
+            required-projects:
+              - openstack/neutron
+              - openstack/networking-l2gw
+              - openstack/networking-sfc
+              - x/vmware-nsxlib
+              - openstack/neutron-fwaas
+              - openstack/neutron-dynamic-routing
+              - openstack/neutron-vpnaas
+              - x/tap-as-a-service
+              - openstack/octavia
+        - openstack-tox-py37:
             timeout: 5400
             required-projects:
               - openstack/neutron

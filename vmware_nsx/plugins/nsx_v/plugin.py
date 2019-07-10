@@ -1796,12 +1796,12 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                             set_len = len(ip_addresses)
                             ip_addresses.add(ap['ip_address'])
                             if len(ip_addresses) == set_len:
-                                msg = _('IP address %s is allowed '
+                                msg = _('IP address %(ip)s is allowed '
                                         'by more than 1 logical port. '
                                         'This is not supported by the '
                                         'backend. Port security cannot '
-                                        'be enabled for network '
-                                        '%s') % (ap['ip_address'], id)
+                                        'be enabled for network %(net)s') % {
+                                    'ip': ap['ip_address'], 'net': id}
                                 LOG.error(msg)
                                 raise n_exc.BadRequest(
                                     resource='networks',
