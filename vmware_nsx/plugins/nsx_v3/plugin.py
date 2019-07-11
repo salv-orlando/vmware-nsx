@@ -69,7 +69,6 @@ from oslo_utils import importutils
 from oslo_utils import uuidutils
 
 from vmware_nsx._i18n import _
-from vmware_nsx.api_replay import utils as api_replay_utils
 from vmware_nsx.common import config  # noqa
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import l3_rpc_agent_api
@@ -2383,17 +2382,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         return ret_val
 
-    def _update_router_wrapper(self, context, router_id, router):
-        if cfg.CONF.api_replay_mode:
-            # NOTE(arosen): the mock.patch here is needed for api_replay_mode
-            with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
-                            side_effect=api_replay_utils._fixup_res_dict):
-                return super(NsxV3Plugin, self).update_router(
-                    context, router_id, router)
-        else:
-            return super(NsxV3Plugin, self).update_router(
-                context, router_id, router)
-
+    @nsx_plugin_common.api_replay_mode_wrapper
     def update_router(self, context, router_id, router):
         gw_info = self._extract_external_gw(context, router, is_extract=False)
         router_data = router['router']
@@ -2473,7 +2462,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                     nsx_router_id,
                     description=router_data['description'])
 
-            return self._update_router_wrapper(context, router_id, router)
+            return super(NsxV3Plugin, self).update_router(
+                context, router_id, router)
         except nsx_lib_exc.ResourceNotFound:
             with db_api.CONTEXT_WRITER.using(context):
                 router_db = self._get_router(context, router_id)
@@ -2670,18 +2660,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         return (ports, address_groups)
 
-    def _add_router_interface_wrapper(self, context, router_id,
-                                      interface_info):
-        if cfg.CONF.api_replay_mode:
-            # NOTE(arosen): the mock.patch here is needed for api_replay_mode
-            with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
-                            side_effect=api_replay_utils._fixup_res_dict):
-                return super(NsxV3Plugin, self).add_router_interface(
-                    context, router_id, interface_info)
-        else:
-            return super(NsxV3Plugin, self).add_router_interface(
-                 context, router_id, interface_info)
-
+    @nsx_plugin_common.api_replay_mode_wrapper
     def add_router_interface(self, context, router_id, interface_info):
         network_id = self._get_interface_network(context, interface_info)
         extern_net = self._network_is_external(context, network_id)
@@ -2717,8 +2696,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                                                  [network_id])
 
             # Update the interface of the neutron router
-            info = self._add_router_interface_wrapper(context, router_id,
-                                                      interface_info)
+            info = super(NsxV3Plugin, self).add_router_interface(
+                 context, router_id, interface_info)
         try:
             subnet = self.get_subnet(context, info['subnet_ids'][0])
             port = self.get_port(context, info['port_id'])
@@ -2919,23 +2898,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 vs_client.update_virtual_server_with_vip(vs['id'],
                                                          vip_address)
 
-    def _create_floating_ip_wrapper(self, context, floatingip):
-        if cfg.CONF.api_replay_mode:
-            # NOTE(arosen): the mock.patch here is needed for api_replay_mode
-            with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
-                            side_effect=api_replay_utils._fixup_res_dict):
-                return super(NsxV3Plugin, self).create_floatingip(
-                    context, floatingip, initial_status=(
-                        const.FLOATINGIP_STATUS_ACTIVE
-                        if floatingip['floatingip']['port_id']
-                        else const.FLOATINGIP_STATUS_DOWN))
-        else:
-            return super(NsxV3Plugin, self).create_floatingip(
-                context, floatingip, initial_status=(
-                    const.FLOATINGIP_STATUS_ACTIVE
-                    if floatingip['floatingip']['port_id']
-                    else const.FLOATINGIP_STATUS_DOWN))
-
     def create_floatingip(self, context, floatingip):
         # First do some validations
         fip_data = floatingip['floatingip']
@@ -3122,14 +3084,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         super(NsxV3Plugin, self).disassociate_floatingips(
             context, port_id, do_notify=False)
 
-    def _ensure_default_security_group(self, context, tenant_id):
-        # NOTE(arosen): if in replay mode we'll create all the default
-        # security groups for the user with their data so we don't
-        # want this to be called.
-        if (cfg.CONF.api_replay_mode is False):
-            return super(NsxV3Plugin, self)._ensure_default_security_group(
-                context, tenant_id)
-
     def _create_fw_section_for_secgroup(self, nsgroup, is_provider):
         # NOTE(arosen): if a security group is provider we want to
         # insert our rules at the top.
@@ -3189,22 +3143,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             section_id, nsgroup_id,
             logging_enabled, action, _sg_rules,
             ruleid_2_remote_nsgroup_map)
-
-    def _handle_api_replay_default_sg(self, context, secgroup_db):
-        """Set default api-replay migrated SG as default manually"""
-        if (secgroup_db['name'] == 'default'):
-            # this is a default security group copied from another cloud
-            # Ugly patch! mark it as default manually
-            with context.session.begin(subtransactions=True):
-                try:
-                    default_entry = securitygroup_model.DefaultSecurityGroup(
-                        security_group_id=secgroup_db['id'],
-                        project_id=secgroup_db['project_id'])
-                    context.session.add(default_entry)
-                except Exception as e:
-                    LOG.error("Failed to mark migrated security group %(id)s "
-                              "as default %(e)s",
-                              {'id': secgroup_db['id'], 'e': e})
 
     def create_security_group(self, context, security_group, default_sg=False):
         secgroup = security_group['security_group']

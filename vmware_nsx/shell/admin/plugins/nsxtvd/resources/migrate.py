@@ -206,6 +206,7 @@ def create_t_resources(context, objects, ext_net):
                 # fix object before creation using the api replay code
                 orig_id = obj['id']
                 prepare_object = getattr(prepare, "prepare_%s" % resource)
+                # TODO(asarfaty): Add availability zones support too
                 obj_data = prepare_object(obj, direct_call=True)
                 enable_dhcp = False
                 # special cases for different objects before create:

@@ -13,7 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
+import decorator
+import mock
 import netaddr
 from oslo_config import cfg
 from oslo_db import exception as db_exc
@@ -38,6 +39,7 @@ from neutron.db import extraroute_db
 from neutron.db import l3_attrs_db
 from neutron.db import l3_db
 from neutron.db import l3_gwmode_db
+from neutron.db.models import securitygroup as securitygroup_model
 from neutron.db import models_v2
 from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
@@ -70,6 +72,7 @@ from neutron_lib.services.qos import constants as qos_consts
 from neutron_lib.utils import helpers
 from neutron_lib.utils import net as nl_net_utils
 
+from vmware_nsx.api_replay import utils as api_replay_utils
 from vmware_nsx.common import availability_zones as nsx_com_az
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import locking
@@ -93,6 +96,17 @@ from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 from vmware_nsxlib.v3 import utils as nsxlib_utils
 
 LOG = logging.getLogger(__name__)
+
+
+@decorator.decorator
+def api_replay_mode_wrapper(f, *args, **kwargs):
+    if cfg.CONF.api_replay_mode:
+        # NOTE(arosen): the mock.patch here is needed for api_replay_mode
+        with mock.patch("neutron_lib.plugins.utils._fixup_res_dict",
+                        side_effect=api_replay_utils._fixup_res_dict):
+            return f(*args, **kwargs)
+    else:
+        return f(*args, **kwargs)
 
 
 # NOTE(asarfaty): the order of inheritance here is important. in order for the
@@ -2760,6 +2774,38 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                 restricted_vlans.append(vlan_id)
 
         return restricted_vlans
+
+    @api_replay_mode_wrapper
+    def _create_floating_ip_wrapper(self, context, floatingip):
+        initial_status = (constants.FLOATINGIP_STATUS_ACTIVE
+                          if floatingip['floatingip']['port_id']
+                          else constants.FLOATINGIP_STATUS_DOWN)
+        return super(NsxPluginV3Base, self).create_floatingip(
+            context, floatingip, initial_status=initial_status)
+
+    def _ensure_default_security_group(self, context, tenant_id):
+        # NOTE(arosen): if in replay mode we'll create all the default
+        # security groups for the user with their data so we don't
+        # want this to be called.
+        if not cfg.CONF.api_replay_mode:
+            return super(NsxPluginV3Base, self)._ensure_default_security_group(
+                context, tenant_id)
+
+    def _handle_api_replay_default_sg(self, context, secgroup_db):
+        """Set default api-replay migrated SG as default manually"""
+        if (secgroup_db['name'] == 'default'):
+            # this is a default security group copied from another cloud
+            # Ugly patch! mark it as default manually
+            with context.session.begin(subtransactions=True):
+                try:
+                    default_entry = securitygroup_model.DefaultSecurityGroup(
+                        security_group_id=secgroup_db['id'],
+                        project_id=secgroup_db['project_id'])
+                    context.session.add(default_entry)
+                except Exception as e:
+                    LOG.error("Failed to mark migrated security group %(id)s "
+                              "as default %(e)s",
+                              {'id': secgroup_db['id'], 'e': e})
 
 
 class TagsCallbacks(object):

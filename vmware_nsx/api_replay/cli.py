@@ -35,6 +35,7 @@ class ApiReplayCli(object):
             dest_os_user_domain_id=args.dest_os_user_domain_id,
             dest_os_password=args.dest_os_password,
             dest_os_auth_url=args.dest_os_auth_url,
+            dest_plugin=args.dest_plugin,
             use_old_keystone=args.use_old_keystone,
             logfile=args.logfile)
 
@@ -101,7 +102,11 @@ class ApiReplayCli(object):
         parser.add_argument(
             "--dest-os-auth-url",
             required=True,
-            help="They keystone api endpoint for this user.")
+            help="The keystone api endpoint for this user.")
+        parser.add_argument(
+            "--dest-plugin",
+            default='nsx-p',
+            help="The core plugin of the destination nsx-t/nsx-p.")
 
         parser.add_argument(
             "--use-old-keystone",
