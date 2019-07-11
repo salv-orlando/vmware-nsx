@@ -34,7 +34,7 @@ LOG = logging.getLogger(__name__)
 class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     @log_helpers.log_method_call
-    def _validate_lb_network(self, context, lb):
+    def _get_lb_router(self, context, lb):
         router_id = lb_utils.get_router_from_network(
             context, self.core_plugin, lb['vip_subnet_id'])
 
@@ -59,8 +59,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, lb['vip_subnet_id'])
-
-        router_id = self._validate_lb_network(context, lb)
+        router_id = self._get_lb_router(context, lb)
         if not router_id and network and not network.get('router:external'):
             completor(success=False)
             msg = (_('Cannot create a loadbalancer %(lb_id)s on subnet. '
