@@ -38,6 +38,26 @@ from vmware_nsx.services.lbaas.octavia import constants as d_const
 LOG = logging.getLogger(__name__)
 cfg.CONF.import_group('oslo_messaging', 'octavia.common.config')
 
+TRANSPORT = None
+RPC_SERVER = None
+
+
+def get_transport():
+    global TRANSPORT
+    if not TRANSPORT:
+        TRANSPORT = messaging.get_rpc_transport(cfg.CONF)
+    return TRANSPORT
+
+
+def get_rpc_server(target, endpoints, access_policy):
+    global RPC_SERVER
+    if not RPC_SERVER:
+        RPC_SERVER = messaging.get_rpc_server(
+            TRANSPORT, target, endpoints, executor='threading',
+            access_policy=access_policy)
+    return RPC_SERVER
+
+
 # List of keys per object type that will not be sent to the listener
 unsupported_keys = {'Loadbalancer': ['vip_qos_policy_id'],
                     'Listener': ['sni_container_refs',
@@ -62,7 +82,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
     @log_helpers.log_method_call
     def _init_rpc_messaging(self):
         topic = d_const.OCTAVIA_TO_DRIVER_TOPIC
-        transport = messaging.get_rpc_transport(cfg.CONF)
+        transport = get_transport()
         target = messaging.Target(topic=topic, exchange="common",
                                   namespace='control', fanout=False,
                                   version='1.0')
@@ -73,14 +93,13 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
         # Initialize RPC listener
         topic = d_const.DRIVER_TO_OCTAVIA_TOPIC
         server = socket.gethostname()
-        transport = messaging.get_rpc_transport(cfg.CONF)
         target = messaging.Target(topic=topic, server=server,
                                   exchange="common", fanout=False)
         endpoints = [NSXOctaviaDriverEndpoint()]
         access_policy = dispatcher.DefaultRPCAccessPolicy
-        self.octavia_server = messaging.get_rpc_server(
-            transport, target, endpoints, executor='threading',
-            access_policy=access_policy)
+
+        self.octavia_server = get_rpc_server(target, endpoints,
+                                             access_policy)
         self.octavia_server.start()
 
     @log_helpers.log_method_call
