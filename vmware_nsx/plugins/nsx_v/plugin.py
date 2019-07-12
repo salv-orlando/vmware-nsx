@@ -2013,19 +2013,22 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                         'supported at backend') % ip
                 raise n_exc.InvalidInput(error_message=msg)
 
+    def _verify_cidr_defined(self, attrs):
+        for ap in attrs[addr_apidef.ADDRESS_PAIRS]:
+            # Check that the IP address is a subnet
+            if len(ap['ip_address'].split('/')) > 1:
+                msg = _('NSXv does not support CIDR as address pairs')
+                raise n_exc.BadRequest(resource='address_pairs',
+                                       msg=msg)
+
     def _validate_address_pairs(self, context, attrs, db_port):
-        network_port_security = self._get_network_security_binding(
-            context, db_port['network_id'])
-        if (not cfg.CONF.nsxv.allow_multiple_ip_addresses or
-            network_port_security):
+        # Ground rule - if spoofguard exists: all tests must take place.
+        policy_id = nsxv_db.get_spoofguard_policy_id(context.session,
+                                                     db_port['network_id'])
+        if policy_id:
             self._validate_unique_address_pair_across_network(
-                 context, db_port, attrs[addr_apidef.ADDRESS_PAIRS])
-            for ap in attrs[addr_apidef.ADDRESS_PAIRS]:
-                # Check that the IP address is a subnet
-                if len(ap['ip_address'].split('/')) > 1:
-                    msg = _('NSXv does not support CIDR as address pairs')
-                    raise n_exc.BadRequest(resource='address_pairs',
-                                           msg=msg)
+                     context, db_port, attrs[addr_apidef.ADDRESS_PAIRS])
+            self._verify_cidr_defined(attrs)
         # Check that the MAC address is the same as the port
         for ap in attrs[addr_apidef.ADDRESS_PAIRS]:
             if ('mac_address' in ap and
