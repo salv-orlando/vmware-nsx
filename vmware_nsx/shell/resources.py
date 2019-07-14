@@ -71,6 +71,7 @@ class Operations(enum.Enum):
     SHOW = 'show'
     VALIDATE = 'validate'
     REUSE = 'reuse'
+    UPDATE_TIER0 = 'update-tier0'
 
 
 ops = [op.value for op in Operations]
@@ -108,12 +109,13 @@ nsxv3_resources = {
                                Operations.NSX_TAG_DEFAULT.value,
                                Operations.NSX_MIGRATE_V_V3.value,
                                Operations.NSX_MIGRATE_EXCLUDE_PORTS.value]),
-    constants.ROUTERS: Resource(constants.ROUTERS,
-                                [Operations.LIST_MISMATCHES.value,
-                                 Operations.NSX_UPDATE_RULES.value,
-                                 Operations.NSX_UPDATE_DHCP_RELAY.value,
-                                 Operations.NSX_ENABLE_STANDBY_RELOCATION.value
-                                 ]),
+    constants.ROUTERS: Resource(
+        constants.ROUTERS, [
+            Operations.LIST_MISMATCHES.value,
+            Operations.NSX_UPDATE_RULES.value,
+            Operations.NSX_UPDATE_DHCP_RELAY.value,
+            Operations.NSX_ENABLE_STANDBY_RELOCATION.value,
+            Operations.UPDATE_TIER0.value]),
     constants.DHCP_BINDING: Resource(constants.DHCP_BINDING,
                                      [Operations.LIST.value,
                                       Operations.NSX_UPDATE.value,
@@ -257,7 +259,8 @@ nsxp_resources = {
     constants.NETWORKS: Resource(constants.NETWORKS,
                                  [Operations.LIST.value]),
     constants.ROUTERS: Resource(constants.ROUTERS,
-                                [Operations.LIST.value]),
+                                [Operations.LIST.value,
+                                 Operations.UPDATE_TIER0.value]),
     constants.CERTIFICATE: Resource(constants.CERTIFICATE,
                                     [Operations.GENERATE.value,
                                      Operations.SHOW.value,

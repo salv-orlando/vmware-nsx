@@ -14,8 +14,15 @@
 
 import sys
 
+from neutron.db import db_base_plugin_v2
+from neutron.db import l3_db
+from neutron_lib.callbacks import registry
+from neutron_lib import context as neutron_context
+from oslo_log import log as logging
+
 from vmware_nsx.common import utils as nsx_utils
 from vmware_nsx.db import db as nsx_db
+from vmware_nsx.db import nsx_models
 from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
@@ -24,12 +31,6 @@ from vmware_nsx.shell.admin.plugins.nsxv3.resources import utils
 from vmware_nsx.shell import resources as shell
 from vmware_nsxlib.v3 import exceptions as nsx_exc
 from vmware_nsxlib.v3 import nsx_constants
-
-from neutron.db import db_base_plugin_v2
-from neutron.db import l3_db
-from neutron_lib.callbacks import registry
-from neutron_lib import context as neutron_context
-from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 neutron_client = utils.NeutronDbClient()
@@ -247,6 +248,79 @@ def update_dhcp_relay(resource, event, trigger, **kwargs):
     LOG.info("Done.")
 
 
+@admin_utils.output_header
+def update_tier0(resource, event, trigger, **kwargs):
+    """Replace old tier0 with a new one on the neutron DB and NSX backend"""
+    errmsg = ("Need to specify old and new tier0 ID. Add --property "
+              "old-tier0=<id> --property new-tier0=<id>")
+    if not kwargs.get('property'):
+        LOG.error("%s", errmsg)
+        return
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    old_tier0 = properties.get('old-tier0')
+    new_tier0 = properties.get('new-tier0')
+    if not old_tier0 or not new_tier0:
+        LOG.error("%s", errmsg)
+        return
+    # Verify the id of the new tier0 (old one might not exist any more)
+    nsxlib = utils.get_connected_nsxlib()
+    try:
+        tier0_obj = nsxlib.logical_router.get(new_tier0)
+    except Exception:
+        LOG.error("Tier0 logical router %s was not found", new_tier0)
+        return
+    if tier0_obj.get('router_type') != 'TIER0':
+        LOG.error("Logical router %s is not a tier0 router", new_tier0)
+        return
+
+    # update all neutron DB entries
+    old_tier0_networks = []
+    admin_cxt = neutron_context.get_admin_context()
+    with admin_cxt.session.begin(subtransactions=True):
+        bindings = admin_cxt.session.query(
+            nsx_models.TzNetworkBinding).filter_by(phy_uuid=old_tier0).all()
+        for bind in bindings:
+            old_tier0_networks.append(bind.network_id)
+            bind.phy_uuid = new_tier0
+
+    if not old_tier0_networks:
+        LOG.info("Did not find any provider networks using tier0 %s",
+                 old_tier0)
+        return
+
+    LOG.info("Updated provider networks in DB: %s", old_tier0_networks)
+
+    # Update tier1 routers GW to point to the new tier0 in the backend
+    plugin = RoutersPlugin()
+    filters = utils.get_plugin_filters(admin_cxt)
+    neutron_routers = plugin.get_routers(admin_cxt, filters=filters)
+    for router in neutron_routers:
+        router_gw_net = (router.get('external_gateway_info') and
+                         router['external_gateway_info'].get('network_id'))
+        if router_gw_net and router_gw_net in old_tier0_networks:
+            nsx_router_id = nsx_db.get_nsx_router_id(
+                admin_cxt.session, router['id'])
+            try:
+                nsxlib.router.remove_router_link_port(nsx_router_id)
+            except Exception as e:
+                LOG.info("Could not delete router %s linked port: %s",
+                         router['id'], e)
+            tags = nsxlib.build_v3_tags_payload(
+                router, resource_type='os-neutron-rport',
+                project_name=admin_cxt.tenant_name)
+            try:
+                nsxlib.router.add_router_link_port(nsx_router_id,
+                                                   new_tier0,
+                                                   tags=tags)
+            except Exception as e:
+                LOG.error("Failed to create router %s linked port: %s",
+                          router['id'], e)
+            else:
+                LOG.info("Updated router %s uplink port", router['id'])
+
+    LOG.info("Done.")
+
+
 registry.subscribe(list_missing_routers,
                    constants.ROUTERS,
                    shell.Operations.LIST_MISMATCHES.value)
@@ -266,6 +340,11 @@ registry.subscribe(delete_backend_router,
 registry.subscribe(update_dhcp_relay,
                    constants.ROUTERS,
                    shell.Operations.NSX_UPDATE_DHCP_RELAY.value)
+
 registry.subscribe(update_enable_standby_relocation,
                    constants.ROUTERS,
                    shell.Operations.NSX_ENABLE_STANDBY_RELOCATION.value)
+
+registry.subscribe(update_tier0,
+                   constants.ROUTERS,
+                   shell.Operations.UPDATE_TIER0.value)

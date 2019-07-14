@@ -364,6 +364,10 @@ Routers
 
     nsxadmin -r routers -o nsx-enable-standby-relocation
 
+- Replace an old tier0 (that might have been deleted) with a new one::
+
+    nsxadmin -r routers -o  update-tier0  --property old-tier0=<id> --property new-tier0=<id> 
+
 Orphaned Routers
 ~~~~~~~~~~~~~~~~~
 
@@ -622,6 +626,10 @@ NSX Policy Plugin
 - Set intent realization and purge cycle interval (in minutes) on policy manager::
 
     nsxadmin -r system -o set -p realization_interval=1
+
+- Replace an old tier0 (that might have been deleted) with a new one::
+
+    nsxadmin -r routers -o  update-tier0  --property old-tier0=<id> --property new-tier0=<id> 
 
 
 Client Certificate
