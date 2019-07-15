@@ -280,6 +280,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         for az in self.get_azs_list():
             az.translate_configured_names_to_uuids(
                 self.nsxpolicy, nsxlib=self.nsxlib, search_scope=search_scope)
+            az.validate_availability_zone(self.nsxpolicy, nsxlib=self.nsxlib)
 
         # WAF is currently not supported by the NSX
         self._waf_profile_uuid = None
