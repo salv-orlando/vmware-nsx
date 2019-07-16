@@ -333,22 +333,17 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         # Counting existing ports to take into account. If no fixed ips
         # are defined - we set it to 3 in order to reserve 2 fixed and another
         # for DHCP.
-
         existing_fixed_ips = len(port.get('fixed_ips', []))
         if existing_fixed_ips == 0:
             existing_fixed_ips = 3
         else:
             existing_fixed_ips += 1
         if address_pairs:
-            if (len(address_pairs) + existing_fixed_ips >=
-                    num_allowed_on_backend):
-                err_msg = (_(
-                    "Number of Address pairs is limited at the backend to %("
-                    "backend)s. Existing and requested %("
-                    "existing_and_requested)s") %
-                           {'backend': nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES,
-                            'existing_and_requested': existing_fixed_ips +
-                            len(address_pairs)})
+            max_addr_pairs = num_allowed_on_backend - existing_fixed_ips
+            if len(address_pairs) > max_addr_pairs:
+                err_msg = (_("Maximum of %(max)s address pairs can be defined "
+                             "for this port on the NSX backend") %
+                           {'max': max_addr_pairs})
                 raise n_exc.InvalidInput(error_message=err_msg)
 
     def _create_port_address_pairs(self, context, port_data):
