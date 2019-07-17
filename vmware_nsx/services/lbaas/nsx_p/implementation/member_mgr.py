@@ -14,7 +14,6 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -32,7 +31,6 @@ def _translate_member_state(state):
 
 
 class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
-    @log_helpers.log_method_call
     def _get_info_from_fip(self, context, fip):
         filters = {'floating_ip_address': [fip]}
         floating_ips = self.core_plugin.get_floatingips(context,
@@ -102,7 +100,6 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                'sub': member['subnet_id'],
                                'err': e})
 
-    @log_helpers.log_method_call
     def create(self, context, member, completor):
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
         self._validate_member_lb_connectivity(context, member, completor)
@@ -130,7 +127,6 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                            'pool': pool_id, 'err': e})
         completor(success=True)
 
-    @log_helpers.log_method_call
     def update(self, context, old_member, new_member, completor):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, new_member['subnet_id'])
@@ -158,7 +154,6 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                            'pool': pool_id, 'err': e})
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete(self, context, member, completor):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, member['subnet_id'])
@@ -180,7 +175,6 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                            'pool': pool_id, 'err': e})
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, member, completor):
         # No action should be taken on members delete cascade
         pass

@@ -14,7 +14,6 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -31,7 +30,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EdgeHealthMonitorManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
-    @log_helpers.log_method_call
     def _build_monitor_args(self, hm):
         if hm['type'] in lb_const.NSXV3_MONITOR_MAP:
             monitor_type = lb_const.NSXV3_MONITOR_MAP.get(hm['type'])
@@ -61,7 +59,6 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                                 "not support it")
         return body
 
-    @log_helpers.log_method_call
     def create(self, context, hm, completor):
         lb_id = hm['pool']['loadbalancer_id']
         pool_id = hm['pool']['id']
@@ -107,7 +104,6 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def update(self, context, old_hm, new_hm, completor):
         lb_id = new_hm['pool']['loadbalancer_id']
         pool_id = new_hm['pool']['id']
@@ -130,7 +126,6 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete(self, context, hm, completor):
         lb_id = hm['pool']['loadbalancer_id']
         pool_id = hm['pool']['id']
@@ -175,6 +170,5 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, hm, completor):
         self.delete(context, hm, completor)

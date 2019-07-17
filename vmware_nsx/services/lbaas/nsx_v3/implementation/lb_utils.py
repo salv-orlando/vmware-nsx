@@ -137,7 +137,6 @@ def validate_lb_member_subnet(context, plugin, subnet_id, lb):
             return False
 
 
-@log_helpers.log_method_call
 def get_rule_match_conditions(policy):
     match_conditions = []
     # values in rule have already been validated in LBaaS API,
@@ -181,7 +180,6 @@ def get_rule_match_conditions(policy):
     return match_conditions
 
 
-@log_helpers.log_method_call
 def get_rule_actions(context, l7policy):
     lb_id = l7policy['listener']['loadbalancer_id']
     if l7policy['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_POOL:
@@ -210,7 +208,6 @@ def get_rule_actions(context, l7policy):
     return actions
 
 
-@log_helpers.log_method_call
 def convert_l7policy_to_lb_rule(context, policy):
     return {
         'match_conditions': get_rule_match_conditions(policy),
@@ -220,13 +217,11 @@ def convert_l7policy_to_lb_rule(context, policy):
     }
 
 
-@log_helpers.log_method_call
 def remove_rule_from_policy(rule):
     l7rules = rule['policy']['rules']
     rule['policy']['rules'] = [r for r in l7rules if r['id'] != rule['id']]
 
 
-@log_helpers.log_method_call
 def update_rule_in_policy(rule):
     remove_rule_from_policy(rule)
     rule['policy']['rules'].append(rule)
@@ -256,7 +251,6 @@ def delete_persistence_profile(nsxlib, persistence_profile_id):
         nsxlib.load_balancer.persistence_profile.delete(persistence_profile_id)
 
 
-@log_helpers.log_method_call
 def build_persistence_profile_tags(pool_tags, listener):
     tags = pool_tags[:]
     # With octavia loadbalancer name might not be among data passed
@@ -281,7 +275,6 @@ def get_pool_tags(context, core_plugin, pool):
                     context.project_name)
 
 
-@log_helpers.log_method_call
 def setup_session_persistence(nsxlib, pool, pool_tags,
                               switch_type, listener, vs_data):
     sp = pool.get('session_persistence')

@@ -14,7 +14,6 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -28,7 +27,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
-    @log_helpers.log_method_call
     def create(self, context, policy, completor):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         policy_name = utils.get_name_and_uuid(policy['name'] or 'policy',
@@ -50,7 +48,6 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def update(self, context, old_policy, new_policy, completor):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         policy_name = utils.get_name_and_uuid(old_policy['name'] or 'policy',
@@ -87,6 +84,5 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             raise n_exc.BadRequest(resource='lbaas-l7policy', msg=msg)
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, policy, completor):
         self.delete(context, policy, completor)

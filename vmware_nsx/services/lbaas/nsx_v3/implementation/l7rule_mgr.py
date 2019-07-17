@@ -14,7 +14,6 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -27,7 +26,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EdgeL7RuleManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
-    @log_helpers.log_method_call
     def _update_l7rule_change(self, context, rule, completor,
                               delete=False):
         rule_client = self.core_plugin.nsxlib.load_balancer.rule
@@ -57,19 +55,15 @@ class EdgeL7RuleManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def create(self, context, rule, completor):
         self._update_l7rule_change(context, rule, completor)
 
-    @log_helpers.log_method_call
     def update(self, context, old_rule, new_rule, completor):
         self._update_l7rule_change(context, new_rule, completor)
 
-    @log_helpers.log_method_call
     def delete(self, context, rule, completor):
         self._update_l7rule_change(context, rule, completor, delete=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, rulle, completor):
         # No action should be taken on rules delete cascade
         pass
