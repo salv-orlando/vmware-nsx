@@ -219,10 +219,19 @@ class PrepareObjectForMigration(object):
         if remove_qos:
             body = self.drop_fields(body, ['qos_policy_id'])
 
-        # remove allowed_address_pairs if empty:
-        if ('allowed_address_pairs' in body and
-            not body['allowed_address_pairs']):
-            del body['allowed_address_pairs']
+        if 'allowed_address_pairs' in body:
+            if not body['allowed_address_pairs']:
+                # remove allowed_address_pairs if empty:
+                del body['allowed_address_pairs']
+            else:
+                # remove unsupported allowed_address_pairs
+                for pair in body['allowed_address_pairs']:
+                    ip = pair.get('ip_address')
+                    if len(ip.split('/')) > 1:
+                        LOG.warning("ignoring allowed_address_pair %s for "
+                                    "port %s as cidr is not supported",
+                                    pair, port['id'])
+                        body['allowed_address_pairs'].remove(pair)
 
         # remove port security if mac learning is enabled
         if (body.get('mac_learning_enabled') and
