@@ -295,13 +295,13 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 LOG.error('Failed to update listener %(listener)s with '
                           'error %(error)s',
                           {'listener': old_listener['id'], 'error': e})
-        # Update default pool and session persistence
-        if (old_listener.get('default_pool_id') !=
-            new_listener.get('default_pool_id')):
-            self._remove_default_pool_binding(context, old_listener)
-            self._update_default_pool_and_binding(context, new_listener,
-                                                  vs_data, completor,
-                                                  old_listener)
+        # Update default pool and session persistence (do this even if the
+        # default pool did not change, as there might have been an error the
+        # last time)
+        self._remove_default_pool_binding(context, old_listener)
+        self._update_default_pool_and_binding(context, new_listener,
+                                              vs_data, completor,
+                                              old_listener)
 
         completor(success=True)
 
