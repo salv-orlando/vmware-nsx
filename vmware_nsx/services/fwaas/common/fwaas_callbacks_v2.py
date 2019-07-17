@@ -25,13 +25,15 @@ from neutron_lib.plugins import directory
 LOG = logging.getLogger(__name__)
 
 try:
-    from neutron_fwaas.db.firewall.v2 import firewall_db_v2
+    from neutron_fwaas.common import fwaas_constants
     from neutron_fwaas.services.firewall.service_drivers.agents.l3reference \
         import firewall_l3_agent_v2
 except ImportError:
     # FWaaS project no found
     from vmware_nsx.services.fwaas.common import fwaas_mocks \
         as firewall_l3_agent_v2
+    from vmware_nsx.services.fwaas.common import fwaas_mocks \
+        as fwaas_constants
 
 
 class DummyAgentApi(object):
@@ -209,13 +211,11 @@ class NsxFwaasCallbacksV2(firewall_l3_agent_v2.L3WithFWaaS):
             if fwg['id'] == fwg_id:
                 return fwg
 
-    # TODO(asarfaty): add this api to fwaas firewall_db_v2
     def _get_port_firewall_group_id(self, context, port_id):
-        entry = context.session.query(
-            firewall_db_v2.FirewallGroupPortAssociation).filter_by(
-            port_id=port_id).first()
-        if entry:
-            return entry.firewall_group_id
+        fw_plugin = directory.get_plugin(fwaas_constants.FIREWALL_V2)
+        if fw_plugin:
+            driver_db = fw_plugin.driver.firewall_db
+            return driver_db.get_fwg_attached_to_port(context, port_id)
 
     def should_apply_firewall_to_router(self, context, router_id):
         """Return True if there are FWaaS rules that are attached to an
