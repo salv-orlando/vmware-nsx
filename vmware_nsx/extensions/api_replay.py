@@ -52,6 +52,16 @@ RESOURCE_ATTRIBUTE_MAP = {
     'policies': {  # QoS policies
         'id': ID_WITH_POST,
     },
+    'firewall_rules': {  # FWaaS V2 rules
+        'id': ID_WITH_POST,
+    },
+    'firewall_policies': {  # FWaaS V2 policies
+        'id': ID_WITH_POST,
+    },
+    'firewall_groups': {  # FWaaS V2 groups
+        'id': ID_WITH_POST,
+    },
+
 }
 
 
