@@ -238,6 +238,8 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             completor(success=False)
             msg = _('Failed to add virtual server to lb service '
                     'at NSX backend')
+            # delete the backend virtual server
+            vs_client.delete(virtual_server['id'])
             raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
 
         nsx_db.add_nsx_lbaas_listener_binding(
