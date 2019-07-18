@@ -1557,14 +1557,17 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.debug("Created DHCP logical port %(port)s for "
                       "network %(network)s",
                       {'port': nsx_port['id'], 'network': network['id']})
+        except nsx_lib_exc.ServiceClusterUnavailable:
+            raise webob.exc.HTTPServiceUnavailable()
         except nsx_lib_exc.ManagerError:
-            with excutils.save_and_reraise_exception():
-                LOG.error("Unable to create logical DHCP server for "
-                          "network %s", network['id'])
-                if dhcp_server:
-                    self.nsxlib.dhcp_server.delete(dhcp_server['id'])
-                super(NsxPluginV3Base, self).delete_port(
-                    context, neutron_port['id'])
+            err_msg = ("Unable to create logical DHCP server for "
+                       "network %s" % network['id'])
+            LOG.error(err_msg)
+            if dhcp_server:
+                self.nsxlib.dhcp_server.delete(dhcp_server['id'])
+            super(NsxPluginV3Base, self).delete_port(
+                context, neutron_port['id'])
+            raise nsx_exc.NsxPluginException(err_msg=err_msg)
 
         try:
             # Add neutron_port_id -> nsx_port_id mapping to the DB.
@@ -2661,10 +2664,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 project_name=context.tenant_name)
             name = self._get_mdproxy_port_name(network['name'],
                                                network['id'])
-            md_port = self.nsxlib.logical_port.create(
-                nsx_net_id, az._native_md_proxy_uuid,
-                tags=tags, name=name,
-                attachment_type=nsxlib_consts.ATTACHMENT_MDPROXY)
+            try:
+                md_port = self.nsxlib.logical_port.create(
+                    nsx_net_id, az._native_md_proxy_uuid,
+                    tags=tags, name=name,
+                    attachment_type=nsxlib_consts.ATTACHMENT_MDPROXY)
+            except nsx_lib_exc.ResourceNotFound:
+                err_msg = (_('Logical switch %s or MD proxy %s do '
+                             'not exist') % (nsx_net_id,
+                                             az._native_md_proxy_uuid))
+                LOG.error(err_msg)
+                raise nsx_exc.NsxPluginException(err_msg=err_msg)
+
             LOG.debug("Created MD-Proxy logical port %(port)s "
                       "for network %(network)s",
                       {'port': md_port['id'],
