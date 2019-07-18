@@ -339,9 +339,9 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
             self.l3_plugin.delete_port(context, port['id'],
                                        force_delete_vpn=True)
 
-    def _delete_local_endpoint(self, resource, event, trigger, **kwargs):
+    def _delete_local_endpoint(self, resource, event, trigger, payload=None):
         """Upon router deletion / gw removal delete the matching endpoint"""
-        router_id = kwargs.get('router_id')
+        router_id = payload.resource_id
         ctx = n_context.get_admin_context()
         self._delete_local_endpoint_by_router(ctx, router_id)
 

@@ -2779,15 +2779,14 @@ class L3NatTestCaseBase(test_l3_plugin.L3NatTestCaseMixin):
         with self.router() as r,\
             self._create_l3_ext_network() as ext_net,\
             self.subnet(network=ext_net):
-            with mock.patch.object(registry, 'notify') as notify:
+            with mock.patch.object(registry, 'publish') as publish:
                 self._add_external_gateway_to_router(
                     r['router']['id'], ext_net['network']['id'])
                 expected = [mock.call(
                                 resources.ROUTER_GATEWAY,
                                 events.AFTER_CREATE, mock.ANY,
-                                context=mock.ANY, gw_ips=mock.ANY,
-                                network_id=mock.ANY, router_id=mock.ANY)]
-                notify.assert_has_calls(expected)
+                                payload=mock.ANY)]
+                publish.assert_has_calls(expected)
 
     def test_router_delete_ipv6_slaac_subnet_inuse_returns_409(self):
         self.skipTest('No DHCP v6 Support yet')
