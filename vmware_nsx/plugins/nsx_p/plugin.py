@@ -1901,9 +1901,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             subnets = self._find_router_subnets(context.elevated(), router_id)
             tier0_uuid = self._get_tier0_uuid_by_router(
                 context.elevated(), router_db)
-            #TODO(asarfaty): it is enough to validate only the new subnet,
-            # and not all
-            self._validate_router_tz(context.elevated(), tier0_uuid, subnets)
+            # Validate the TZ of the new subnet match the one of the router
+            self._validate_router_tz(context.elevated(), tier0_uuid, [subnet])
 
             segment_id = self._get_network_nsx_segment_id(context, network_id)
             subnet = self.get_subnet(context, info['subnet_ids'][0])
