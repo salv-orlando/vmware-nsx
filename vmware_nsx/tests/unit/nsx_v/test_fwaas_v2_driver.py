@@ -275,6 +275,9 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
             mock.patch("vmware_nsx.db.db.get_nsx_switch_and_port_id",
                        return_value=('vnic-index-1', 0)),\
             mock.patch.object(edge_utils, "update_firewall") as update_fw,\
+            mock.patch.object(self.plugin.fwaas_callbacks,
+                              '_get_port_firewall_group_id',
+                              return_value=None),\
             mock.patch.object(edge_utils, 'get_router_edge_id',
                               return_value='edge-1'):
             self.firewall.delete_firewall_group('nsx', apply_list, firewall)
@@ -287,6 +290,9 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
         rule_list = self._fake_rules_v4()
         firewall = self._fake_firewall_group_with_admin_down(rule_list)
         with mock.patch.object(edge_utils, "update_firewall") as update_fw,\
+            mock.patch.object(self.plugin.fwaas_callbacks,
+                              '_get_port_firewall_group_id',
+                              return_value=None),\
             mock.patch.object(edge_utils, 'get_router_edge_id',
                               return_value='edge-1'):
             self.firewall.create_firewall_group('nsx', apply_list, firewall)
