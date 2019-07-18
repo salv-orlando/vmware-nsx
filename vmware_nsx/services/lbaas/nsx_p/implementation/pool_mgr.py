@@ -16,7 +16,6 @@
 import functools
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -98,7 +97,6 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 LOG.error('Failed to attach pool %s to virtual '
                           'server %s', pool['id'], listener['id'])
 
-    @log_helpers.log_method_call
     def create(self, context, pool, completor):
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
 
@@ -144,7 +142,6 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                     listener, completor)
         completor(success=True)
 
-    @log_helpers.log_method_call
     def update(self, context, old_pool, new_pool, completor):
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
 
@@ -194,7 +191,6 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                           'error %(error)s',
                           {'pool': old_pool['id'], 'error': e})
 
-    @log_helpers.log_method_call
     def delete(self, context, pool, completor):
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
 
@@ -243,6 +239,5 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, pool, completor):
         self.delete(context, pool, completor)

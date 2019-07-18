@@ -14,7 +14,6 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -33,14 +32,12 @@ LOG = logging.getLogger(__name__)
 
 class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
-    @log_helpers.log_method_call
     def _get_lb_router(self, context, lb):
         router_id = lb_utils.get_router_from_network(
             context, self.core_plugin, lb['vip_subnet_id'])
 
         return router_id
 
-    @log_helpers.log_method_call
     def _get_info_from_fip(self, context, fip):
         filters = {'floating_ip_address': [fip]}
         floating_ips = self.core_plugin.get_floatingips(context,
@@ -53,7 +50,6 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                      'be a floating IP') % {'fip': fip})
             raise n_exc.BadRequest(resource='lbaas-vip', msg=msg)
 
-    @log_helpers.log_method_call
     def create(self, context, lb, completor):
         lb_id = lb['id']
 
@@ -125,11 +121,9 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                           'device_owner': lb_const.VMWARE_LB_VIP_OWNER}})
         completor(success=True)
 
-    @log_helpers.log_method_call
     def update(self, context, old_lb, new_lb, completor):
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete(self, context, lb, completor):
         router_id = lb_utils.get_router_from_network(
             context, self.core_plugin, lb['vip_subnet_id'])
@@ -177,23 +171,19 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, lb, completor):
         """Delete all backend and DB resources of this loadbalancer"""
         self.delete(context, lb, completor)
 
-    @log_helpers.log_method_call
     def refresh(self, context, lb):
         # TODO(kobis): implement
         pass
 
-    @log_helpers.log_method_call
     def _get_lb_virtual_servers(self, context, lb):
         # Get all virtual servers that belong to this loadbalancer
         vs_list = [vs['id'] for vs in lb['listeners']]
         return vs_list
 
-    @log_helpers.log_method_call
     def stats(self, context, lb):
         # Since multiple LBaaS loadbalancer can share the same LB service,
         # get the corresponding virtual servers' stats instead of LB service.
@@ -224,7 +214,6 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             raise n_exc.BadRequest(resource='lbaas-lb', msg=msg)
         return stats
 
-    @log_helpers.log_method_call
     def get_operating_status(self, context, id, with_members=False):
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         try:
@@ -262,7 +251,6 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # to add the listeners statuses from the virtual servers statuses
         return statuses
 
-    @log_helpers.log_method_call
     def _nsx_status_to_lb_status(self, nsx_status):
         if not nsx_status:
             # default fallback

@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -25,7 +24,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EdgeL7RuleManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
-    @log_helpers.log_method_call
     def _update_l7rule_change(self, rule, completor, delete=False):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         policy = rule['policy']
@@ -50,19 +48,15 @@ class EdgeL7RuleManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def create(self, context, rule, completor):
         self._update_l7rule_change(rule, completor)
 
-    @log_helpers.log_method_call
     def update(self, context, old_rule, new_rule, completor):
         self._update_l7rule_change(new_rule, completor)
 
-    @log_helpers.log_method_call
     def delete(self, context, rule, completor):
         self._update_l7rule_change(rule, completor, delete=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, rule, completor):
         # No action should be taken on rules delete cascade
         pass

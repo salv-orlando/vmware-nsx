@@ -16,7 +16,6 @@
 import functools
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 
 from vmware_nsx._i18n import _
@@ -32,7 +31,6 @@ LOG = logging.getLogger(__name__)
 ADV_RULE_NAME = 'LB external VIP advertisement'
 
 
-@log_helpers.log_method_call
 def get_rule_match_conditions(policy):
     match_conditions = []
     # values in rule have already been validated in LBaaS API,
@@ -76,7 +74,6 @@ def get_rule_match_conditions(policy):
     return match_conditions
 
 
-@log_helpers.log_method_call
 def get_rule_actions(nsxpolicy, l7policy):
     if l7policy['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_POOL:
         if l7policy['redirect_pool_id']:
@@ -103,7 +100,6 @@ def get_rule_actions(nsxpolicy, l7policy):
     return actions
 
 
-@log_helpers.log_method_call
 def convert_l7policy_to_lb_rule(nsxpolicy, policy):
     return {
         'match_conditions': get_rule_match_conditions(policy),
@@ -113,19 +109,16 @@ def convert_l7policy_to_lb_rule(nsxpolicy, policy):
     }
 
 
-@log_helpers.log_method_call
 def remove_rule_from_policy(rule):
     l7rules = rule['policy']['rules']
     rule['policy']['rules'] = [r for r in l7rules if r['id'] != rule['id']]
 
 
-@log_helpers.log_method_call
 def update_rule_in_policy(rule):
     remove_rule_from_policy(rule)
     rule['policy']['rules'].append(rule)
 
 
-@log_helpers.log_method_call
 def update_router_lb_vip_advertisement(context, core_plugin, router_id):
     router = core_plugin.get_router(context.elevated(), router_id)
 
@@ -143,7 +136,6 @@ def update_router_lb_vip_advertisement(context, core_plugin, router_id):
             external_cidrs)
 
 
-@log_helpers.log_method_call
 def get_monitor_policy_client(lb_client, hm):
     if hm['type'] == lb_const.LB_HEALTH_MONITOR_TCP:
         return lb_client.lb_monitor_profile_tcp

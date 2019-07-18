@@ -16,7 +16,6 @@
 import copy
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -35,7 +34,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
-    @log_helpers.log_method_call
     def _get_listener_tags(self, context, listener):
         tags = lb_utils.get_tags(self.core_plugin, listener['id'],
                                  lb_const.LB_LISTENER_TYPE,
@@ -49,7 +47,6 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             'tag': listener['loadbalancer_id']})
         return tags
 
-    @log_helpers.log_method_call
     def _upload_certificate(self, listener_id, cert_href, tags,
                             certificate=None):
         nsxpolicy = self.core_plugin.nsxpolicy
@@ -73,7 +70,6 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             }
         }
 
-    @log_helpers.log_method_call
     def _get_virtual_server_kwargs(self, context, listener, vs_name, tags,
                                    certificate=None):
         # If loadbalancer vip_port already has floating ip, use floating
@@ -151,9 +147,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             lb_common.validate_session_persistence(
                 listener.get('default_pool'), listener, completor)
 
-    @log_helpers.log_method_call
-    def create(self, context, listener, completor,
-               certificate=None):
+    def create(self, context, listener, completor, certificate=None):
         nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
         vs_client = nsxlib_lb.virtual_server
         vs_name = utils.get_name_and_uuid(listener['name'] or 'listener',
@@ -227,7 +221,6 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                           "virtual server %s",
                           persistence_profile_id, listener['id'])
 
-    @log_helpers.log_method_call
     def update(self, context, old_listener, new_listener, completor,
                certificate=None):
         nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
@@ -266,7 +259,6 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                       completor, old_listener)
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete(self, context, listener, completor):
         nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
         vs_client = nsxlib_lb.virtual_server
@@ -320,7 +312,6 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, listener, completor):
         self.delete(context, listener, completor)
 

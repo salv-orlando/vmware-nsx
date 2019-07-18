@@ -14,7 +14,6 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -49,7 +48,6 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                     int(code) for code in codes]
         return body
 
-    @log_helpers.log_method_call
     def create(self, context, hm, completor):
         pool_id = hm['pool']['id']
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
@@ -88,7 +86,6 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def update(self, context, old_hm, new_hm, completor):
         monitor_client = lb_utils.get_monitor_policy_client(
             self.core_plugin.nsxpolicy.load_balancer, new_hm)
@@ -103,7 +100,6 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete(self, context, hm, completor):
         pool_id = hm['pool']['id']
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
@@ -137,6 +133,5 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         completor(success=True)
 
-    @log_helpers.log_method_call
     def delete_cascade(self, context, hm, completor):
         self.delete(context, hm, completor)

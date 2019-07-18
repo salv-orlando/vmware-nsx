@@ -13,15 +13,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 from neutron_lib import exceptions as n_exc
-from oslo_log import helpers as log_helpers
+from oslo_log import log as logging
 
 from vmware_nsx._i18n import _
 from vmware_nsx.services.lbaas import lb_const
 
+LOG = logging.getLogger(__name__)
 
-@log_helpers.log_method_call
+
 def validate_session_persistence(pool, listener, completor):
     sp = pool.get('session_persistence')
+    LOG.debug("validate_session_persistence called with session_persistence "
+              "%s", sp)
     if not listener or not sp:
         # safety first!
         return
