@@ -323,9 +323,12 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _validate_address_pairs(self, address_pairs):
         for pair in address_pairs:
             ip = pair.get('ip_address')
-            if len(ip.split('/')) > 1:
-                LOG.error("cidr is not supported in allowed address pairs")
-                raise nsx_exc.InvalidIPAddress(ip_address=ip)
+            # Validate ipv4 cidrs (No limitation on ipv6):
+            if ':' not in ip:
+                if len(ip.split('/')) > 1 and ip.split('/')[1] != '32':
+                    LOG.error("cidr %s is not supported in allowed address "
+                              "pairs", ip)
+                    raise nsx_exc.InvalidIPAddress(ip_address=ip)
 
     def _validate_number_of_address_pairs(self, port):
         address_pairs = port.get(addr_apidef.ADDRESS_PAIRS)
