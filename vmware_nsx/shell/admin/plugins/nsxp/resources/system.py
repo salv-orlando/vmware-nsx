@@ -33,6 +33,10 @@ def set_system_parameters(resource, event, trigger, **kwargs):
 
     This setting is affecting NSX Policy Manager appliance.
     """
+    usage = ("Usage: nsxadmin -r %s -o %s --property realization_interval="
+             "<%s-%s> ") % (constants.SYSTEM, shell.Operations.SET.value,
+                            MIN_REALIZATION_INTERVAL, MAX_REALIZATION_INTERVAL)
+
     if kwargs.get('property'):
         properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
         interval = properties.get('realization_interval')
@@ -53,6 +57,11 @@ def set_system_parameters(resource, event, trigger, **kwargs):
                           "policy appliance - %s", ex)
 
             LOG.info("Intent realization interval set to %s min" % interval)
+        else:
+            LOG.error("Missing parameters: %s", usage)
+
+    else:
+        LOG.error("Missing parameters: %s", usage)
 
 
 registry.subscribe(set_system_parameters,
