@@ -61,8 +61,16 @@ def import_projects(resource, event, trigger, **kwargs):
         return
 
     ctx = n_context.get_admin_context()
-    if not db.get_project_plugin_mapping(ctx.session, project):
+    curr_map = db.get_project_plugin_mapping(ctx.session, project)
+    if not curr_map:
         db.add_project_plugin_mapping(ctx.session, project, plugin)
+        LOG.info('Done.')
+    else:
+        if curr_map.plugin == plugin:
+            LOG.info("%s is already the plugin of project %s", plugin, project)
+        else:
+            LOG.error("Project %s is mapped to plugin %s. Existing mapping "
+                      "cannot be modified.", project, curr_map.plugin)
 
 
 def get_resource_file_name(project_id, resource):
