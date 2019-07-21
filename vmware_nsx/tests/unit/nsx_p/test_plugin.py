@@ -133,6 +133,11 @@ class NsxPPluginTestCaseMixin(
                    "NsxPolicySegmentApi.set_admin_state").start()
         mock.patch("vmware_nsxlib.v3.policy.core_resources."
                    "NsxPolicySegmentPortApi.set_admin_state").start()
+        mock.patch("vmware_nsxlib.v3.policy.core_resources.NsxPolicyTier0Api."
+                   "get_edge_cluster_path", return_value="x/1").start()
+        mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                   "NsxPolicyEdgeClusterApi.get_edge_node_ids",
+                   return_value=["node1"]).start()
         mock.patch("vmware_nsxlib.v3.NsxLib.get_tag_limits",
                    return_value=nsxlib_utils.TagLimits(20, 40, 15)).start()
         # Add some nsxlib mocks for the passthrough apis
@@ -140,6 +145,10 @@ class NsxPPluginTestCaseMixin(
                    return_value=nsx_constants.NSX_VERSION_2_5_0).start()
         mock.patch("vmware_nsxlib.v3.core_resources.NsxLibLogicalRouter."
                    "update").start()
+        mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportNode."
+                   "get_transport_zones",
+                   return_value=[NSX_OVERLAY_TZ_NAME,
+                                 NSX_VLAN_TZ_NAME]).start()
 
     def _mock_nsxlib_backend_calls(self):
         """Mock nsxlib backend calls used as passthrough

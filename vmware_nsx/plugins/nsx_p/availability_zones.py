@@ -21,6 +21,7 @@ from vmware_nsx.common import config
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.plugins.common_v3 import availability_zones as v3_az
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
+from vmware_nsxlib.v3.policy import utils as p_utils
 
 LOG = log.getLogger(__name__)
 
@@ -142,6 +143,76 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
         else:
             self._native_dhcp_profile_uuid = None
             self._native_md_proxy_uuid = None
+
+    def _get_edge_cluster_tzs(self, nsxpolicy, nsxlib, ec_uuid):
+        ec_nodes = nsxpolicy.edge_cluster.get_edge_node_ids(ec_uuid)
+        ec_tzs = []
+        for tn_uuid in ec_nodes:
+            ec_tzs.extend(nsxlib.transport_node.get_transport_zones(
+                tn_uuid))
+        return ec_tzs
+
+    def _validate_tz(self, nsxpolicy, nsxlib, obj_type, obj_id, ec_uuid):
+        obj_tzs = self._get_edge_cluster_tzs(nsxpolicy, nsxlib, ec_uuid)
+        if self._default_overlay_tz_uuid not in obj_tzs:
+            msg = (_("%(type)s %(id)s of availability zone %(az)s with edge "
+                     "cluster %(ec)s does not match the default overlay tz "
+                     "%(tz)s") % {
+                'type': obj_type,
+                'id': obj_id,
+                'ec': ec_uuid,
+                'tz': self._default_overlay_tz_uuid,
+                'az': self.name})
+            raise nsx_exc.NsxPluginException(err_msg=msg)
+
+        if (self._default_vlan_tz_uuid and
+            self._default_vlan_tz_uuid not in obj_tzs):
+            msg = (_("%(type)s %(id)s of availability zone %(az)s with edge "
+                     "cluster %(ec)s does not match the default vlan tz "
+                     "%(tz)s") % {
+                'id': obj_id,
+                'ec': ec_uuid,
+                'tz': self._default_vlan_tz_uuid,
+                'az': self.name})
+            raise nsx_exc.NsxPluginException(err_msg=msg)
+
+    def validate_availability_zone(self, nsxpolicy, nsxlib=None):
+        """Validate that all the components of this AZ are connected"""
+
+        if not nsxlib:
+            LOG.warning("Cannot validate availability zone %s without "
+                        "passthrough api", self.name)
+            return
+
+        # Validate tier0 TZ match the default ones
+        tier0_ec_path = nsxpolicy.tier0.get_edge_cluster_path(
+            self._default_tier0_router)
+        if not tier0_ec_path:
+            msg = (_("Tier0 %(id)s of availability zone %(az)s does not have "
+                     "an edge cluster") % {
+                'id': self._default_tier0_router,
+                'az': self.name})
+            raise nsx_exc.NsxPluginException(err_msg=msg)
+        tier0_ec_uuid = p_utils.path_to_id(tier0_ec_path)
+        self._validate_tz(nsxpolicy, nsxlib, 'Tier0',
+                          self._default_tier0_router,
+                          tier0_ec_uuid)
+
+        if self._native_dhcp_profile_uuid:
+            dhcp_ec = nsxlib.native_dhcp_profile.get(
+                self._native_dhcp_profile_uuid).get('edge_cluster_id')
+            if dhcp_ec != tier0_ec_uuid:
+                self._validate_tz(nsxpolicy, nsxlib, 'DHCP profile',
+                                  self._native_dhcp_profile_uuid,
+                                  dhcp_ec)
+
+        if self._native_md_proxy_uuid:
+            md_ec = nsxlib.native_md_proxy.get(
+                self._native_md_proxy_uuid).get('edge_cluster_id')
+            if md_ec != tier0_ec_uuid:
+                self._validate_tz(nsxpolicy, nsxlib, 'MD Proxy',
+                                  self._native_md_proxy_uuid,
+                                  md_ec)
 
 
 class NsxPAvailabilityZones(common_az.ConfiguredAvailabilityZones):
