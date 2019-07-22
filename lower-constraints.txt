@@ -38,7 +38,7 @@ SQLAlchemy==1.2.0
 sphinx==1.6.5
 stestr==1.0.0
 stevedore==1.20.0
-tenacity==4.9.0
+tenacity==5.0.1
 testtools==2.2.0
 tooz==1.58.0
 vmware-nsxlib==13.1.0
