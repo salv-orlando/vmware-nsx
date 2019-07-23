@@ -113,7 +113,7 @@ class CommonEdgeFwaasV3Driver(fwaas_base.FwaasDriverBase):
                      'cidr': cidr, 'id': fwaas_rule_id})
         net = netaddr.IPNetwork(cidr)
         if net.version == 4:
-            if cidr.startswith('0.0.0.0/'):
+            if cidr.startswith('0.0.0.0'):
                 # Treat as ANY and just log warning
                 LOG.warning(error_msg)
                 return
