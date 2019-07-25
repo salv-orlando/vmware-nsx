@@ -29,8 +29,10 @@ def validate_session_persistence(pool, listener, completor):
         # safety first!
         return
     # L4 listeners only allow source IP persistence
-    if (listener['protocol'] == lb_const.LB_PROTOCOL_TCP and
-            sp['type'] != lb_const.LB_SESSION_PERSISTENCE_SOURCE_IP):
+    # (HTTPS is also considers L4 listener)
+    if ((listener['protocol'] == lb_const.LB_PROTOCOL_TCP or
+         listener['protocol'] == lb_const.LB_PROTOCOL_HTTPS) and
+        sp['type'] != lb_const.LB_SESSION_PERSISTENCE_SOURCE_IP):
         completor(success=False)
         msg = (_("Invalid session persistence type %(sp_type)s for "
                  "pool on listener %(lst_id)s with %(proto)s protocol") %
