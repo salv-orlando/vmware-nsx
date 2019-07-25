@@ -6,7 +6,7 @@
 This document describes the REST API extensions integrated with the
 VMware [NSX OpenStack neutron plugins](https://wiki.openstack.org/wiki/Neutron/VMware_NSX_plugins).
 The intent of this document is to supplement the
-[OpenStack neutron REST API guide](https://developer.openstack.org/api-ref/networking/v2) by describing
+[OpenStack neutron REST API guide](https://docs.openstack.org/api-ref/network/v2) by describing
 the extensions implemented by the VMware NSX neutron plugins.
 
 The VMware NSX neutron plugins implement
@@ -14,7 +14,7 @@ The VMware NSX neutron plugins implement
 by defining new top-level REST resources, operations (e.g. verbs) and attribute extensions
 to existing neutron REST API entities (depending on the extension). As all extensions apply
 to the neutron REST API, the
-[general information](https://developer.openstack.org/api-ref/networking/v2/#general-information)
+[general information](https://docs.openstack.org/api-ref/network/v2/#general-information)
 for the neutron API applies here as well.
 
 The VMware NSX neutron extensions supported by your plugin will depend on the version
@@ -43,7 +43,7 @@ of VMware NSX used. Two versions described herein are:
 
 ###### Description
 This resource attribute extensions adds the `advanced_service_providers`
-attribute to neutron [subnets](https://developer.openstack.org/api-ref/networking/v2/#subnets).
+attribute to neutron [subnets](https://docs.openstack.org/api-ref/network/v2/#subnets).
 This read-only attribute is a list of NSX advanced service provider IDs associated on a per-subnet
 basis. The advanced service provider IDs are populated by the plugin automatically
 when interfacing with the NSX manager backend.
@@ -58,7 +58,7 @@ NSX-V.
 None (read-only).
 
 ###### Extended Resource
-[subnet](https://developer.openstack.org/api-ref/networking/v2/#subnets)
+[subnet](https://docs.openstack.org/api-ref/network/v2/#subnets)
 
 ###### Extension Attribute(s)
   * `advanced_service_providers`: A list of NSX advanced service provider IDs (in `string` format)
@@ -107,7 +107,7 @@ None (read-only).
 ### [DHCP MTU](#dhcp-mtu)
 
 ###### Description
-Extends neutron [subnets](https://developer.openstack.org/api-ref/networking/v2/#subnets)
+Extends neutron [subnets](https://docs.openstack.org/api-ref/network/v2/#subnets)
 providing the ability to specify per-subnet DHCP MTU via the
 `dhcp_mtu` attribute.
 
@@ -121,7 +121,7 @@ NSX-V.
 POST, PUT
 
 ###### Extended Resource
-[subnet](https://developer.openstack.org/api-ref/networking/v2/#subnets)
+[subnet](https://docs.openstack.org/api-ref/network/v2/#subnets)
 
 ###### Extension Attribute(s)
   * `dhcp_mtu`: The DHCP MTU to use for the associated subnet. Must be a valid DHCP
@@ -170,7 +170,7 @@ POST, PUT
 ### [DNS Search Domain](#dns-search-domain)
 
 ###### Description
-Extends neutron [subnets](https://developer.openstack.org/api-ref/networking/v2/#subnets)
+Extends neutron [subnets](https://docs.openstack.org/api-ref/network/v2/#subnets)
 providing the ability to specify per-subnet DNS search via the
 `dns_search_domain` attribute.
 
@@ -184,7 +184,7 @@ NSX-V.
 POST, PUT
 
 ###### Extended Resource
-[subnet](https://developer.openstack.org/api-ref/networking/v2/#subnets)
+[subnet](https://docs.openstack.org/api-ref/network/v2/#subnets)
 
 ###### Extension Attribute(s)
   * `dns_search_domain`: The DNS search domain to use for networking on the associated
@@ -233,7 +233,7 @@ POST, PUT
 ### [MAC Learning](#mac-learning)
 
 ###### Description
-Extends neutron [ports](https://developer.openstack.org/api-ref/networking/v2/#ports)
+Extends neutron [ports](https://docs.openstack.org/api-ref/network/v2/#ports)
 providing the ability to enable MAC learning on the associated port via the
 `mac_learning_enabled` attribute.
 
@@ -247,7 +247,7 @@ NSX-T.
 POST, PUT
 
 ###### Extended Resource
-[ports](https://developer.openstack.org/api-ref/networking/v2/#ports)
+[ports](https://docs.openstack.org/api-ref/network/v2/#ports)
 
 ###### Extension Attribute(s)
   * `mac_learning_enabled`: A boolean value that indicates if MAC Learning is enabled
@@ -311,7 +311,7 @@ POST, PUT
 The VMware NSX neutron plugins also support the
 [neutron provider networks extension](https://docs.openstack.org/neutron/latest/admin/archives/adv-features.html#provider-networks).
 Provider network extensions add [attributes](https://docs.openstack.org/neutron/latest/admin/archives/adv-features.html#provider-attributes)
-to neutron [networks](https://developer.openstack.org/api-ref/networking/v2/#networks)
+to neutron [networks](https://docs.openstack.org/api-ref/network/v2/#networks)
 enabling providers to map virtual networks onto physical networks, or in this case
 onto physical networks in NSX.
 
@@ -323,11 +323,11 @@ NSX-T, NSX-V.
 
 ###### Supported Verbs
 See the
-[neutron provider networks extension](https://developer.openstack.org/api-ref/networking/v2/#networks-provider-extended-attributes-networks)
+[neutron provider networks extension](https://docs.openstack.org/api-ref/network/v2/#networks-provider-extended-attributes-networks)
 API reference documentation.
 
 ###### Extended Resource
-  * [networks](https://developer.openstack.org/api-ref/networking/v2/#networks)
+  * [networks](https://docs.openstack.org/api-ref/network/v2/#networks)
 
 ###### Extension Attribute(s)
   * `provider:network_type`: For the NSX plugins valid values are `flat` or `vlan`.
@@ -367,10 +367,10 @@ API reference documentation.
 
 ###### Description
 This extension enables support for provider-only created/managed neutron
-[security groups](https://developer.openstack.org/api-ref/networking/v2/#security-groups-security-groups).
+[security groups](https://docs.openstack.org/api-ref/network/v2/#security-groups-security-groups).
 To enable this support a `provider` boolean attribute is added to neutron security
 groups indicating if the group is a provider-only group. Additionally, neutron
-[ports](https://developer.openstack.org/api-ref/networking/v2/#ports) are extended with
+[ports](https://docs.openstack.org/api-ref/network/v2/#ports) are extended with
 a `provider_security_groups` attribute that indicates a list of provider-only
 security groups belonging to the said port.
 
@@ -385,8 +385,8 @@ The `provider` attribute on neutron security groups is only settable during crea
 However the `provider_security_groups` attribute on ports supports both POST and PUT.
 
 ###### Extended Resource
-  * [ports](https://developer.openstack.org/api-ref/networking/v2/#ports)
-  * [security groups](https://developer.openstack.org/api-ref/networking/v2/#security-groups-security-groups)
+  * [ports](https://docs.openstack.org/api-ref/network/v2/#ports)
+  * [security groups](https://docs.openstack.org/api-ref/network/v2/#security-groups-security-groups)
 
 ###### Extension Attribute(s)
   * `provider`: A boolean indicating if the security group is provider-only.
@@ -542,7 +542,7 @@ GET port
 ### [Router Size](#router-size)
 
 ###### Description
-Extends neutron [routers](https://developer.openstack.org/api-ref/networking/v2/#routers-routers)
+Extends neutron [routers](https://docs.openstack.org/api-ref/network/v2/#routers-routers)
 by adding the `router_size` attribute to support configuration of NSX-V
 edge size.
 
@@ -556,7 +556,7 @@ NSX-V.
 POST, PUT
 
 ###### Extended Resource
-[routers](https://developer.openstack.org/api-ref/networking/v2/#routers-routers)
+[routers](https://docs.openstack.org/api-ref/network/v2/#routers-routers)
 
 ###### Extension Attribute(s)
   * `router_size`: The NSX-V edge size to use.
@@ -606,7 +606,7 @@ POST, PUT
 ### [Router Type](#router-type)
 
 ###### Description
-Extends neutron [routers](https://developer.openstack.org/api-ref/networking/v2/#routers-routers)
+Extends neutron [routers](https://docs.openstack.org/api-ref/network/v2/#routers-routers)
 by adding the `router_type` attribute to support configuration of NSX-V
 router type.
 
@@ -620,7 +620,7 @@ NSX-V.
 POST, PUT
 
 ###### Extended Resource
-[routers](https://developer.openstack.org/api-ref/networking/v2/#routers-routers)
+[routers](https://docs.openstack.org/api-ref/network/v2/#routers-routers)
 
 ###### Extension Attribute(s)
   * `router_type`: The NSX-V router type. Must be either `shared` or `exclusive`.
@@ -672,7 +672,7 @@ POST, PUT
 
 ###### Description
 Extends neutron
-[security group rules](https://developer.openstack.org/api-ref/networking/v2/#security-group-rules-security-group-rules)
+[security group rules](https://docs.openstack.org/api-ref/network/v2/#security-group-rules-security-group-rules)
 by adding a `local_ip_prefix` attribute allowing rules to be created with IP prefixes.
 
 ###### Extension Type
@@ -685,7 +685,7 @@ NSX-T, NSXv.
 POST; using an IP prefix on a rule can only be done when creating the rule.
 
 ###### Extended Resource
-[security group rules](https://developer.openstack.org/api-ref/networking/v2/#security-group-rules-security-group-rules)
+[security group rules](https://docs.openstack.org/api-ref/network/v2/#security-group-rules-security-group-rules)
 
 ###### Extension Attribute(s)
   * `local_ip_prefix`: The local IP prefix used for the rule.
@@ -713,7 +713,7 @@ POST; using an IP prefix on a rule can only be done when creating the rule.
 
 ###### Description
 Extends neutron
-[security groups](https://developer.openstack.org/api-ref/networking/v2/#security-groups-security-groups)
+[security groups](https://docs.openstack.org/api-ref/network/v2/#security-groups-security-groups)
 with a boolean attribute `logging` to enable per security group logging on NSX.
 
 ###### Extension Type
@@ -726,7 +726,7 @@ NSX-T, NSX-V.
 POST, PUT.
 
 ###### Extended Resource
-[security groups](https://developer.openstack.org/api-ref/networking/v2/#security-groups-security-groups)
+[security groups](https://docs.openstack.org/api-ref/network/v2/#security-groups-security-groups)
 
 ###### Extension Attribute(s)
   * `logging`: A boolean attribute indicating if logging is enabled for the group.
@@ -801,7 +801,7 @@ POST, PUT.
 
 ###### Description
 Extends neutron
-[ports](https://developer.openstack.org/api-ref/networking/v2/#ports) by adding
+[ports](https://docs.openstack.org/api-ref/network/v2/#ports) by adding
 the `vnic_index` attribute enabling per-port assignment of a VNIC index.
 
 ###### Extension Type
@@ -814,7 +814,7 @@ NSX-V.
 POST, PUT.
 
 ###### Extended Resource
-[ports](https://developer.openstack.org/api-ref/networking/v2/#ports)
+[ports](https://docs.openstack.org/api-ref/network/v2/#ports)
 
 ###### Extension Attribute(s)
   * `vnic_index`: The VNIC index (integer value) assigned to the port.
