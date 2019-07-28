@@ -46,6 +46,10 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
         if hm['url_path']:
             mon['url'] = hm['url_path']
+
+        if hm['expected_codes']:
+            mon['expected'] = hm['expected_codes']
+
         return mon
 
     @log_helpers.log_method_call
