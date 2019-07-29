@@ -33,6 +33,7 @@ from vmware_nsx._i18n import _
 from vmware_nsx.common import config  # noqa
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs_utils
+from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as nsxp_utils
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as nsxv_utils
 from vmware_nsx.shell.admin.plugins.nsxv3.resources import utils as nsxv3_utils
 from vmware_nsx.shell import resources
@@ -108,6 +109,15 @@ class AbstractTestAdminUtils(base.BaseTestCase):
             for op in res_dict[res].supported_ops:
                 args = {'property': func_args}
                 self._test_resource(res_name, op, **args)
+
+    def _create_router(self):
+        tenant_id = uuidutils.generate_uuid()
+        data = {'router': {'tenant_id': tenant_id}}
+        data['router']['name'] = 'dummy'
+        data['router']['admin_state_up'] = True
+
+        edgeapi = nsxv_utils.NeutronDbClient()
+        return self._plugin.create_router(edgeapi.context, data)
 
 
 class TestNsxvAdminUtils(AbstractTestAdminUtils,
@@ -295,15 +305,6 @@ class TestNsxv3AdminUtils(AbstractTestAdminUtils,
                     self._test_resources_with_args(
                         resources.nsxv3_resources, args)
 
-    def _create_router(self):
-        tenant_id = uuidutils.generate_uuid()
-        data = {'router': {'tenant_id': tenant_id}}
-        data['router']['name'] = 'dummy'
-        data['router']['admin_state_up'] = True
-
-        edgeapi = nsxv_utils.NeutronDbClient()
-        return self._plugin.create_router(edgeapi.context, data)
-
 
 class TestNsxtvdAdminUtils(AbstractTestAdminUtils):
 
@@ -320,5 +321,15 @@ class TestNsxpAdminUtils(AbstractTestAdminUtils,
     def _get_plugin_name(self):
         return 'nsxp'
 
+    def _init_mock_plugin(self):
+        self._plugin = nsxp_utils.NsxPolicyPluginWrapper()
+
     def test_nsxp_resources(self):
         self._test_resources(resources.nsxp_resources)
+
+    def test_nsxp_resources_with_objects(self):
+        # Create some neutron objects for the utilities to run on
+        self._create_router()
+        with self.network():
+            # Run all utilities with backend objects
+            self._test_resources(resources.nsxp_resources)

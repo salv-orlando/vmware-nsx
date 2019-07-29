@@ -57,7 +57,8 @@ def log_info(resource, data, attrs=['display_name', 'id']):
 
 def get_realization_info(resource, *realization_args):
     try:
-        nsx_info = resource.get_realization_info(*realization_args)
+        nsx_info = resource.get_realization_info(*realization_args,
+                                                 silent=True)
         if not nsx_info:
             info_text = "MISSING"
         else:
