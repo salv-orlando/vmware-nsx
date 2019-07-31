@@ -825,14 +825,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         network[qos_consts.QOS_POLICY_ID] = (qos_com_utils.
             get_network_policy_id(context, network['id']))
 
+    def _translate_net_db_2_dict(self, context, net_db):
+        net_dict = self._make_network_dict(net_db, context=context)
+        self._extend_get_network_dict_provider(context, net_dict)
+        return net_dict
+
     def get_network(self, context, id, fields=None):
         with db_api.CONTEXT_READER.using(context):
             # Get network from Neutron database
             network = self._get_network(context, id)
             # Don't do field selection here otherwise we won't be able to add
             # provider networks fields
-            net = self._make_network_dict(network, context=context)
-            self._extend_get_network_dict_provider(context, net)
+            net = self._translate_net_db_2_dict(context, network)
         return db_utils.resource_fields(net, fields)
 
     def get_networks(self, context, filters=None, fields=None,
@@ -2032,19 +2036,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         self._validate_host_routes_input(subnet)
         self._validate_subnet_ip_version(subnet['subnet'])
 
-        network = self._get_network(
-            context, subnet['subnet']['network_id'])
+        net_id = subnet['subnet']['network_id']
+        network = self._get_network(context, net_id)
         self._validate_single_ipv6_subnet(context, network, subnet['subnet'])
 
         # TODO(berlin): public external subnet announcement
         if self._subnet_with_native_dhcp(subnet['subnet']):
 
-            self._validate_external_subnet(context,
-                                           subnet['subnet']['network_id'])
+            self._validate_external_subnet(context, net_id)
             self._ensure_native_dhcp()
-            lock = 'nsxv3_network_' + subnet['subnet']['network_id']
+            lock = 'nsxv3_network_' + net_id
             ddi_support, ddi_type = self._is_ddi_supported_on_net_with_type(
-                context, subnet['subnet']['network_id'])
+                context, net_id, network=network)
             with locking.LockManager.get_lock(lock):
                 # Check if it is on an overlay network and is the first
                 # DHCP-enabled subnet to create.
@@ -2066,8 +2069,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                     context, created_subnet['id'])
                         self._extension_manager.process_create_subnet(context,
                             subnet['subnet'], created_subnet)
-                        dhcp_relay = self._get_net_dhcp_relay(
-                            context, subnet['subnet']['network_id'])
+                        dhcp_relay = self._get_net_dhcp_relay(context, net_id)
                         if not dhcp_relay:
                             if self.nsxlib:
                                 try:
@@ -2086,13 +2088,11 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         msg = None
                     else:
                         msg = (_("Can not create more than one DHCP-enabled "
-                                "subnet in network %s") %
-                               subnet['subnet']['network_id'])
+                                "subnet in network %s") % net_id)
                 else:
                     msg = _("Native DHCP is not supported for %(type)s "
-                            "network %(id)s") % {
-                          'id': subnet['subnet']['network_id'],
-                          'type': ddi_type}
+                            "network %(id)s") % {'id': net_id,
+                                                 'type': ddi_type}
                 if msg:
                     LOG.error(msg)
                     raise n_exc.InvalidInput(error_message=msg)
@@ -2292,7 +2292,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     if enable_dhcp:
                         (ddi_support,
                          ddi_type) = self._is_ddi_supported_on_net_with_type(
-                            context, orig_subnet['network_id'])
+                            context, orig_subnet['network_id'],
+                            network=network)
                         if ddi_support:
                             if self._has_no_dhcp_enabled_subnet(
                                 context, network):
@@ -2535,13 +2536,20 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _is_vlan_router_interface_supported(self):
         """Should be implemented by each plugin"""
 
-    def _is_ddi_supported_on_network(self, context, network_id):
+    def _is_ddi_supported_on_network(self, context, network_id, network=None):
         result, _ = self._is_ddi_supported_on_net_with_type(
-            context, network_id)
+            context, network_id, network=network)
         return result
 
-    def _is_ddi_supported_on_net_with_type(self, context, network_id):
-        net = self.get_network(context, network_id)
+    def _is_ddi_supported_on_net_with_type(self, context, network_id,
+                                           network=None):
+        # Get the network dictionary from the inputs
+        if network:
+            net = (network if isinstance(network, dict)
+                   else self._translate_net_db_2_dict(context, network))
+        else:
+            net = self.get_network(context, network_id)
+
         # NSX current does not support transparent VLAN ports for
         # DHCP and metadata
         if cfg.CONF.vlan_transparent:
@@ -2659,7 +2667,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             not self._has_native_dhcp_metadata()):
             return
         is_ddi_network = self._is_ddi_supported_on_network(
-            context, network['id'])
+            context, network['id'], network=network)
         if is_ddi_network:
             # Enable native metadata proxy for this network.
             tags = self.nsxlib.build_v3_tags_payload(
