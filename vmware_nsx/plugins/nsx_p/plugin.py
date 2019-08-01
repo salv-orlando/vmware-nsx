@@ -1500,6 +1500,42 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if self.nsxpolicy.tier1.get_edge_cluster_path(router_id):
             return True
 
+    def _wait_until_edge_cluster_realized(self, router_id):
+        """Wait until MP logical router has an edge-cluster
+
+        Since currently the locale-services has no realization info,
+        And some actions should be performed only after it was realized,
+        this method checks the MP Lr for its edge-cluster id until it is set.
+        """
+        if not cfg.CONF.nsx_p.allow_passthrough:
+            return
+
+        lr_id = self.nsxpolicy.tier1.get_realized_id(
+            router_id, entity_type='RealizedLogicalRouter')
+        if not lr_id:
+            LOG.error("_wait_until_edge_cluster_realized Failed: No MP id "
+                      "found for Tier1 %s", router_id)
+            return
+
+        test_num = 0
+        max_attempts = cfg.CONF.nsx_p.realization_max_attempts
+        sleep = cfg.CONF.nsx_p.realization_wait_sec
+        while test_num < max_attempts:
+            # get all the realized resources of the tier1
+            lr = self.nsxlib.logical_router.get(lr_id)
+            if lr.get('edge_cluster_id'):
+                break
+            time.sleep(sleep)
+            test_num += 1
+
+        if lr.get('edge_cluster_id'):
+            LOG.debug("MP LR %s of Tier1 %s edge cluster %s was set after %s "
+                      "attempts", lr_id, router_id, lr.get('edge_cluster_id'),
+                      test_num + 1)
+        else:
+            LOG.error("MP LR %s if Tier1 %s edge cluster was not set after %s "
+                      "attempts", lr_id, router_id, test_num + 1)
+
     def create_service_router(self, context, router_id, router=None,
                               update_firewall=True):
         """Create a service router and enable standby relocation"""
@@ -1525,7 +1561,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 router['id'], enable_standby_relocation=True)
         except Exception as ex:
             LOG.warning("Failed to enable standby relocation for router "
-                        "%s: %s", router['id'], ex)
+                        "%s: %s", router_id, ex)
+
+        # Validate locale-services realization before additional tier1 config
+        self._wait_until_edge_cluster_realized(router_id)
 
         # update firewall rules (there might be FW group waiting for a
         # service router)
