@@ -119,17 +119,25 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
             if logged:
                 rule['logged'] = True
             if is_ingress:
-                if not rule.get('destination_ip_address'):
+                if (not rule.get('destination_ip_address') or
+                    rule['destination_ip_address'].startswith('0.0.0.0')):
                     rule['destination_vnic_groups'] = ['vnic-index-1']
             else:
-                if not rule.get('source_ip_address'):
+                if (not rule.get('source_ip_address') or
+                    rule['source_ip_address'].startswith('0.0.0.0')):
                     rule['source_vnic_groups'] = ['vnic-index-1']
             if rule.get('destination_ip_address'):
-                rule['destination_ip_address'] = [
-                    rule['destination_ip_address']]
+                if rule['destination_ip_address'].startswith('0.0.0.0'):
+                    del rule['destination_ip_address']
+                else:
+                    rule['destination_ip_address'] = [
+                        rule['destination_ip_address']]
             if rule.get('source_ip_address'):
-                rule['source_ip_address'] = [
-                    rule['source_ip_address']]
+                if rule['source_ip_address'].startswith('0.0.0.0'):
+                    del rule['source_ip_address']
+                else:
+                    rule['source_ip_address'] = [
+                        rule['source_ip_address']]
             rule['name'] = (fwaas_callbacks_v2.RULE_NAME_PREFIX +
                             (rule.get('name') or rule['id']))[:30]
             if rule.get('id'):
@@ -210,10 +218,10 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
                 {'firewall_rule_list': expected_rules})
 
     def _setup_firewall_with_rules(self, func, is_ingress=True,
-                                   is_conflict=False):
+                                   is_conflict=False, cidr='10.24.4.0/24'):
         apply_list = self._fake_apply_list()
         rule_list = self._fake_rules_v4(is_ingress=is_ingress,
-                                        is_conflict=is_conflict)
+                                        is_conflict=is_conflict, cidr=cidr)
         firewall = self._fake_firewall_group(rule_list, is_ingress=is_ingress)
         with mock.patch.object(self.plugin.fwaas_callbacks, 'get_port_fwg',
                               return_value=firewall),\
@@ -254,6 +262,10 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
     def test_create_firewall_with_egress_rules(self):
         self._setup_firewall_with_rules(self.firewall.create_firewall_group,
                                         is_ingress=False)
+
+    def test_create_firewall_with_illegal_cidr(self):
+        self._setup_firewall_with_rules(self.firewall.create_firewall_group,
+                                        cidr='0.0.0.0/24')
 
     def test_update_firewall_with_egress_rules(self):
         self._setup_firewall_with_rules(self.firewall.update_firewall_group,

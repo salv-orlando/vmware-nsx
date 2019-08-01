@@ -155,13 +155,19 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
                 not rule['destination_ip_address'].startswith('0.0.0.0')):
                 rule['destination_ip_address'] = [
                     rule['destination_ip_address']]
-            elif replace_dest:
-                rule['destination_vnic_groups'] = [replace_dest]
+            else:
+                if replace_dest:
+                    rule['destination_vnic_groups'] = [replace_dest]
+                if 'destination_ip_address' in rule:
+                    del rule['destination_ip_address']
             if (rule.get('source_ip_address') and
                 not rule['source_ip_address'].startswith('0.0.0.0')):
                 rule['source_ip_address'] = [rule['source_ip_address']]
-            elif replace_src:
-                rule['source_vnic_groups'] = [replace_src]
+            else:
+                if replace_src:
+                    rule['source_vnic_groups'] = [replace_src]
+                if 'source_ip_address' in rule:
+                    del rule['source_ip_address']
             if logged:
                 rule['logged'] = True
             translated_rules.append(rule)
