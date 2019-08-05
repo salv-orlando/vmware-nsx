@@ -2469,7 +2469,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self._prepare_exclude_list_group()
             self._add_exclude_list_group()
 
-    def _create_security_group_backend_resources(self, context, secgroup):
+    def _create_security_group_backend_resources(self, context, secgroup,
+                                                 entries):
         """Create communication map (=section) and group (=NS group)
 
         Both will have the security group id as their NSX id.
@@ -2500,12 +2501,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         category = NSX_P_REGULAR_SECTION_CATEGORY
         if secgroup.get(provider_sg.PROVIDER) is True:
             category = NSX_P_PROVIDER_SECTION_CATEGORY
-        # create the communication map (=section) without and entries (=rules)
+
+        # create the communication map (=section) and entries (=rules)
         try:
-            self.nsxpolicy.comm_map.create_or_overwrite_map_only(
-                nsx_name, NSX_P_GLOBAL_DOMAIN_ID, map_id=sg_id,
-                description=secgroup.get('description'),
-                tags=tags, category=category)
+            if entries:
+                self.nsxpolicy.comm_map.create_with_entries(
+                    nsx_name, NSX_P_GLOBAL_DOMAIN_ID, map_id=sg_id,
+                    description=secgroup.get('description'),
+                    entries=entries,
+                    tags=tags, category=category)
+            else:
+                self.nsxpolicy.comm_map.create_or_overwrite_map_only(
+                    nsx_name, NSX_P_GLOBAL_DOMAIN_ID, map_id=sg_id,
+                    description=secgroup.get('description'),
+                    tags=tags, category=category)
         except Exception as e:
             msg = (_("Failed to create NSX communication map for SG %(sg)s: "
                      "%(e)s") % {'sg': sg_id, 'e': e})
@@ -2577,7 +2586,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def _create_security_group_backend_rule(self, context, map_id,
                                             sg_rule, secgroup_logging,
-                                            is_provider_sg=False):
+                                            is_provider_sg=False,
+                                            create_rule=True):
+        """Create backend resources for a DFW rule
+
+        All rule resources (service, groups) will be created
+        The rule itself will be created if create_rule=True.
+        Else this method will return the rule entry structure for future use.
+        """
         # The id of the map and group is the same as the security group id
         this_group_id = map_id
         # There is no rule name in neutron. Using ID instead
@@ -2633,18 +2649,34 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                                this_group_id)]
         action = (policy_constants.ACTION_DENY if is_provider_sg
                   else policy_constants.ACTION_ALLOW)
-        self.nsxpolicy.comm_map.create_entry(
-            nsx_name, NSX_P_GLOBAL_DOMAIN_ID,
-            map_id, entry_id=sg_rule['id'],
-            description=sg_rule.get('description'),
-            service_ids=[service] if service else None,
-            ip_protocol=ip_protocol,
-            action=action,
-            source_groups=[source] if source else None,
-            dest_groups=[destination] if destination else None,
-            scope=scope,
-            direction=direction, logged=logging,
-            tag=sg_rule.get('project_id'))
+        if create_rule:
+            self.nsxpolicy.comm_map.create_entry(
+                nsx_name, NSX_P_GLOBAL_DOMAIN_ID,
+                map_id, entry_id=sg_rule['id'],
+                description=sg_rule.get('description'),
+                service_ids=[service] if service else None,
+                ip_protocol=ip_protocol,
+                action=action,
+                source_groups=[source] if source else None,
+                dest_groups=[destination] if destination else None,
+                scope=scope,
+                direction=direction, logged=logging,
+                tag=sg_rule.get('project_id'))
+        else:
+            # Just return the rule entry without creating it
+            rule_entry = self.nsxpolicy.comm_map.build_entry(
+                nsx_name, NSX_P_GLOBAL_DOMAIN_ID,
+                map_id, entry_id=sg_rule['id'],
+                description=sg_rule.get('description'),
+                service_ids=[service] if service else None,
+                ip_protocol=ip_protocol,
+                action=action,
+                source_groups=[source] if source else None,
+                dest_groups=[destination] if destination else None,
+                scope=scope,
+                tag=sg_rule.get('project_id'),
+                direction=direction, logged=logging)
+            return rule_entry
 
     def create_security_group(self, context, security_group, default_sg=False):
         secgroup = security_group['security_group']
@@ -2675,17 +2707,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self._handle_api_replay_default_sg(context, secgroup_db)
 
         try:
-            # Create Group & communication map on the NSX
-            self._create_security_group_backend_resources(
-                context, secgroup)
-
-            # Add the security-group rules
+            # create all the rule entries
             sg_rules = secgroup_db['security_group_rules']
             secgroup_logging = secgroup.get(sg_logging.LOGGING, False)
+            backend_rules = []
             for sg_rule in sg_rules:
-                self._create_security_group_backend_rule(
+                rule_entry = self._create_security_group_backend_rule(
                     context, secgroup_db['id'], sg_rule,
-                    secgroup_logging)
+                    secgroup_logging, create_rule=False)
+                backend_rules.append(rule_entry)
+            # Create Group & communication map on the NSX
+            self._create_security_group_backend_resources(
+                context, secgroup, backend_rules)
+
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 LOG.exception("Failed to create backend SG rules "
@@ -2795,6 +2829,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         is_provider_sg = sg.get(provider_sg.PROVIDER)
         secgroup_logging = self._is_security_group_logged(context, sg_id)
         for rule_data in rules_db:
+            #TODO(asarfaty): Consider using update_entries with all the rules
+            # if multiple rules are added
             # create the NSX backend rule
             self._create_security_group_backend_rule(
                 context, sg_id, rule_data, secgroup_logging,

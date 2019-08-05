@@ -1211,7 +1211,7 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
                         ) as group_create,\
             mock.patch("vmware_nsxlib.v3.policy.core_resources."
                        "NsxPolicyCommunicationMapApi."
-                       "create_or_overwrite_map_only") as comm_map_create,\
+                       "create_with_entries") as comm_map_create,\
             self.security_group(name, description) as sg:
             sg_id = sg['security_group']['id']
             nsx_name = utils.get_name_and_uuid(name, sg_id)
@@ -1223,6 +1223,7 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
                 nsx_name, policy_constants.DEFAULT_DOMAIN, map_id=sg_id,
                 description=description,
                 tags=mock.ANY,
+                entries=mock.ANY,
                 category=policy_constants.CATEGORY_ENVIRONMENT)
 
     def _create_provider_security_group(self):
