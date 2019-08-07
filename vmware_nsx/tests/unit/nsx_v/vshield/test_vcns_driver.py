@@ -295,8 +295,6 @@ class VcnsDriverTestCase(base.BaseTestCase):
         instance = self.mock_vcns.start()
         instance.return_value.deploy_edge.side_effect = self.fc.deploy_edge
         instance.return_value.get_edge_id.side_effect = self.fc.get_edge_id
-        instance.return_value.get_edge_deploy_status.side_effect = (
-            self.fc.get_edge_deploy_status)
         instance.return_value.delete_edge.side_effect = self.fc.delete_edge
         instance.return_value.update_interface.side_effect = (
             self.fc.update_interface)

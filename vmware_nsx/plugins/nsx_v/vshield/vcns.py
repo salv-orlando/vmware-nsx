@@ -186,14 +186,6 @@ class Vcns(object):
         uri = URI_PREFIX + "/jobs/%s" % job_id
         return self.do_request(HTTP_GET, uri, decode=True)
 
-    def get_edge_jobs(self, edge_id):
-        uri = URI_PREFIX + "/%s/jobs" % edge_id
-        return self.do_request(HTTP_GET, uri, decode=True)
-
-    def get_edge_deploy_status(self, edge_id):
-        uri = URI_PREFIX + "/%s/status?getlatest=false" % edge_id
-        return self.do_request(HTTP_GET, uri, decode="True")
-
     def delete_edge(self, edge_id):
         uri = "%s/%s" % (URI_PREFIX, edge_id)
         return self.do_request(HTTP_DELETE, uri)
@@ -761,11 +753,6 @@ class Vcns(object):
             'property': prop
         }
         return self.do_request(HTTP_PUT, uri, payload, decode=True)
-
-    def get_system_control(self, edge_id):
-        uri = self._build_uri_path(edge_id, SYSCTL_SERVICE)
-
-        return self.do_request(HTTP_GET, uri)
 
     def _get_enforcement_point_body(self, enforcement_points):
         e_point_list = []
