@@ -14,13 +14,16 @@
 #    under the License.
 
 from oslo_config import cfg
+from oslo_log import log as logging
 
 from vmware_nsx._i18n import _
 from vmware_nsx.common import availability_zones as common_az
 from vmware_nsx.common import config
 from vmware_nsx.common import exceptions as nsx_exc
+from vmware_nsx.common import utils as c_utils
 
 DEFAULT_NAME = common_az.DEFAULT_NAME
+LOG = logging.getLogger(__name__)
 
 
 class NsxVAvailabilityZone(common_az.ConfiguredAvailabilityZone):
@@ -207,6 +210,92 @@ class NsxVAvailabilityZone(common_az.ConfiguredAvailabilityZone):
         # If False - it uses the global metadata (if defined)
         return self.az_metadata_support
 
+    def _validate_opt_connectivity(self, cluster_info, cluster_field,
+                                   az_value):
+        for obj in cluster_info.get(cluster_field, []):
+            if obj['id'] == az_value:
+                return True
+        return False
+
+    def validate_az_connectivity(self, vcns):
+        info = vcns.get_tz_connectivity_info(self.vdn_scope_id)
+        if not info or not info.get('clustersInfo'):
+            LOG.warning("Couldn't get TZ %s connectivity information to "
+                        "validate the configuration", self.vdn_scope_id)
+            return
+
+        LOG.info("Validating connectivity of availability zone %s With TZ %s, "
+                 "clusters %s, DVS %s external net %s and mdproxy net %s",
+                 self.name, self.vdn_scope_id, cfg.CONF.nsxv.cluster_moid,
+                 self.dvs_id, self.external_network, self.mgt_net_moid)
+
+        # Look for each configured cluster
+        for configured_cluster in cfg.CONF.nsxv.cluster_moid:
+            found_cluster = False
+            for cluster_info in info['clustersInfo']:
+                if cluster_info.get('clusterId') == configured_cluster:
+                    found_cluster = True
+                    # Validate the external network:
+                    external_net_standard = self._validate_opt_connectivity(
+                        cluster_info, 'standardNetworks',
+                        self.external_network)
+                    external_net_portgroup = self._validate_opt_connectivity(
+                        cluster_info, 'distributedVirtualPortGroups',
+                        self.external_network)
+                    if (not external_net_standard and
+                        not external_net_portgroup):
+                        raise nsx_exc.NsxInvalidConfiguration(
+                            opt_name='external_network',
+                            opt_value=self.external_network,
+                            reason=(_("Edge cluster %(ec)s in not connected "
+                                      "to external network %(val)s in AZ "
+                                      "%(az)s") % {
+                                    'ec': configured_cluster,
+                                    'val': self.external_network,
+                                    'az': self.name}))
+
+                    # Validate mgt_net_moid
+                    if self.mgt_net_moid:
+                        mgt_net_standard = self._validate_opt_connectivity(
+                            cluster_info, 'standardNetworks',
+                            self.mgt_net_moid)
+                        mgt_net_portgroup = self._validate_opt_connectivity(
+                            cluster_info, 'distributedVirtualPortGroups',
+                            self.mgt_net_moid)
+                        if not mgt_net_standard and not mgt_net_portgroup:
+                            raise nsx_exc.NsxInvalidConfiguration(
+                                opt_name='mgt_net_moid',
+                                opt_value=self.mgt_net_moid,
+                                reason=(_("Edge cluster %(ec)s in not "
+                                          "connected to mgt_net_moid %(val)s "
+                                          "in AZ %(az)s") % {
+                                        'ec': configured_cluster,
+                                        'val': self.mgt_net_moid,
+                                        'az': self.name}))
+
+                    # Validate DVS
+                    if self.dvs_id and not self._validate_opt_connectivity(
+                        cluster_info, 'distributedVirtualSwitches',
+                        self.dvs_id):
+                        raise nsx_exc.NsxInvalidConfiguration(
+                            opt_name='dvs_id', opt_value=self.dvs_id,
+                            reason=(_("Edge cluster %(ec)s in not connected "
+                                      "to dvs_id %(val)s in AZ %(az)s") % {
+                                    'ec': configured_cluster,
+                                    'val': self.dvs_id,
+                                    'az': self.name}))
+                    break
+
+            # Didn't find the edge cluster
+            if not found_cluster:
+                raise nsx_exc.NsxInvalidConfiguration(
+                    opt_name='vdn_scope_id', opt_value=self.vdn_scope_id,
+                    reason=(_("Edge cluster %(ec)s in not connected "
+                              "to vdn_scope_id %(val)s in AZ %(az)s") % {
+                            'ec': configured_cluster,
+                            'val': self.vdn_scope_id,
+                            'az': self.name}))
+
 
 class NsxVAvailabilityZones(common_az.ConfiguredAvailabilityZones):
 
@@ -266,3 +355,11 @@ class NsxVAvailabilityZones(common_az.ConfiguredAvailabilityZones):
 
     def get_additional_dvs_ids(self):
         return self.get_unique_non_default_param("dvs_id")
+
+    def validate_connectivity(self, vcns):
+        if (not c_utils.is_nsxv_version_6_4_6(vcns.get_version()) or
+            not cfg.CONF.nsxv.cluster_moid):
+            return
+
+        for az in self.list_availability_zones_objects():
+            az.validate_az_connectivity(vcns)

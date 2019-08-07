@@ -51,6 +51,7 @@ EXCLUDELIST_PREFIX = '/api/2.1/app/excludelist'
 SERVICE_INSERTION_PROFILE_PREFIX = '/api/2.0/si/serviceprofile'
 SECURITY_POLICY_PREFIX = '/api/2.0/services/policy/securitypolicy'
 APPLICATION_PREFIX = '%s/%s' % (SERVICES_PREFIX, 'application')
+TZ_CONNECTIVITY_PREFIX = '/api/4.0/edges/transportzonenetworks'
 
 #LbaaS Constants
 LOADBALANCER_SERVICE = "loadbalancer/config"
@@ -1193,3 +1194,8 @@ class Vcns(object):
 
     def get_application_id(self, name):
         return self._globalobjects_lookup(name, use_cache=True)
+
+    def get_tz_connectivity_info(self, vdn_scope_id):
+        uri = '%s/%s' % (TZ_CONNECTIVITY_PREFIX, vdn_scope_id)
+        h, info = self.do_request(HTTP_GET, uri, decode=True)
+        return info
