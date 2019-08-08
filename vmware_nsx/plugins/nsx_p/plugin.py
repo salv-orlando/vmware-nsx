@@ -285,22 +285,28 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # WAF is currently not supported by the NSX
         self._waf_profile_uuid = None
 
-        # create or override ipv6 RA service
-        unicast_ra = self.nsxpolicy.icmp_service.build_entry(
-            'unicast RA', IPV6_RA_SERVICE, 'unicast',
-            version=6, icmp_type=134)
-        multicast_ra = self.nsxpolicy.icmp_service.build_entry(
-            'multicast RA', IPV6_RA_SERVICE, 'multicast',
-            version=6, icmp_type=151)
-
         try:
-            self.nsxpolicy.mixed_service.create_or_overwrite(
-                IPV6_RA_SERVICE, IPV6_RA_SERVICE,
-                entries=[unicast_ra, multicast_ra])
-        except nsx_lib_exc.ManagerError:
-            msg = _("Failed to configure RA service for IPv6 connectivity")
-            LOG.error(msg)
-            raise nsx_exc.NsxPluginException(err_msg=msg)
+            self.nsxpolicy.mixed_service.get(IPV6_RA_SERVICE)
+        except nsx_lib_exc.ResourceNotFound:
+            # create or override ipv6 RA service
+            unicast_ra = self.nsxpolicy.icmp_service.build_entry(
+                'unicast RA', IPV6_RA_SERVICE, 'unicast',
+                version=6, icmp_type=134)
+            multicast_ra = self.nsxpolicy.icmp_service.build_entry(
+                'multicast RA', IPV6_RA_SERVICE, 'multicast',
+                version=6, icmp_type=151)
+
+            try:
+                self.nsxpolicy.mixed_service.create_or_overwrite(
+                    IPV6_RA_SERVICE, IPV6_RA_SERVICE,
+                    entries=[unicast_ra, multicast_ra])
+            except nsx_lib_exc.StaleRevision as e:
+                # This means that another controller is also creating this
+                LOG.info("Failed to configure mixed_service: %s", e)
+            except nsx_lib_exc.ManagerError:
+                msg = _("Failed to configure RA service for IPv6 connectivity")
+                LOG.error(msg)
+                raise nsx_exc.NsxPluginException(err_msg=msg)
 
     def _init_backend_resource(self, resource_api, name_or_id,
                                search_scope=None):
@@ -362,11 +368,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         try:
             self.nsxpolicy.spoofguard_profile.get(SPOOFGUARD_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
-            self.nsxpolicy.spoofguard_profile.create_or_overwrite(
-                SPOOFGUARD_PROFILE_ID,
-                profile_id=SPOOFGUARD_PROFILE_ID,
-                address_binding_whitelist=True,
-                tags=self.nsxpolicy.build_v3_api_version_tag())
+            try:
+                self.nsxpolicy.spoofguard_profile.create_or_overwrite(
+                    SPOOFGUARD_PROFILE_ID,
+                    profile_id=SPOOFGUARD_PROFILE_ID,
+                    address_binding_whitelist=True,
+                    tags=self.nsxpolicy.build_v3_api_version_tag())
+            except nsx_lib_exc.StaleRevision as e:
+                # This means that another controller is also creating this
+                LOG.info("Failed to configure spoofguard_profile: %s", e)
 
         # No Port security spoofguard profile
         # (default NSX profile. just verify it exists)
@@ -382,12 +392,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.nsxpolicy.mac_discovery_profile.get(
                 MAC_DISCOVERY_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
-            self.nsxpolicy.mac_discovery_profile.create_or_overwrite(
-                MAC_DISCOVERY_PROFILE_ID,
-                profile_id=MAC_DISCOVERY_PROFILE_ID,
-                mac_change_enabled=True,
-                mac_learning_enabled=True,
-                tags=self.nsxpolicy.build_v3_api_version_tag())
+            try:
+                self.nsxpolicy.mac_discovery_profile.create_or_overwrite(
+                    MAC_DISCOVERY_PROFILE_ID,
+                    profile_id=MAC_DISCOVERY_PROFILE_ID,
+                    mac_change_enabled=True,
+                    mac_learning_enabled=True,
+                    tags=self.nsxpolicy.build_v3_api_version_tag())
+            except nsx_lib_exc.StaleRevision as e:
+                # This means that another controller is also creating this
+                LOG.info("Failed to configure mac_discovery_profile: %s", e)
 
         # No Mac discovery profile profile
         # (default NSX profile. just verify it exists)
@@ -404,18 +418,22 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.nsxpolicy.segment_security_profile.get(
                 NO_SEG_SECURITY_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
-            self.nsxpolicy.segment_security_profile.create_or_overwrite(
-                NO_SEG_SECURITY_PROFILE_ID,
-                profile_id=NO_SEG_SECURITY_PROFILE_ID,
-                bpdu_filter_enable=False,
-                dhcp_client_block_enabled=False,
-                dhcp_client_block_v6_enabled=False,
-                dhcp_server_block_enabled=False,
-                dhcp_server_block_v6_enabled=False,
-                non_ip_traffic_block_enabled=False,
-                ra_guard_enabled=False,
-                rate_limits_enabled=False,
-                tags=self.nsxpolicy.build_v3_api_version_tag())
+            try:
+                self.nsxpolicy.segment_security_profile.create_or_overwrite(
+                    NO_SEG_SECURITY_PROFILE_ID,
+                    profile_id=NO_SEG_SECURITY_PROFILE_ID,
+                    bpdu_filter_enable=False,
+                    dhcp_client_block_enabled=False,
+                    dhcp_client_block_v6_enabled=False,
+                    dhcp_server_block_enabled=False,
+                    dhcp_server_block_v6_enabled=False,
+                    non_ip_traffic_block_enabled=False,
+                    ra_guard_enabled=False,
+                    rate_limits_enabled=False,
+                    tags=self.nsxpolicy.build_v3_api_version_tag())
+            except nsx_lib_exc.StaleRevision as e:
+                # This means that another controller is also creating this
+                LOG.info("Failed to configure segment_security_profile: %s", e)
 
         # Port security segment-security profile
         # (default NSX profile. just verify it exists)
@@ -431,21 +449,31 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         try:
             self.nsxpolicy.ipv6_ndra_profile.get(SLAAC_NDRA_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
-            self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
-                SLAAC_NDRA_PROFILE_ID,
-                profile_id=SLAAC_NDRA_PROFILE_ID,
-                ra_mode=policy_constants.IPV6_RA_MODE_SLAAC_RA,
-                tags=self.nsxpolicy.build_v3_api_version_tag())
+            try:
+                self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
+                    SLAAC_NDRA_PROFILE_ID,
+                    profile_id=SLAAC_NDRA_PROFILE_ID,
+                    ra_mode=policy_constants.IPV6_RA_MODE_SLAAC_RA,
+                    tags=self.nsxpolicy.build_v3_api_version_tag())
+            except nsx_lib_exc.StaleRevision as e:
+                # This means that another controller is also creating this
+                LOG.info("Failed to configure ipv6_ndra_profile for SLAAC: %s",
+                         e)
 
         # Verify NO SLAAC NDRA profile (find it or create)
         try:
             self.nsxpolicy.ipv6_ndra_profile.get(NO_SLAAC_NDRA_PROFILE_ID)
         except nsx_lib_exc.ResourceNotFound:
-            self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
-                NO_SLAAC_NDRA_PROFILE_ID,
-                profile_id=NO_SLAAC_NDRA_PROFILE_ID,
-                ra_mode=policy_constants.IPV6_RA_MODE_DISABLED,
-                tags=self.nsxpolicy.build_v3_api_version_tag())
+            try:
+                self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
+                    NO_SLAAC_NDRA_PROFILE_ID,
+                    profile_id=NO_SLAAC_NDRA_PROFILE_ID,
+                    ra_mode=policy_constants.IPV6_RA_MODE_DISABLED,
+                    tags=self.nsxpolicy.build_v3_api_version_tag())
+            except nsx_lib_exc.StaleRevision as e:
+                # This means that another controller is also creating this
+                LOG.info("Failed to configure ipv6_ndra_profile for NO SLAAC: "
+                         "%s", e)
 
         self.client_ssl_profile = None
 
@@ -484,11 +512,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             try:
                 ssl_profile_client.get(NSX_P_CLIENT_SSL_PROFILE)
             except nsx_lib_exc.ResourceNotFound:
-                ssl_profile_client.create_or_overwrite(
-                    NSX_P_CLIENT_SSL_PROFILE,
-                    client_ssl_profile_id=NSX_P_CLIENT_SSL_PROFILE,
-                    description='Neutron LB Client SSL Profile',
-                    tags=self.nsxlib.build_v3_api_version_tag())
+                try:
+                    ssl_profile_client.create_or_overwrite(
+                        NSX_P_CLIENT_SSL_PROFILE,
+                        client_ssl_profile_id=NSX_P_CLIENT_SSL_PROFILE,
+                        description='Neutron LB Client SSL Profile',
+                        tags=self.nsxlib.build_v3_api_version_tag())
+                except nsx_lib_exc.StaleRevision as e:
+                    # This means that another controller is also creating this
+                    LOG.info("Failed to configure LB client_ssl_profile: %s",
+                             e)
             self.client_ssl_profile = NSX_P_CLIENT_SSL_PROFILE
 
     def spawn_complete(self, resource, event, trigger, payload=None):
