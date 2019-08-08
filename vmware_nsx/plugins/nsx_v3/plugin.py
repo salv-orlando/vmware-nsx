@@ -876,20 +876,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         bindings = nsx_db.get_network_bindings(context.session, network_id)
         # With NSX plugin, "normal" overlay networks will have no binding
         if not bindings:
-            # check the backend transport zone
-            az = self.get_network_az_by_net_id(context, network_id)
-            tz = az._default_overlay_tz_uuid
-            if tz:
-                backend_type = self.nsxlib.transport_zone.get_transport_type(
-                    tz)
-                if (backend_type !=
-                    self.nsxlib.transport_zone.TRANSPORT_TYPE_OVERLAY):
-                    # This is a misconfiguration
-                    LOG.warning("Availability zone %(az)s default overlay TZ "
-                                "%(tz)s is of type %(type)s",
-                                {'az': az.name, 'tz': tz,
-                                 'type': backend_type})
-                    return False
+            # using the default/AZ overlay_tz
             return True
         binding = bindings[0]
         if binding.binding_type == utils.NsxV3NetworkTypes.GENEVE:
@@ -900,6 +887,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             ls = self.nsxlib.logical_switch.get(binding.phy_uuid)
             tz = ls.get('transport_zone_id')
             if tz:
+                # This call is cached on the nsxlib side
                 backend_type = self.nsxlib.transport_zone.get_transport_type(
                     tz)
                 return (backend_type ==
@@ -1441,14 +1429,27 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         return result
 
     def _get_net_tz(self, context, net_id):
-        mappings = nsx_db.get_nsx_switch_ids(context.session, net_id)
-        if mappings:
-            nsx_net_id = mappings[0]
-            if nsx_net_id:
-                nsx_net = self.nsxlib.logical_switch.get(nsx_net_id)
-                return nsx_net.get('transport_zone_id')
+        bindings = nsx_db.get_network_bindings(context.session, net_id)
+        if bindings:
+            bind_type = bindings[0].binding_type
+            if bind_type == utils.NsxV3NetworkTypes.NSX_NETWORK:
+                # If it is NSX network, return the TZ of the backend LS
+                mappings = nsx_db.get_nsx_switch_ids(context.session, net_id)
+                if mappings and mappings[0]:
+                    nsx_net = self.nsxlib.logical_switch.get(mappings[0])
+                    return nsx_net.get('transport_zone_id')
+            elif bind_type == utils.NetworkTypes.L3_EXT:
+                # External network has tier0 as phy_uuid
+                return
+            else:
+                return bindings[0].phy_uuid
+        else:
+            # Get the default one for the network AZ
+            az = self.get_network_az_by_net_id(context, net_id)
+            return az._default_overlay_tz_uuid
 
     def _is_ens_tz(self, tz_id):
+        # This call is cached on the nsxlib side
         mode = self.nsxlib.transport_zone.get_host_switch_mode(tz_id)
         return mode == self.nsxlib.transport_zone.HOST_SWITCH_MODE_ENS
 

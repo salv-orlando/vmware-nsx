@@ -2898,7 +2898,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         bindings = nsx_db.get_network_bindings(context.session, network_id)
         # With NSX plugin, "normal" overlay networks will have no binding
         if not bindings:
-            # using the default /AZ overlay_tz
+            # using the default/AZ overlay_tz
             return True
 
         binding = bindings[0]
@@ -2909,11 +2909,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             segment = self.nsxpolicy.segment.get(binding.phy_uuid)
             tz = self._get_nsx_net_tz_id(segment)
             if tz:
+                # This call is cached on the nsxlib side
                 type = self.nsxpolicy.transport_zone.get_transport_type(
                     tz)
                 return type == nsxlib_consts.TRANSPORT_TYPE_OVERLAY
 
     def _is_ens_tz(self, tz_id):
+        # This call is cached on the nsxlib side
         mode = self.nsxpolicy.transport_zone.get_host_switch_mode(tz_id)
         return mode == nsxlib_consts.HOST_SWITCH_MODE_ENS
 
