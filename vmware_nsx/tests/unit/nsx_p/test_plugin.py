@@ -2043,15 +2043,18 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
         path_prefix = ("/infra/sites/default/enforcement-points/default/"
                        "edge-clusters/")
         # create a router and external network
-        with self.router() as r, self._create_l3_ext_network() as ext_net, \
-                self.subnet(
-                    network=ext_net, cidr='10.0.1.0/24',
-                    enable_dhcp=False) as s, mock.patch(
-            "vmware_nsxlib.v3.policy.core_resources."
-            "NsxPolicyTier1Api.get_edge_cluster_path",
-            return_value=False), mock.patch(
-            "vmware_nsxlib.v3.policy.core_resources."
-                "NsxPolicyTier1Api.set_edge_cluster_path") as add_srv_router:
+        with self.router() as r, \
+            self._create_l3_ext_network() as ext_net, \
+            self.subnet(network=ext_net, cidr='10.0.1.0/24',
+                        enable_dhcp=False) as s, \
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.get_edge_cluster_path",
+                       return_value=False), \
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.set_edge_cluster_path"
+                       ) as add_srv_router,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.get_realized_id"):
             self._add_external_gateway_to_router(
                 r['router']['id'],
                 s['subnet']['network_id'])
