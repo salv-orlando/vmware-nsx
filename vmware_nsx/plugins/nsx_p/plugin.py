@@ -1589,9 +1589,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                       tier0_uuid)
 
         try:
-            # Enable standby relocation on this router
-            self.nsxpolicy.tier1.set_standby_relocation(
-                router['id'], enable_standby_relocation=True)
+            # Enable standby relocation & FW on this router
+            self.nsxpolicy.tier1.update(
+                router['id'], disable_firewall=False,
+                enable_standby_relocation=True)
         except Exception as ex:
             LOG.warning("Failed to enable standby relocation for router "
                         "%s: %s", router_id, ex)
