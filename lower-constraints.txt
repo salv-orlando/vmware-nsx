@@ -10,7 +10,7 @@ httplib2==0.9.1
 mock==2.0.0
 netaddr==0.7.18
 neutron-lib==1.28.0
-octavia-lib==1.1.1
+octavia-lib==1.3.1
 openstackdocstheme==1.18.1
 oslo.concurrency==3.26.0
 oslo.config==5.2.0
@@ -38,7 +38,7 @@ SQLAlchemy==1.2.0
 sphinx==1.6.5
 stestr==1.0.0
 stevedore==1.20.0
-tenacity==5.0.1
+tenacity==5.0.2
 testtools==2.2.0
 tooz==1.58.0
 vmware-nsxlib==13.1.0

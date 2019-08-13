@@ -31,7 +31,7 @@ function _nsxv_ini_set {
 
 
 function install_neutron_projects {
-    pkg_list="networking-l2gw networking-sfc neutron-fwaas neutron-dynamic-routing neutron-vpnaas octavia octavia-lib vmware-nsxlib"
+    pkg_list="networking-l2gw networking-sfc neutron-fwaas neutron-dynamic-routing neutron-vpnaas vmware-nsxlib"
     for pkg in `echo $pkg_list`
     do
         pkg_renamed=`echo $pkg | sed 's/-/_/g'`
@@ -47,6 +47,7 @@ function install_neutron_projects {
             sudo chown -R ${USER}:${USER} src/${pkg}
         fi
     done
+    # install neutron and octavia separately to not delete neutron-lib & octavia-lib
     sudo rm -rf /usr/local/lib/python2.7/dist-packages/neutron
     sudo rm -rf /usr/local/lib/python2.7/dist-packages/neutron.egg*
     sudo rm -rf /usr/local/lib/python3.5/dist-packages/neutron
@@ -56,6 +57,17 @@ function install_neutron_projects {
     else
         sudo -H pip install -e "git+https://opendev.org/openstack/neutron@${NEUTRON_BRANCH}#egg=neutron"
         sudo chown -R ${USER}:${USER} src/neutron
+    fi
+
+    sudo rm -rf /usr/local/lib/python2.7/dist-packages/octavia
+    sudo rm -rf /usr/local/lib/python2.7/dist-packages/octavia.egg*
+    sudo rm -rf /usr/local/lib/python3.5/dist-packages/octavia
+    sudo rm -rf /usr/local/lib/python3.5/dist-packages/octavia.egg*
+    if is_service_enabled octavia; then
+       echo "service octavia is enabled explicitly by devstack"
+    else
+        sudo -H pip install -e "git+https://opendev.org/openstack/octavia@${NEUTRON_BRANCH}#egg=octavia"
+        sudo chown -R ${USER}:${USER} src/octavia
     fi
 }
 
