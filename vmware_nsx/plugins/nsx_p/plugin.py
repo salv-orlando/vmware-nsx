@@ -892,6 +892,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             profile_id = SLAAC_NDRA_PROFILE_ID
 
         if delete:
+            router_subnets = self._load_router_subnet_cidrs_from_db(
+                context.elevated(), router_id)
             # check if there is another slaac overlay subnet that needs
             # advertising (vlan advertising is attached on interface level)
             slaac_subnets = [s for s in router_subnets
@@ -1624,7 +1626,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         orgaddr, orgmask, _orgnexthop = (
             self._get_external_attachment_info(
                 context, router))
-        router_subnets = self._find_router_subnets(
+        router_subnets = self._load_router_subnet_cidrs_from_db(
             context.elevated(), router_id)
         self._validate_router_gw_and_tz(context, router_id, info,
                                         org_enable_snat, router_subnets)
@@ -1966,8 +1968,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self._validate_router_tz(context.elevated(), tier0_uuid, [subnet])
 
             segment_id = self._get_network_nsx_segment_id(context, network_id)
-            rtr_subnets = self._find_router_subnets(context.elevated(),
-                                                    router_id)
+            rtr_subnets = self._load_router_subnet_cidrs_from_db(
+                context.elevated(), router_id)
             if overlay_net:
                 # overlay interface
                 pol_subnets = []
@@ -2055,8 +2057,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         overlay_net = self._is_overlay_network(context, network_id)
         segment_id = self._get_network_nsx_segment_id(context, network_id)
 
-        rtr_subnets = self._find_router_subnets(context.elevated(),
-                                                router_id)
+        rtr_subnets = self._load_router_subnet_cidrs_from_db(
+            context.elevated(), router_id)
         try:
             if overlay_net:
                 # Remove the tier1 router from this segment on the NSX

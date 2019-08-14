@@ -3869,43 +3869,47 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             address_groups.append(address_group)
         return address_groups
 
-    def _get_nat_rules(self, context, router):
+    def _get_dnat_rules(self, context, router):
         fip_qry = context.session.query(l3_db_models.FloatingIP)
         fip_db = fip_qry.filter_by(router_id=router['id']).all()
-
-        snat = []
 
         dnat = [{'dst': fip.floating_ip_address,
                  'translated': fip.fixed_ip_address}
                 for fip in fip_db if fip.fixed_port_id]
+        return dnat
+
+    def _get_nat_rules(self, context, router):
+        snat = []
+
+        dnat = self._get_dnat_rules(context, router)
 
         gw_port = router.gw_port
         if gw_port and gw_port.get('fixed_ips') and router.enable_snat:
             snat_ip = gw_port['fixed_ips'][0]['ip_address']
-            subnets = self._find_router_subnets(context.elevated(),
-                                                router['id'])
-            for subnet in subnets:
-                # Do not build NAT rules for v6
-                if subnet.get('ip_version') == 6:
-                    continue
-                # if the subnets address scope is the same as the gateways:
-                # no need for SNAT
-                gw_address_scope = self._get_network_address_scope(
-                    context.elevated(), gw_port['network_id'])
-                subnet_address_scope = self._get_subnetpool_address_scope(
-                    context.elevated(), subnet['subnetpool_id'])
-                if (gw_address_scope and
-                    gw_address_scope == subnet_address_scope):
-                    LOG.info("No need for SNAT rule for router %(router)s "
-                             "and subnet %(subnet)s because they use the "
-                             "same address scope %(addr_scope)s.",
-                             {'router': router['id'],
-                              'subnet': subnet['id'],
-                              'addr_scope': gw_address_scope})
-                    continue
+            subnets = self._load_router_subnet_cidrs_from_db(
+                context.elevated(), router['id'])
+            gw_address_scope = self._get_network_address_scope(
+                context.elevated(), gw_port['network_id'])
+            if gw_address_scope:
+                for subnet in subnets:
+                    # Do not build NAT rules for v6
+                    if subnet.get('ip_version') == 6:
+                        continue
+                    # if the subnets address scope is the same as the gateways:
+                    # no need for SNAT
+                    subnet_address_scope = self._get_subnetpool_address_scope(
+                        context.elevated(), subnet['subnetpool_id'])
+                    if gw_address_scope == subnet_address_scope:
+                        LOG.info("No need for SNAT rule for router %(router)s "
+                                 "and subnet %(subnet)s because they use the "
+                                 "same address scope %(addr_scope)s.",
+                                 {'router': router['id'],
+                                  'subnet': subnet['id'],
+                                  'addr_scope': gw_address_scope})
+                        continue
 
-                snat.append(self._get_default_nat_rule(
-                    context, router['id'], subnet, snat_ip))
+                    snat.append(self._get_default_nat_rule(
+                        context, router['id'], subnet, snat_ip))
         return (snat, dnat)
 
     def _get_default_nat_rule(self, context, router_id, subnet, snat_ip):
@@ -3921,13 +3925,14 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             rule['vnic_index'] = vcns_const.EXTERNAL_VNIC_INDEX
         return rule
 
-    def _get_nosnat_subnets_fw_rules(self, context, router):
+    def _get_nosnat_subnets_fw_rules(self, context, router, subnets=None):
         """Open edge firewall holes for nosnat subnets to do static routes."""
         no_snat_fw_rules = []
         gw_port = router.gw_port
         if gw_port and not router.enable_snat:
             subnet_cidrs = self._find_router_subnets_cidrs(context.elevated(),
-                                                           router['id'])
+                                                           router['id'],
+                                                           subnets)
             if subnet_cidrs:
                 no_snat_fw_rules.append({
                     'name': NO_SNAT_RULE_NAME,
@@ -3937,7 +3942,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                     'destination_ip_address': subnet_cidrs})
         return no_snat_fw_rules
 
-    def _get_allocation_pools_fw_rule(self, context, router):
+    def _get_allocation_pools_fw_rule(self, context, router, subnets=None):
         """Get the firewall rule for the default gateway address pool
 
         Return the firewall rule that should be added in order to allow
@@ -3953,8 +3958,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         if gw_address_scope is None:
             return
 
-        subnets = self._find_router_subnets(context.elevated(),
-                                            router['id'])
+        if not subnets:
+            subnets = self._load_router_subnet_cidrs_from_db(
+                context.elevated(), router['id'])
         no_nat_cidrs = []
         for subnet in subnets:
             # if the subnets address scope is the same as the gateways:
@@ -3973,7 +3979,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
     def _get_dnat_fw_rule(self, context, router):
         # Get FW rule to open dnat firewall flows
-        _, dnat_rules = self._get_nat_rules(context, router)
+        dnat_rules = self._get_dnat_rules(context, router)
         dnat_cidrs = [rule['dst'] for rule in dnat_rules]
         if dnat_cidrs:
             return {
@@ -3982,12 +3988,12 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 'enabled': True,
                 'destination_ip_address': dnat_cidrs}
 
-    def _get_subnet_fw_rules(self, context, router):
+    def _get_subnet_fw_rules(self, context, router, subnets=None):
         # Get FW rule/s to open subnets firewall flows and static routes
         # relative flows
         fw_rules = []
         subnet_cidrs_per_ads = self._find_router_subnets_cidrs_per_addr_scope(
-            context.elevated(), router['id'])
+            context.elevated(), router['id'], subnets=subnets)
         routes = self._get_extra_routes_by_router_id(context, router['id'])
         routes_dest = [route['destination'] for route in routes]
         for subnet_cidrs in subnet_cidrs_per_ads:
@@ -4244,7 +4250,10 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
         # Add FW rule/s to open subnets firewall flows and static routes
         # relative flows
-        subnet_rules = self._get_subnet_fw_rules(context, router_db)
+        subnets = self._load_router_subnet_cidrs_from_db(context.elevated(),
+                                                         router_id)
+        subnet_rules = self._get_subnet_fw_rules(context, router_db,
+                                                 subnets=subnets)
         if subnet_rules:
             fw_rules.extend(subnet_rules)
 
@@ -4271,13 +4280,13 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
         # Add rule for not NAT-ed allocation pools
         alloc_pool_rule = self._get_allocation_pools_fw_rule(
-            context, router_db)
+            context, router_db, subnets=subnets)
         if alloc_pool_rule:
             fw_rules.append(alloc_pool_rule)
 
         # Add no-snat rules
         nosnat_fw_rules = self._get_nosnat_subnets_fw_rules(
-            context, router_db)
+            context, router_db, subnets=subnets)
         fw_rules.extend(nosnat_fw_rules)
 
         vpn_plugin = directory.get_plugin(plugin_const.VPN)
