@@ -344,7 +344,9 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                         # Use the parent vip_subnet_id instead
                         obj_dict['subnet_id'] = obj_dict['loadbalancer'][
                             'vip_subnet_id']
-            else:
+            elif not is_update:
+                # Do not set pool & LB if in update situation, as we want to
+                # use the original data of this member
                 obj_dict['pool'] = None
                 obj_dict['loadbalancer'] = None
 
