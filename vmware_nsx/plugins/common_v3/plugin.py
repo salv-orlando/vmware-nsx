@@ -52,6 +52,7 @@ from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
 from neutron_lib.api.definitions import availability_zone as az_def
 from neutron_lib.api.definitions import external_net as extnet_apidef
 from neutron_lib.api.definitions import extra_dhcp_opt as ext_edo
+from neutron_lib.api.definitions import l3 as l3_apidef
 from neutron_lib.api.definitions import port_security as psec
 from neutron_lib.api.definitions import portbindings as pbin
 from neutron_lib.api.definitions import provider_net as pnet
@@ -287,7 +288,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if subnet_id:
             return self.get_subnet(context, subnet_id)
 
-    def _get_interface_network(self, context, interface_info):
+    def _get_interface_network_id(self, context, interface_info, subnet=None):
+        if subnet:
+            return subnet['network_id']
+
         is_port, is_sub = self._validate_interface_info(interface_info)
         if is_port:
             net_id = self.get_port(context,
@@ -310,15 +314,14 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
              sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('::/'))):
             sg_rule[sg_prefix.LOCAL_IP_PREFIX] = None
 
-    def _validate_interface_address_scope(self, context,
-                                          router_db, interface_info):
+    def _validate_interface_address_scope(self, context, router_db,
+                                          interface_subnet):
         gw_network_id = (router_db.gw_port.network_id if router_db.gw_port
                          else None)
-
-        subnet = self.get_subnet(context, interface_info['subnet_ids'][0])
         if not router_db.enable_snat and gw_network_id:
             self._validate_address_scope_for_router_interface(
-                context.elevated(), router_db.id, gw_network_id, subnet['id'])
+                context.elevated(), router_db.id, gw_network_id,
+                interface_subnet['id'], subnet=interface_subnet)
 
     def _validate_address_pairs(self, address_pairs):
         for pair in address_pairs:
@@ -1260,6 +1263,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         """
         pass
 
+    def _get_router_gw_info(self, context, router_id):
+        router = self.get_router(context, router_id)
+        return router.get(l3_apidef.EXTERNAL_GW_INFO, {})
+
     def _validate_router_gw_and_tz(self, context, router_id, info,
                                    org_enable_snat, router_subnets):
         # Ensure that a router cannot have SNAT disabled if there are
@@ -1279,6 +1286,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if new_tier0_uuid:
                 self._validate_router_tz(context, new_tier0_uuid,
                                          router_subnets)
+
+    def _get_tier0_uuid_by_router(self, context, router):
+        network_id = router.gw_port_id and router.gw_port.network_id
+        return self._get_tier0_uuid_by_net_id(context, network_id)
 
     def _validate_gw_overlap_interfaces(self, context, gateway_net,
                                         interfaces_networks):

@@ -873,7 +873,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return updated_net
 
     def _update_slaac_on_router(self, context, router_id,
-                                subnet, delete=False):
+                                subnet, router_subnets, delete=False):
         # TODO(annak): redesign when policy supports downlink-level
         # ndra profile attachment
 
@@ -892,12 +892,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             profile_id = SLAAC_NDRA_PROFILE_ID
 
         if delete:
-
-            rtr_subnets = self._find_router_subnets(context.elevated(),
-                                                router_id)
             # check if there is another slaac overlay subnet that needs
             # advertising (vlan advertising is attached on interface level)
-            slaac_subnets = [s for s in rtr_subnets
+            slaac_subnets = [s for s in router_subnets
                              if s['id'] != subnet['id'] and
                              s.get('ipv6_address_mode') == 'slaac' and
                              self._is_overlay_network(context,
@@ -1428,10 +1425,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return (ports if not fields else
                 [db_utils.resource_fields(port, fields) for port in ports])
 
-    def _get_tier0_uuid_by_router(self, context, router):
-        network_id = router.gw_port_id and router.gw_port.network_id
-        return self._get_tier0_uuid_by_net_id(context, network_id)
-
     def _add_subnet_snat_rule(self, context, router_id, subnet,
                               gw_address_scope, gw_ip):
         if not self._need_router_snat_rules(context, router_id, subnet,
@@ -1621,10 +1614,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # remove the edge cluster from the tier1 router
         self.nsxpolicy.tier1.remove_edge_cluster(router_id)
 
-    def _get_router_gw_info(self, context, router_id):
-        router = self.get_router(context, router_id)
-        return router.get(l3_apidef.EXTERNAL_GW_INFO, {})
-
     def _update_router_gw_info(self, context, router_id, info,
                                called_from=None):
         # Get the original data of the router GW
@@ -1654,8 +1643,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         new_enable_snat = router.enable_snat
         newaddr, newmask, _newnexthop = self._get_external_attachment_info(
             context, router)
-        router_subnets = self._find_router_subnets(
-            context.elevated(), router_id)
         sr_currently_exists = self.verify_sr_at_backend(router_id)
         fw_exist = self._router_has_edge_fw_rules(context, router)
         vpn_exist = self.service_router_has_vpnaas(context, router_id)
@@ -1802,8 +1789,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return self.get_router(context, router['id'])
 
     def delete_router(self, context, router_id):
-        router = self.get_router(context, router_id)
-        if router.get(l3_apidef.EXTERNAL_GW_INFO):
+        gw_info = self._get_router_gw_info(context, router_id)
+        if gw_info:
             try:
                 self._update_router_gw_info(context, router_id, {},
                                             called_from="delete")
@@ -1928,16 +1915,17 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     @nsx_plugin_common.api_replay_mode_wrapper
     def add_router_interface(self, context, router_id, interface_info):
-        network_id = self._get_interface_network(context, interface_info)
+        # NOTE: In dual stack case, neutron would create a separate interface
+        # for each IP version
+        # We only allow one subnet per IP version
+        subnet = self._get_interface_subnet(context, interface_info)
+        network_id = self._get_interface_network_id(context, interface_info,
+                                                    subnet=subnet)
         extern_net = self._network_is_external(context, network_id)
         overlay_net = self._is_overlay_network(context, network_id)
         router_db = self._get_router(context, router_id)
         gw_network_id = (router_db.gw_port.network_id if router_db.gw_port
                          else None)
-        # NOTE: In dual stack case, neutron would create a separate interface
-        # for each IP version
-        # We only allow one subnet per IP version
-        subnet = self._get_interface_subnet(context, interface_info)
 
         with locking.LockManager.get_lock(str(network_id)):
             # disallow more than one subnets belong to same network being
@@ -1964,26 +1952,26 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
             # Update the interface of the neutron router
             info = super(NsxPolicyPlugin, self).add_router_interface(
-                 context, router_id, interface_info)
+                context, router_id, interface_info)
 
         try:
             # If it is a no-snat router, interface address scope must be the
             # same as the gateways
-            self._validate_interface_address_scope(context, router_db, info)
+            self._validate_interface_address_scope(context, router_db, subnet)
 
             # Check GW & subnets TZ
-            subnets = self._find_router_subnets(context.elevated(), router_id)
             tier0_uuid = self._get_tier0_uuid_by_router(
                 context.elevated(), router_db)
             # Validate the TZ of the new subnet match the one of the router
             self._validate_router_tz(context.elevated(), tier0_uuid, [subnet])
 
             segment_id = self._get_network_nsx_segment_id(context, network_id)
-            subnet = self.get_subnet(context, info['subnet_ids'][0])
+            rtr_subnets = self._find_router_subnets(context.elevated(),
+                                                    router_id)
             if overlay_net:
                 # overlay interface
                 pol_subnets = []
-                for rtr_subnet in subnets:
+                for rtr_subnet in rtr_subnets:
                     # For dual stack, we allow one v4 and one v6
                     # subnet per network
                     if rtr_subnet['network_id'] == network_id:
@@ -1998,11 +1986,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
                 # will update the router only if needed
                 self._update_slaac_on_router(context, router_id,
-                                             subnet)
+                                             subnet, rtr_subnets)
             else:
                 # Vlan interface
                 pol_subnets = []
-                for rtr_subnet in subnets:
+                for rtr_subnet in rtr_subnets:
                     if rtr_subnet['network_id'] == network_id:
                         prefix_len = int(rtr_subnet['cidr'].split('/')[1])
                         pol_subnets.append(policy_defs.InterfaceSubnet(
@@ -2032,7 +2020,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 # if this is an ipv6 subnet and router has GW,
                 # we need to add advertisement rule
                 self._update_router_advertisement_rules(
-                    router_id, subnets, True)
+                    router_id, rtr_subnets, True)
 
             # update firewall rules
             self.update_router_firewall(context, router_id, router_db)
@@ -2048,7 +2036,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):
-        LOG.info("Removing router %s interface %s", router_id, interface_info)
         # find the subnet - it is need for removing the SNAT rule
         subnet = subnet_id = None
         if 'port_id' in interface_info:
@@ -2068,13 +2055,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         overlay_net = self._is_overlay_network(context, network_id)
         segment_id = self._get_network_nsx_segment_id(context, network_id)
 
-        subnets = self._find_router_subnets(context.elevated(),
-                                            router_id)
+        rtr_subnets = self._find_router_subnets(context.elevated(),
+                                                router_id)
         try:
             if overlay_net:
                 # Remove the tier1 router from this segment on the NSX
                 pol_subnets = []
-                for rtr_subnet in subnets:
+                for rtr_subnet in rtr_subnets:
                     # For dual stack, we allow one v4 and one v6
                     # subnet per network
                     if rtr_subnet['network_id'] == network_id:
@@ -2093,12 +2080,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
                 # will update the router only if needed
                 self._update_slaac_on_router(context, router_id,
-                                             subnet, delete=True)
+                                             subnet, rtr_subnets, delete=True)
 
             else:
                 # VLAN interface
                 pol_subnets = []
-                for rtr_subnet in subnets:
+                for rtr_subnet in rtr_subnets:
                     if rtr_subnet['network_id'] == network_id:
                         prefix_len = int(rtr_subnet['cidr'].split('/')[1])
                         pol_subnets.append(policy_defs.InterfaceSubnet(
@@ -2125,7 +2112,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 # if this is an ipv6 subnet and router has GW,
                 # we need to remove advertisement rule
                 self._update_router_advertisement_rules(
-                    router_id, subnets, True)
+                    router_id, rtr_subnets, True)
 
             # update firewall rules
             self.update_router_firewall(context, router_id, router_db)

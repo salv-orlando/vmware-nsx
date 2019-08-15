@@ -2062,10 +2062,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         return (ports if not fields else
                 [db_utils.resource_fields(port, fields) for port in ports])
 
-    def _get_tier0_uuid_by_router(self, context, router):
-        network_id = router.gw_port_id and router.gw_port.network_id
-        return self._get_tier0_uuid_by_net_id(context, network_id)
-
     def _validate_router_tz(self, context, tier0_uuid, subnets):
         # make sure the related GW (Tier0 router) belongs to the same TZ
         # as the subnets attached to the Tier1 router
@@ -2349,8 +2345,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if not cfg.CONF.nsx_v3.native_dhcp_metadata:
             nsx_rpc.handle_router_metadata_access(self, context, router_id,
                                                   interface=None)
-        router = self.get_router(context, router_id)
-        if router.get(l3_apidef.EXTERNAL_GW_INFO):
+        gw_info = self._get_router_gw_info(context, router_id)
+        if gw_info:
             self._update_router_gw_info(context, router_id, {})
         nsx_router_id = nsx_db.get_nsx_router_id(context.session,
                                                  router_id)
@@ -2663,15 +2659,16 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
     @nsx_plugin_common.api_replay_mode_wrapper
     def add_router_interface(self, context, router_id, interface_info):
-        network_id = self._get_interface_network(context, interface_info)
+        # In case on dual stack, neutron creates a separate interface per
+        # IP version
+        subnet = self._get_interface_subnet(context, interface_info)
+        network_id = self._get_interface_network_id(context, interface_info,
+                                                    subnet=subnet)
         extern_net = self._network_is_external(context, network_id)
         overlay_net = self._is_overlay_network(context, network_id)
         router_db = self._get_router(context, router_id)
         gw_network_id = (router_db.gw_port.network_id if router_db.gw_port
                          else None)
-        # In case on dual stack, neutron creates a separate interface per
-        # IP version
-        subnet = self._get_interface_subnet(context, interface_info)
 
         with locking.LockManager.get_lock(str(network_id)):
             # disallow more than one subnets belong to same network being
@@ -2698,16 +2695,15 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
             # Update the interface of the neutron router
             info = super(NsxV3Plugin, self).add_router_interface(
-                 context, router_id, interface_info)
+                context, router_id, interface_info)
+
         try:
-            subnet = self.get_subnet(context, info['subnet_ids'][0])
-            port = self.get_port(context, info['port_id'])
             nsx_net_id, nsx_port_id = nsx_db.get_nsx_switch_and_port_id(
-                context.session, port['id'])
+                context.session, info['port_id'])
 
             # If it is a no-snat router, interface address scope must be the
             # same as the gateways
-            self._validate_interface_address_scope(context, router_db, info)
+            self._validate_interface_address_scope(context, router_db, subnet)
 
             nsx_router_id = nsx_db.get_nsx_router_id(context.session,
                                                      router_id)
@@ -2716,7 +2712,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             display_name = utils.get_name_and_uuid(
                 subnet['name'] or 'subnet', subnet['id'])
             tags = self.nsxlib.build_v3_tags_payload(
-                port, resource_type='os-neutron-rport-id',
+                {'id': info['port_id'], 'project_id': context.project_id},
+                resource_type='os-neutron-rport-id',
                 project_name=context.tenant_name)
             tags.append({'scope': 'os-subnet-id', 'tag': subnet['id']})
 
@@ -2729,12 +2726,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             resource_type = (None if overlay_net else
                              nsxlib_consts.LROUTERPORT_CENTRALIZED)
 
-            # Check GW & subnets TZ
-            subnets = self._find_router_subnets(context.elevated(),
-                                                router_id)
+            # Validate the TZ of the new subnet match the one of the router
             tier0_uuid = self._get_tier0_uuid_by_router(context.elevated(),
                                                         router_db)
-            self._validate_router_tz(context.elevated(), tier0_uuid, subnets)
+            self._validate_router_tz(context.elevated(), tier0_uuid, [subnet])
 
             # create the interface ports on the NSX
             self.nsxlib.router.create_logical_router_intf_port_by_ls_id(
@@ -2788,14 +2783,17 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):
+        self._validate_interface_info(interface_info, for_removal=True)
+        # Get the interface port & subnet
         subnet = None
         subnet_id = None
         port_id = None
-        self._validate_interface_info(interface_info, for_removal=True)
+        network_id = None
         if 'port_id' in interface_info:
             port_id = interface_info['port_id']
             # find subnet_id - it is need for removing the SNAT rule
             port = self._get_port(context, port_id)
+            network_id = port['network_id']
             if port.get('fixed_ips'):
                 for fip in port['fixed_ips']:
                     subnet_id = fip['subnet_id']
@@ -2810,11 +2808,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             self._confirm_router_interface_not_in_use(
                 context, router_id, subnet_id)
             subnet = self._get_subnet(context, subnet_id)
-            rport_qry = context.session.query(models_v2.Port)
-            ports = rport_qry.filter_by(
-                device_id=router_id,
-                device_owner=l3_db.DEVICE_OWNER_ROUTER_INTF,
-                network_id=subnet['network_id'])
+            network_id = subnet['network_id']
+            ports = self._get_router_interface_ports_by_network(
+                context, router_id, network_id)
             for p in ports:
                 fip_subnet_ids = [fixed_ip['subnet_id']
                                   for fixed_ip in p['fixed_ips']]
@@ -2833,10 +2829,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
             nsx_net_id, _nsx_port_id = nsx_db.get_nsx_switch_and_port_id(
                 context.session, port_id)
-            subnet = self.get_subnet(context, subnet_id)
+            if not subnet:
+                subnet = self._get_subnet(context, subnet_id)
             ports, address_groups = self._get_ports_and_address_groups(
-                context, router_id, subnet['network_id'],
-                exclude_sub_ids=[subnet['id']])
+                context, router_id, network_id,
+                exclude_sub_ids=[subnet_id])
             nsx_router_id = nsx_db.get_nsx_router_id(
                 context.session, router_id)
             if len(ports) >= 1:
@@ -2865,7 +2862,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             LOG.error("router port on router %(router_id)s for net "
                       "%(net_id)s not found at the backend",
                       {'router_id': router_id,
-                       'net_id': subnet['network_id']})
+                       'net_id': network_id})
 
         # inform the FWaaS that interface port was removed
         if self.fwaas_callbacks:

@@ -116,8 +116,9 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
         network = self.get_network(context, net_id)
         return network.get(ext_address_scope.IPV4_ADDRESS_SCOPE)
 
-    def _get_subnet_address_scope(self, context, subnet_id):
-        subnet = self.get_subnet(context, subnet_id)
+    def _get_subnet_address_scope(self, context, subnet_id, subnet=None):
+        if not subnet:
+            subnet = self.get_subnet(context, subnet_id)
         if not subnet['subnetpool_id']:
             return
         subnetpool = self.get_subnetpool(context, subnet['subnetpool_id'])
@@ -130,14 +131,15 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
         return subnetpool.get('address_scope_id', '')
 
     def _validate_address_scope_for_router_interface(self, context, router_id,
-                                                     gw_network_id, subnet_id):
+                                                     gw_network_id, subnet_id,
+                                                     subnet=None):
         """Validate that the GW address scope is the same as the interface"""
         gw_address_scope = self._get_network_address_scope(context,
                                                            gw_network_id)
         if not gw_address_scope:
             return
-        subnet_address_scope = self._get_subnet_address_scope(context,
-                                                              subnet_id)
+        subnet_address_scope = self._get_subnet_address_scope(
+            context, subnet_id, subnet=subnet)
         if (not subnet_address_scope or
             subnet_address_scope != gw_address_scope):
             raise nsx_exc.NsxRouterInterfaceDoesNotMatchAddressScope(
@@ -385,16 +387,6 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
     def _validate_qos_policy_id(self, context, qos_policy_id):
         if qos_policy_id:
             qos_com_utils.validate_policy_accessable(context, qos_policy_id)
-
-    def _get_interface_network(self, context, interface_info):
-        is_port, is_sub = self._validate_interface_info(interface_info)
-        if is_port:
-            net_id = self.get_port(context,
-                                   interface_info['port_id'])['network_id']
-        elif is_sub:
-            net_id = self.get_subnet(context,
-                                     interface_info['subnet_id'])['network_id']
-        return net_id
 
     def _process_extra_attr_router_create(self, context, router_db, r):
         for extra_attr in l3_attrs_db.get_attr_info().keys():
