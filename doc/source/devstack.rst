@@ -8,6 +8,25 @@ configuration file(s) run ./stack.sh
 NSX-V
 -----
 
+Mandatory basic configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add those parameters in ``local.conf``::
+
+    [[local|localrc]]
+    enable_plugin vmware-nsx https://opendev.org/x/vmware-nsx
+    Q_PLUGIN=vmware_nsx_v
+    NSXV_MANAGER_URI=<URI>
+    NSXV_USER=<username>
+    NSXV_PASSWORD=<password>
+    NSXV_VDN_SCOPE_ID=<Transport Zone UUID>
+    NSXV_DVS_ID=<Distributed Switch UUID>
+    NSXV_DATACENTER_MOID=<Data Center UUID>
+    NSXV_DATASTORE_ID=<Data Store UUID>
+    NSXV_RESOURCE_POOL_ID=<Resource Pool UUID>
+    NSXV_EXTERNAL_NETWORK=<External Network UUID>
+    NSXV_CLUSTER_MOID=<Edge Cluster UUID>
+
 QoS Driver
 ~~~~~~~~~~
 
@@ -29,6 +48,7 @@ FWaaS (V2) Driver
 Add neutron-fwaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
+    enable_plugin neutron-fwaas https://opendev.org/openstack/neutron-fwaas
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,firewall_v2
 
@@ -138,6 +158,22 @@ Add octavia and python-octaviaclient repos as external repositories and configur
 NSX-T
 -----
 
+Mandatory basic configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add those parameters in ``local.conf``::
+
+    [[local|localrc]]
+    enable_plugin vmware-nsx https://opendev.org/x/vmware-nsx
+    Q_PLUGIN=vmware_nsx_v3
+    NSX_MANAGER=<ip>
+    NSX_USER=<username>
+    NSX_PASSWORD=<password>
+    DHCP_PROFILE_UUID=<MP name or UUID of the DHCP profile>
+    METADATA_PROXY_UUID=<MP name or UUID of the metadata proxy>
+    DEFAULT_TIER0_ROUTER_UUID=<MP name or UUID of a Tier0 router>
+    DEFAULT_OVERLAY_TZ_UUID=<MP name or UUID of of the overlay transport zone>
+
 QoS Driver
 ~~~~~~~~~~
 
@@ -188,6 +224,7 @@ FWaaS (V2) Driver
 Add neutron-fwaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
+    enable_plugin neutron-fwaas https://opendev.org/openstack/neutron-fwaas
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,firewall_v2
 
@@ -205,6 +242,7 @@ Neutron VPNaaS
 Add neutron-vpnaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
+    enable_plugin neutron-vpnaas https://opendev.org/openstack/neutron-vpnaas
     NEUTRON_VPNAAS_SERVICE_PROVIDER=VPN:vmware:vmware_nsx.services.vpnaas.nsxv3.ipsec_driver.NSXv3IPsecVpnDriver:default
     Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsx_vpnaas
 
@@ -245,6 +283,22 @@ Add octavia and python-octaviaclient repos as external repositories and configur
 NSX-P
 -----
 
+Mandatory basic configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add those parameters in ``local.conf``::
+
+    [[local|localrc]]
+    enable_plugin vmware-nsx https://opendev.org/x/vmware-nsx
+    Q_PLUGIN=vmware_nsx_p
+    NSX_POLICY=<ip>
+    NSX_USER=<username>
+    NSX_PASSWORD=<password>
+    DHCP_PROFILE_UUID=<MP name or UUID of the DHCP profile>
+    METADATA_PROXY_UUID=<MP name or UUID of the metadata proxy>
+    DEFAULT_TIER0_ROUTER_UUID=<Policy name or ID of Tier0>
+    DEFAULT_OVERLAY_TZ_UUID=<Policy name or ID of of the overlay transport zone>
+
 QoS Driver
 ~~~~~~~~~~
 
@@ -265,6 +319,7 @@ FWaaS (V2) Driver
 Add neutron-fwaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
+    enable_plugin neutron-fwaas https://opendev.org/openstack/neutron-fwaas
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,firewall_v2
 
@@ -312,6 +367,7 @@ Neutron VPNaaS
 Add neutron-vpnaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
+    enable_plugin neutron-vpnaas https://opendev.org/openstack/neutron-vpnaas
     NEUTRON_VPNAAS_SERVICE_PROVIDER=VPN:vmware:vmware_nsx.services.vpnaas.nsxp.ipsec_driver.NSXpIPsecVpnDriver:default
     Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsx_vpnaas
 
@@ -323,12 +379,23 @@ Add neutron-vpnaas repo as an external repository and configure following flags 
 NSX-TVD
 -------
 
+Mandatory basic configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add those parameters in ``local.conf``::
+
+    [[local|localrc]]
+    enable_plugin vmware-nsx https://opendev.org/x/vmware-nsx
+    Q_PLUGIN=vmware_nsx_tvd
+    <NSX-V and / or NSX-T parameters>
+
 FWaaS (V2) Driver
 ~~~~~~~~~~~~~~~~~
 
 Add neutron-fwaas repo as an external repository and configure following flags in ``local.conf``::
 
     [[local|localrc]]
+    enable_plugin neutron-fwaas https://opendev.org/openstack/neutron-fwaas
     enable_service q-fwaas-v2
     Q_SERVICE_PLUGIN_CLASSES+=,vmware_nsxtvd_fwaasv2
 
