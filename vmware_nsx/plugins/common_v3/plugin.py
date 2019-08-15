@@ -623,9 +623,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             subnet_ids = (fixed_ip['subnet_id']
                           for fixed_ip in port_data['fixed_ips'])
 
-        # check only dhcp enabled subnets
-        return (self._get_subnet(context.elevated(), subnet_id)
-                for subnet_id in subnet_ids)
+            return (self._get_subnet(context.elevated(), subnet_id)
+                    for subnet_id in subnet_ids)
+        return []
 
     def _validate_create_port(self, context, port_data):
         self._validate_max_ips_per_port(context,
