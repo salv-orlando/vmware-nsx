@@ -4187,6 +4187,9 @@ class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
         self._default_tenant_id = self._tenant_id
         self._router_tenant_id = 'test-router-tenant'
 
+    def _get_md_proxy_fw_rules(self):
+        return []
+
     @mock.patch.object(edge_utils.EdgeManager,
                        'update_interface_addr')
     def test_router_update_gateway_with_different_external_subnet(self, mock):

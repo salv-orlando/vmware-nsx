@@ -4246,6 +4246,12 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         the NSX (in case of distributed router it can be plr or tlr)
         """
         fw_rules = []
+        distributed = False
+        if router_db:
+            nsx_attr = router_db.get('nsx_attributes', {})
+            distributed = (
+                nsx_attr.get('distributed', False) if nsx_attr else False)
+
         edge_id = self._get_edge_id_by_rtr_id(context, router_id)
 
         # Add FW rule/s to open subnets firewall flows and static routes
@@ -4258,7 +4264,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             fw_rules.extend(subnet_rules)
 
         # If metadata service is enabled, block access to inter-edge network
-        if self.metadata_proxy_handler:
+        if self.metadata_proxy_handler and not distributed:
             fw_rules += nsx_v_md_proxy.get_router_fw_rules()
 
         # Add FWaaS rules if FWaaS is enabled
