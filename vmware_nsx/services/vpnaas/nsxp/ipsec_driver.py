@@ -67,12 +67,15 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
             LOG.debug("Cannot delete local CIDR group for vpnservice %s as "
                       "it was not found", vpnservice['id'])
 
+    def _get_connection_local_cidr_group_name(self, connection):
+        return 'local_%s' % connection['id']
+
     def _get_connection_local_cidr_group(self, context, connection, cidrs):
         """Create/Override the group for the local cidrs of a connection
         used for the edge firewall rules allowing the vpn traffic.
         Return the group id, which is the same as the connection id.
         """
-        group_id = connection['id']
+        group_id = self._get_connection_local_cidr_group_name(connection)
         expr = self._nsxpolicy.group.build_ip_address_expression(cidrs)
         tags = self._nsxpolicy.build_v3_tags_payload(
             connection,
@@ -86,12 +89,16 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
 
     def _delete_connection_local_cidr_group(self, connection):
         try:
+            group_id = self._get_connection_local_cidr_group_name(connection)
             self._nsxpolicy.group.delete(
-                policy_constants.DEFAULT_DOMAIN, group_id=connection['id'])
+                policy_constants.DEFAULT_DOMAIN, group_id=group_id)
         except nsx_lib_exc.ResourceNotFound:
             # If there is no FWaaS on the router it may not have been created
             LOG.debug("Cannot delete local CIDR group for connection %s as "
                       "it was not found", connection['id'])
+
+    def _get_connection_peer_cidr_group_name(self, connection):
+        return 'peer_%s' % connection['id']
 
     def _get_peer_cidr_group(self, context, conn):
         """Create/Override the group for the peer cidrs of a connection
@@ -99,7 +106,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         Return the group id, which is the same as the connection id.
         """
         group_ips = self.validator._get_peer_cidrs(context, conn)
-        group_id = conn['id']
+        group_id = self._get_connection_peer_cidr_group_name(conn)
         expr = self._nsxpolicy.group.build_ip_address_expression(group_ips)
         tags = self._nsxpolicy.build_v3_tags_payload(
             conn,
@@ -113,8 +120,9 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
 
     def _delete_peer_cidr_group(self, conn):
         try:
+            group_id = self._get_connection_peer_cidr_group_name(conn)
             self._nsxpolicy.group.delete(
-                policy_constants.DEFAULT_DOMAIN, group_id=conn['id'])
+                policy_constants.DEFAULT_DOMAIN, group_id=group_id)
         except nsx_lib_exc.ResourceNotFound:
             # If there is no FWaaS on the router it may not have been created
             LOG.debug("Cannot delete peer CIDR group for connection %s as "
@@ -134,8 +142,9 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         for srv in services:
             subnet_id = None
             if srv['subnet_id']:
+                subnet_id = srv['subnet_id']
                 subnet = self.l3_plugin.get_subnet(
-                    context.elevated(), srv['subnet_id'])
+                    context.elevated(), subnet_id)
                 local_cidrs = [subnet['cidr']]
                 local_group = self._get_service_local_cidr_group(
                     context, srv, local_cidrs)
@@ -173,6 +182,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         # if it is during delete - try to delete the group of this connection
         if delete:
             self._delete_peer_cidr_group(conn)
+            self._delete_connection_local_cidr_group(conn)
 
     def update_router_advertisement(self, context, router_id):
         """Advertise the local subnets of all the services on the router"""
@@ -549,7 +559,6 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         # update router firewall rules
         self._update_firewall_rules(context, vpnservice, ipsec_site_conn,
                                     delete=True)
-        self._delete_service_local_cidr_group(ipsec_site_conn)
 
         # update router advertisement rules
         self.update_router_advertisement(context, vpnservice['router_id'])
