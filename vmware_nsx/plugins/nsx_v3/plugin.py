@@ -159,7 +159,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                                    sg_logging.ALIAS,
                                    provider_sg.ALIAS,
                                    hk_ext.ALIAS,
-                                   "port-security-groups-filtering"]
+                                   "port-security-groups-filtering",
+                                   "advanced-service-providers"]
 
     @resource_registry.tracked_resources(
         network=models_v2.Network,

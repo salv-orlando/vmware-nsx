@@ -167,7 +167,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                    sg_logging.ALIAS,
                                    provider_sg.ALIAS,
                                    "port-security-groups-filtering",
-                                   mac_ext.ALIAS]
+                                   mac_ext.ALIAS,
+                                   "advanced-service-providers"]
 
     @resource_registry.tracked_resources(
         network=models_v2.Network,
