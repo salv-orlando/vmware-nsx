@@ -1201,7 +1201,7 @@ class FakeVcns(object):
         return True
 
     def get_version(self):
-        return '6.2.3'
+        return '6.4.6'
 
     def get_tuning_configuration(self):
         return {
@@ -1608,3 +1608,11 @@ class FakeVcns(object):
 
     def get_application_id(self, name):
         return 'application-123'
+
+    def get_tz_connectivity_info(self, vdn_scope_id):
+        return {'clustersInfo': [{
+            'clusterId': 'fake_cluster_moid',
+            'standardNetworks': [{'id': 'fake_net'}],
+            'distributedVirtualPortGroups': [{'id': 'net-1'}],
+            'distributedVirtualSwitches': [{'id': 'fake_dvs_id'}],
+        }]}

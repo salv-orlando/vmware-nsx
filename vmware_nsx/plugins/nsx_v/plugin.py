@@ -5047,6 +5047,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         if cfg.CONF.nsxv.vdr_transit_network:
             edge_utils.validate_vdr_transit_network()
 
+        # Validate configuration connectivity per AZ
+        self._availability_zones_data.validate_connectivity(self.nsx_v.vcns)
+
     def _nsx_policy_is_hidden(self, policy):
         for attrib in policy.get('extendedAttributes', []):
             if (attrib['name'].lower() == 'ishidden' and

@@ -30,6 +30,8 @@ def override_nsx_ini_test():
     cfg.CONF.set_override("vdn_scope_id", "fake_vdn_scope_id",
                           group="nsxv")
     cfg.CONF.set_override("dvs_id", "fake_dvs_id", group="nsxv")
+    cfg.CONF.set_override("cluster_moid", "fake_cluster_moid", group="nsxv")
+    cfg.CONF.set_override("external_network", "fake_net", group="nsxv")
 
 
 def override_nsx_ini_full_test():

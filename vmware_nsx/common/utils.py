@@ -110,6 +110,11 @@ def is_nsxv_version_6_3(nsx_version):
             version.LooseVersion('6.3'))
 
 
+def is_nsxv_version_6_4_6(nsx_version):
+    return (version.LooseVersion(nsx_version) >=
+            version.LooseVersion('6.4.6'))
+
+
 def is_nsxv_dhcp_binding_supported(nsx_version):
     return ((version.LooseVersion(nsx_version) >=
              version.LooseVersion('6.3.3')) or
