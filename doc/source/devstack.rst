@@ -360,6 +360,15 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     [controller_worker]
     network_driver = allowed_address_pairs_driver
 
+Trunk Driver
+~~~~~~~~~~~~
+
+Enable trunk service and configure following flags in ``local.conf``::
+
+    [[local]|[localrc]]
+    # Trunk plugin NSX-P driver config
+    ENABLED_SERVICES+=,q-trunk
+    Q_SERVICE_PLUGIN_CLASSES+=,trunk
 
 Neutron VPNaaS
 ~~~~~~~~~~~~~~

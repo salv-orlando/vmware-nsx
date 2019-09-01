@@ -92,6 +92,7 @@ from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.services.qos.common import utils as qos_com_utils
 from vmware_nsx.services.qos.nsx_v3 import driver as qos_driver
 from vmware_nsx.services.qos.nsx_v3 import pol_utils as qos_utils
+from vmware_nsx.services.trunk.nsx_p import driver as trunk_driver
 
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
@@ -232,6 +233,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         # Init QoS
         qos_driver.register(qos_utils.PolicyQosNotificationsHandler())
+
+        # Register NSXP trunk driver to support trunk extensions
+        self.trunk_driver = trunk_driver.NsxpTrunkDriver.create(self)
 
         registry.subscribe(self.spawn_complete,
                            resources.PROCESS,
