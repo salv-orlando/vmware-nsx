@@ -102,6 +102,22 @@ class PrepareObjectForMigration(object):
     drop_fwaas_policy_fields = []
     drop_fwaas_group_fields = ['status']
 
+    lb_ignore_fields = ['created_at', 'updated_at', 'operating_status',
+                        'provisioning_status', 'id']
+    drop_lb_loadbalancer_fields = lb_ignore_fields + [
+        'listeners', 'pools',  # Those objects will be created laster
+        'vip_subnet_id',  # vip_port_id will be used
+        'flavor_id',  # not supported by the driver
+    ]
+    drop_lb_listener_fields = lb_ignore_fields + [
+        'loadbalancers', 'l7policies', 'default_pool_id']
+    drop_lb_pool_fields = lb_ignore_fields + [
+        'loadbalancers', 'healthmonitor_id', 'listeners', 'members']
+    drop_lb_member_fields = lb_ignore_fields
+    drop_lb_hm_fields = lb_ignore_fields + ['pools']
+    drop_lb_l7policy_fields = lb_ignore_fields + ['rules']
+    drop_lb_l7rule_fields = lb_ignore_fields
+
     def drop_fields(self, item, drop_fields):
         body = {}
         for k, v in item.items():
@@ -248,6 +264,10 @@ class PrepareObjectForMigration(object):
             if 'device_owner' not in body:
                 body['device_owner'] = ""
 
+        if body.get('device_owner') == 'Octavia':
+            # remove device id & owner. Octavia will re-set it.
+            body['device_id'] = ""
+            body['device_owner'] = ""
         return body
 
     def prepare_floatingip(self, fip, direct_call=False):
@@ -273,3 +293,24 @@ class PrepareObjectForMigration(object):
     def prepare_fwaas_group(self, group):
         self.fix_description(group)
         return self.drop_fields(group, self.drop_fwaas_group_fields)
+
+    def prepare_lb_loadbalancer(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_loadbalancer_fields)
+
+    def prepare_lb_listener(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_listener_fields)
+
+    def prepare_lb_pool(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_pool_fields)
+
+    def prepare_lb_member(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_member_fields)
+
+    def prepare_lb_hm(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_hm_fields)
+
+    def prepare_lb_l7policy(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_l7policy_fields)
+
+    def prepare_lb_l7rule(self, lb_obj):
+        return self.drop_fields(lb_obj, self.drop_lb_l7rule_fields)

@@ -37,6 +37,7 @@ class ApiReplayCli(object):
             dest_os_auth_url=args.dest_os_auth_url,
             dest_plugin=args.dest_plugin,
             use_old_keystone=args.use_old_keystone,
+            max_retry=args.max_retry,
             logfile=args.logfile)
 
     def _setup_argparse(self):
@@ -118,6 +119,11 @@ class ApiReplayCli(object):
             "--logfile",
             default=DEFAULT_LOGFILE,
             help="Output logfile.")
+
+        parser.add_argument(
+            "--max-retry",
+            default=10,
+            help="Maximum number of retrying different operations.")
 
         # NOTE: this will return an error message if any of the
         # require options are missing.
