@@ -150,19 +150,24 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
                         'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF]}
         return self.get_ports(context, filters=port_filters)
 
-    def _find_router_subnets_cidrs(self, context, router_id):
+    def _find_router_subnets_cidrs(self, context, router_id, subnets=None):
         """Retrieve cidrs of subnets attached to the specified router."""
-        subnets = self._find_router_subnets(context, router_id)
+        if not subnets:
+            subnets = self._load_router_subnet_cidrs_from_db(context,
+                                                             router_id)
         return [subnet['cidr'] for subnet in subnets]
 
-    def _find_router_subnets_cidrs_per_addr_scope(self, context, router_id):
+    def _find_router_subnets_cidrs_per_addr_scope(self, context, router_id,
+                                                  subnets=None):
         """Generate a list of cidrs per address pool.
 
         Go over all the router interface subnets.
         return a list of lists of subnets cidrs belonging to same
         address pool.
         """
-        subnets = self._find_router_subnets(context, router_id)
+        if not subnets:
+            subnets = self._load_router_subnet_cidrs_from_db(context,
+                                                             router_id)
         cidrs_map = {}
         for subnet in subnets:
             ads = self._get_subnetpool_address_scope(
@@ -197,22 +202,27 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
                 else:
                     filters['id'] = [entry['port_id'] for entry in bindings]
 
-    def _find_router_subnets(self, context, router_id):
+    def _load_router_subnet_cidrs_from_db(self, context, router_id):
         """Retrieve subnets attached to the specified router."""
         ports = self._get_port_by_device_id(context, router_id,
                                             l3_db.DEVICE_OWNER_ROUTER_INTF)
         # No need to check for overlapping CIDRs
-        subnets = []
+        subnet_ids = []
         for port in ports:
             for ip in port.get('fixed_ips', []):
-                subnet_qry = context.session.query(models_v2.Subnet)
-                subnet = subnet_qry.filter_by(id=ip.subnet_id).one()
-                subnets.append({'id': subnet.id, 'cidr': subnet.cidr,
-                                'subnetpool_id': subnet.subnetpool_id,
-                                'ip_version': subnet.ip_version,
-                                'network_id': subnet.network_id,
-                                'gateway_ip': subnet.gateway_ip,
-                                'ipv6_address_mode': subnet.ipv6_address_mode})
+                subnet_ids.append(ip.subnet_id)
+
+        subnet_qry = context.session.query(models_v2.Subnet)
+        db_subnets = subnet_qry.filter(
+            models_v2.Subnet.id.in_(subnet_ids)).all()
+        subnets = [{'id': subnet.id,
+                    'cidr': subnet.cidr,
+                    'subnetpool_id': subnet.subnetpool_id,
+                    'ip_version': subnet.ip_version,
+                    'network_id': subnet.network_id,
+                    'gateway_ip': subnet.gateway_ip,
+                    'ipv6_address_mode': subnet.ipv6_address_mode}
+                   for subnet in db_subnets]
         return subnets
 
     def _find_router_gw_subnets(self, context, router):
@@ -255,8 +265,8 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
         LOG.info("Inspecting routers for potential configuration changes "
                  "due to address scope change on subnetpool %s", subnetpool_id)
         for rtr in routers:
-            subnets = self._find_router_subnets(elevated_context,
-                                                rtr['id'])
+            subnets = self._load_router_subnet_cidrs_from_db(elevated_context,
+                                                             rtr['id'])
             gw_subnets = self._find_router_gw_subnets(elevated_context,
                                                       rtr)
 

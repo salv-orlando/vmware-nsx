@@ -2152,7 +2152,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             self._get_external_attachment_info(
                 context, router))
 
-        router_subnets = self._find_router_subnets(
+        router_subnets = self._load_router_subnet_cidrs_from_db(
             context.elevated(), router_id)
         self._validate_router_gw_and_tz(context, router_id, info,
                                         org_enable_snat, router_subnets)
