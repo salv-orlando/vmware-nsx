@@ -28,6 +28,7 @@ from vmware_nsx.common import locking
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.extensions import routersize
 from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
+from vmware_nsx.plugins.nsx_v import md_proxy
 from vmware_nsx.plugins.nsx_v.vshield import edge_utils
 from vmware_nsx.plugins.nsx_v.vshield import vcns_driver
 
@@ -192,6 +193,9 @@ def migrate_distributed_routers_dhcp(resource, event, trigger, **kwargs):
     context = n_context.get_admin_context()
     nsxv = utils.get_nsxv_client()
     with utils.NsxVPluginWrapper() as plugin:
+        nsxv_manager = vcns_driver.VcnsDriver(
+            edge_utils.NsxVCallbacks(plugin))
+        edge_manager = edge_utils.EdgeManager(nsxv_manager, plugin)
         routers = plugin.get_routers(context)
         for router in routers:
             if router.get('distributed', False):
@@ -208,6 +212,30 @@ def migrate_distributed_routers_dhcp(resource, event, trigger, **kwargs):
                         route_obj['staticRoutes']['staticRoutes'] = new_routes
 
                         nsxv.update_routes(edge_id, route_obj)
+
+                        _update_vdr_fw_config(nsxv, edge_id)
+                        plr_id = edge_manager.get_plr_by_tlr_id(context,
+                                                                router['id'])
+
+                        if plr_id:
+                            binding = nsxv_db.get_nsxv_router_binding(
+                                context.session, plr_id)
+                            if binding:
+                                _update_vdr_fw_config(nsxv, binding['edge_id'])
+
+
+def _update_vdr_fw_config(nsxv, edge_id):
+    fw_config = nsxv.get_firewall(edge_id)[1]
+
+    md_rule_names = [rule['name'] for rule in md_proxy.get_router_fw_rules()]
+
+    fw_rules = fw_config.get('firewallRules', {}).get('firewallRules', [])
+    if fw_rules:
+        fw_rules = [rule for rule in fw_rules
+                    if rule['name'] not in md_rule_names]
+
+        fw_config['firewallRules']['firewallRules'] = fw_rules
+        nsxv.update_firewall(edge_id, fw_config)
 
 
 def is_router_conflicting_on_edge(context, driver, router_id):
