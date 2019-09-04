@@ -856,7 +856,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self.nsxpolicy.segment.update(
                     network_id,
                     name=net_name,
-                    description=net_data.get('description'))
+                    description=updated_net.get('description', ''))
             except nsx_lib_exc.ManagerError:
                 LOG.exception("Unable to update NSX backend, rolling "
                               "back changes on neutron")
@@ -1054,7 +1054,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self.nsxpolicy.segment_port.create_or_overwrite(
             name, segment_id,
             port_id=port_data['id'],
-            description=port_data.get('description'),
+            description=port_data.get('description', ''),
             address_bindings=address_bindings,
             vif_id=vif_id,
             tags=tags)
@@ -1886,7 +1886,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     router_id)
                 self.nsxpolicy.tier1.update(
                     router_id, name=router_name,
-                    description=updated_router.get('description'))
+                    description=updated_router.get('description', ''))
             # Updating static routes
             self._delete_static_routes(router_id, routes_removed)
             removed_routes = True
@@ -2783,11 +2783,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self.nsxpolicy.group.update(
                     domain_id, sg_id,
                     name=nsx_name,
-                    description=secgroup_res.get('description'))
+                    description=secgroup_res.get('description', ''))
                 self.nsxpolicy.comm_map.update(
                     domain_id, sg_id,
                     name=nsx_name,
-                    description=secgroup_res.get('description'))
+                    description=secgroup_res.get('description', ''))
             except Exception as e:
                 LOG.warning("Failed to update SG %s NSX resources: %s",
                             sg_id, e)
