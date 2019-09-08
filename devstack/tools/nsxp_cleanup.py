@@ -28,6 +28,7 @@ from vmware_nsxlib.v3 import config
 from vmware_nsxlib.v3 import exceptions
 from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3 import policy
+from vmware_nsxlib.v3.policy import constants as policy_constants
 
 
 class NeutronNsxDB(object):
@@ -91,18 +92,6 @@ class NSXClient(object):
             self.nsxlib = v3.NsxLib(nsxlib_config)
         else:
             self.NsxLib = None
-
-    def get_nsx_os_domains(self):
-        domains = self.get_os_resources(self.nsxpolicy.domain.list())
-        return [d['id'] for d in domains]
-
-    def cleanup_domains(self, domains):
-        """Delete all OS created NSX Policy segments ports per segment"""
-        for domain_id in domains:
-            try:
-                self.nsxpolicy.domain.delete(domain_id)
-            except exceptions.ManagerError as e:
-                print("Failed to delete domain %s: %s" % (domain_id, e))
 
     def get_os_resources(self, resources):
         """
@@ -363,7 +352,7 @@ class NSXClient(object):
             try:
                 self.nsxpolicy.service.delete(srv['id'])
             except exceptions.ManagerError as e:
-                print("Failed to delete service %s: %s" % (srv['id'], e))
+                print("Failed to delete rule service %s: %s" % (srv['id'], e))
 
     def _cleanup_lb_resource(self, service, service_name):
         r_list = self.get_os_resources(service.list())
@@ -432,19 +421,15 @@ class NSXClient(object):
         Global cleanup steps:
             - Tier1 routers
             - Segments and ports
+            - rules and services
         """
-        domains = self.get_nsx_os_domains()
-        for domain_id in domains:
-            print("Cleaning up openstack resources from domain %s" % domain_id)
-            self.cleanup_security_groups(domain_id)
-
-        print("Cleaning up openstack global resources")
+        print("Cleaning up openstack resources")
+        self.cleanup_security_groups(policy_constants.DEFAULT_DOMAIN)
         self.cleanup_segments()
         self.cleanup_load_balancers()
         self.cleanup_nsx_logical_dhcp_servers()
         self.cleanup_tier1_routers()
         self.cleanup_rules_services()
-        self.cleanup_domains(domains)
 
 
 if __name__ == "__main__":
