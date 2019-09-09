@@ -998,6 +998,8 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
     def setUp(self):
         cfg.CONF.set_override('switching_profiles', [NSX_SWITCH_PROFILE],
                               'nsx_v3')
+        # add vlan transparent to the configuration
+        cfg.CONF.set_override('vlan_transparent', True)
         super(TestPortsV2, self).setUp()
         self.plugin = directory.get_plugin()
         self.ctx = context.get_admin_context()
@@ -1844,6 +1846,8 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
             self.assertEqual(
                 vlan_id,
                 sport['port'][portbindings.VIF_DETAILS]['segmentation-id'])
+            self.assertFalse(
+                sport['port'][portbindings.VIF_DETAILS]['vlan-transparent'])
 
     def test_create_port_vnic_direct_flat(self):
         self._test_create_port_vnic_direct(0)
@@ -1895,6 +1899,31 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                                               psec.PORTSECURITY),
                                     **kwargs)
             self.assertEqual(res.status_int, exc.HTTPBadRequest.code)
+
+    def test_create_transparent_vlan_port(self):
+        providernet_args = {pnet.NETWORK_TYPE: 'vlan',
+                            vlan_apidef.VLANTRANSPARENT: True}
+        with mock.patch('vmware_nsxlib.v3.core_resources.NsxLibTransportZone.'
+                       'get_transport_type', return_value='VLAN'):
+            result = self._create_network(fmt='json', name='vlan_net',
+                                          admin_state_up=True,
+                                          providernet_args=providernet_args,
+                                          arg_list=(
+                                              pnet.NETWORK_TYPE,
+                                              pnet.SEGMENTATION_ID,
+                                              vlan_apidef.VLANTRANSPARENT))
+            network = self.deserialize('json', result)
+            net_id = network['network']['id']
+
+            with self.subnet(network=network):
+                kwargs = {portbindings.VNIC_TYPE: portbindings.VNIC_DIRECT}
+                net_id = network['network']['id']
+                res = self._create_port(self.fmt, net_id=net_id,
+                                        arg_list=(portbindings.VNIC_TYPE,),
+                                        **kwargs)
+                port = self.deserialize('json', res)
+                self.assertTrue(
+                    port['port'][portbindings.VIF_DETAILS]['vlan-transparent'])
 
     @common_v3.with_disable_dhcp
     def test_requested_subnet_id_v4_and_v6(self):

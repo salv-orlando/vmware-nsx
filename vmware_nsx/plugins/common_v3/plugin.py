@@ -1151,6 +1151,15 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if bindings:
             return bindings[0].vlan_id
 
+    def _get_network_vlan_transparent(self, context, network_id):
+        if not cfg.CONF.vlan_transparent:
+            return False
+        # Get this flag directly from DB to improve performance
+        db_entry = context.session.query(models_v2.Network).filter_by(
+            id=network_id).first()
+        if db_entry:
+            return True if db_entry.vlan_transparent else False
+
     def _extend_nsx_port_dict_binding(self, context, port_data):
         # Not using the register api for this because we need the context
         # Some attributes were already initialized by _extend_port_portbinding
@@ -1173,6 +1182,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if port_data[pbin.VNIC_TYPE] != pbin.VNIC_NORMAL:
                 port_data[pbin.VIF_DETAILS]['segmentation-id'] = (
                     self._get_network_segmentation_id(context, net_id))
+                port_data[pbin.VIF_DETAILS]['vlan-transparent'] = (
+                    self._get_network_vlan_transparent(context, net_id))
 
     def _extend_qos_port_dict_binding(self, context, port):
         # add the qos policy id from the DB
