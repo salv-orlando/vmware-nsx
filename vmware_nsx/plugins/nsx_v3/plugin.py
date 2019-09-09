@@ -970,6 +970,12 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                         {'network': {'vlan_transparent': vlt}})
 
             rollback_network = True
+
+            # this extra lookup is necessary to get the
+            # latest db model for the extension functions
+            net_model = self._get_network(context, created_net['id'])
+            resource_extend.apply_funcs('networks', created_net, net_model)
+
             if is_backend_network:
                 self._create_net_mdproxy_port(
                     context, created_net, az, nsx_net_id)
@@ -989,11 +995,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 if rollback_network:
                     super(NsxV3Plugin, self).delete_network(
                         context, created_net['id'])
-
-        # this extra lookup is necessary to get the
-        # latest db model for the extension functions
-        net_model = self._get_network(context, created_net['id'])
-        resource_extend.apply_funcs('networks', created_net, net_model)
 
         # Update the QoS policy (will affect only future compute ports)
         qos_com_utils.set_qos_policy_on_new_net(

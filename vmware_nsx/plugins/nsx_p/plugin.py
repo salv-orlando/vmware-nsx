@@ -743,6 +743,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     super(NsxPolicyPlugin, self).delete_network(
                         context, net_id)
 
+        # this extra lookup is necessary to get the
+        # latest db model for the extension functions
+        net_model = self._get_network(context, net_id)
+        resource_extend.apply_funcs('networks', created_net, net_model)
+
         # MD Proxy is currently supported by the passthrough api only
         if is_backend_network and cfg.CONF.nsx_p.allow_passthrough:
             try:
@@ -754,11 +759,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             except Exception as e:
                 LOG.error("Failed to create mdproxy port for network %s: %s",
                           net_id, e)
-
-        # this extra lookup is necessary to get the
-        # latest db model for the extension functions
-        net_model = self._get_network(context, net_id)
-        resource_extend.apply_funcs('networks', created_net, net_model)
 
         # Update the QoS policy (will affect only future compute ports)
         qos_com_utils.set_qos_policy_on_new_net(
