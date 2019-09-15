@@ -961,10 +961,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _default_physical_net(self, physical_net):
         return physical_net is None or physical_net == 'default'
 
-    def _validate_provider_create(self, context, network_data,
-                                  default_vlan_tz_uuid,
-                                  default_overlay_tz_uuid,
-                                  mdproxy_uuid,
+    def _validate_provider_create(self, context, network_data, az,
                                   nsxlib_tz, nsxlib_network,
                                   transparent_vlan=False):
         """Validate the parameters of a new provider network
@@ -977,6 +974,11 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         - vlan_id: vlan tag, 0 or None
         - switch_mode: standard or ENS
         """
+        # initialize the relevant parameters from the AZ
+        default_vlan_tz_uuid = az._default_vlan_tz_uuid
+        default_overlay_tz_uuid = az._default_overlay_tz_uuid
+        mdproxy_uuid = az._native_md_proxy_uuid
+
         is_provider_net = any(
             validators.is_attr_set(network_data.get(f))
             for f in (pnet.NETWORK_TYPE,
@@ -1107,9 +1109,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 switch_mode = nsxlib_tz.get_host_switch_mode(physical_net)
 
         # validate the mdproxy TZ matches this one.
-        if (not err_msg and physical_net and self.nsxlib and
+        if (not err_msg and physical_net and
             self._has_native_dhcp_metadata()):
-            if not self._validate_net_mdproxy_tz(physical_net, mdproxy_uuid):
+            if not self._validate_net_mdproxy_tz(
+                az, physical_net, mdproxy_uuid):
                 err_msg = (_('Network TZ %(tz)s does not match MD proxy '
                              '%(md)s edge cluster') %
                            {'tz': physical_net, 'md': mdproxy_uuid})
@@ -1129,19 +1132,11 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 'vlan_id': vlan_id,
                 'switch_mode': switch_mode}
 
-    def _validate_net_mdproxy_tz(self, tz_uuid, mdproxy_uuid):
-        """Validate that the network TZ matches the mdproxy edge cluster"""
-        # TODO(asarfaty): separate the validation when using policy mdproxy
-        mdproxy_obj = self.nsxlib.native_md_proxy.get(mdproxy_uuid)
-        ec_id = mdproxy_obj['edge_cluster_id']
-        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
-        ec_tzs = []
-        for tn_uuid in ec_nodes:
-            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
-                tn_uuid))
-        if tz_uuid not in ec_tzs:
-            return False
-        return True
+    def _validate_net_mdproxy_tz(self, az, tz_uuid, mdproxy_uuid):
+        """Validate that the network TZ matches the mdproxy edge cluster
+        Should be implemented by each plugin.
+        """
+        pass
 
     def _network_is_nsx_net(self, context, network_id):
         bindings = nsx_db.get_network_bindings(context.session, network_id)
@@ -1944,18 +1939,15 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 {'router': {az_def.AZ_HINTS: az_hints}})
 
     def get_network_availability_zones(self, net_db):
-        if self._has_native_dhcp_metadata():
-            hints = az_validator.convert_az_string_to_list(
-                net_db[az_def.AZ_HINTS])
-            # When using the configured AZs, the az will always be the same
-            # as the hint (or default if none)
-            if hints:
-                az_name = hints[0]
-            else:
-                az_name = self.get_default_az().name
-            return [az_name]
+        hints = az_validator.convert_az_string_to_list(
+            net_db[az_def.AZ_HINTS])
+        # When using the configured AZs, the az will always be the same
+        # as the hint (or default if none)
+        if hints:
+            az_name = hints[0]
         else:
-            return []
+            az_name = self.get_default_az().name
+        return [az_name]
 
     def _get_router_az_obj(self, router):
         l3_attrs_db.ExtraAttributesMixin._extend_extra_router_dict(
@@ -1973,11 +1965,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                                 force=True)
 
     def _list_availability_zones(self, context, filters=None):
-        # If no native_dhcp_metadata - use neutron AZs
-        if not self._has_native_dhcp_metadata():
-            return super(NsxPluginV3Base, self)._list_availability_zones(
-                context, filters=filters)
-
         result = {}
         for az in self._availability_zones_data.list_availability_zones():
             # Add this availability zone as a network & router resource
@@ -1996,10 +1983,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if self._is_sub_plugin and not force:
             # validation should be done together for both plugins
             return
-        # If no native_dhcp_metadata - use neutron AZs
-        if not self._has_native_dhcp_metadata():
-            return super(NsxPluginV3Base, self).validate_availability_zones(
-                context, resource_type, availability_zones)
         # Validate against the configured AZs
         return self.validate_obj_azs(availability_zones)
 
@@ -2692,7 +2675,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                                   net_name or 'network'),
                                        net_id)
 
-    def _create_net_mdproxy_port(self, context, network, az, nsx_net_id):
+    def _create_net_mp_mdproxy_port(self, context, network, az, nsx_net_id):
+        """Add MD proxy on the MP logical-switch by creating a logical port"""
         if (not self.nsxlib or
             not self._has_native_dhcp_metadata()):
             return

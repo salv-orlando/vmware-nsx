@@ -21,6 +21,7 @@ from vmware_nsx.common import config
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.plugins.common_v3 import availability_zones as v3_az
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
+from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3.policy import utils as p_utils
 
 LOG = log.getLogger(__name__)
@@ -136,13 +137,37 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
             auto_config=True, is_mandatory=False,
             search_scope=search_scope)
 
+        self.use_policy_md = False
+        if (nsxpolicy.feature_supported(
+                nsx_constants.FEATURE_NSX_POLICY_MDPROXY)):
+            # Try to initialize md-proxy from the policy
+            try:
+                self._native_md_proxy_uuid = self._init_default_resource(
+                    nsxpolicy, nsxpolicy.md_proxy, 'metadata_proxy',
+                    auto_config=True, is_mandatory=True,
+                    search_scope=search_scope)
+                LOG.info("NSX-P az using policy MD proxy: %s",
+                    self._native_md_proxy_uuid)
+                self.use_policy_md = True
+            except Exception:
+                LOG.info("NSX-P az could not use policy MD proxy. Using MP "
+                         "one instead")
+
+        if not self.use_policy_md:
+            # Try to initialize md-proxy from the MP
+            if nsxlib:
+                self._translate_metadata_proxy(
+                    nsxlib, search_scope=search_scope)
+                LOG.info("NSX-P az using MP MD proxy: %s",
+                    self._native_md_proxy_uuid)
+            else:
+                self._native_md_proxy_uuid = None
+
         # If passthrough api is supported, also initialize those NSX objects
         if nsxlib:
             self._translate_dhcp_profile(nsxlib, search_scope=search_scope)
-            self._translate_metadata_proxy(nsxlib, search_scope=search_scope)
         else:
             self._native_dhcp_profile_uuid = None
-            self._native_md_proxy_uuid = None
 
     def _get_edge_cluster_tzs(self, nsxpolicy, nsxlib, ec_uuid):
         ec_nodes = nsxpolicy.edge_cluster.get_edge_node_ids(ec_uuid)

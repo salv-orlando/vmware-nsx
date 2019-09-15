@@ -98,6 +98,7 @@ from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import core_defs as policy_defs
+from vmware_nsxlib.v3.policy import utils as p_utils
 from vmware_nsxlib.v3 import security
 from vmware_nsxlib.v3 import utils as nsxlib_utils
 
@@ -586,7 +587,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def _create_network_on_backend(self, context, net_data,
                                    transparent_vlan,
-                                   provider_data):
+                                   provider_data, az):
         net_data['id'] = net_data.get('id') or uuidutils.generate_uuid()
 
         # update the network name to indicate the neutron id too.
@@ -612,13 +613,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         else:
             vlan_ids = None
 
+        kwargs = {
+            'segment_id': net_data['id'],
+            'description': net_data.get('description'),
+            'vlan_ids': vlan_ids,
+            'transport_zone_id': provider_data['physical_net'],
+            'tags': tags}
+
+        if az.use_policy_md:
+            kwargs['metadata_proxy_id'] = az._native_md_proxy_uuid
+
         self.nsxpolicy.segment.create_or_overwrite(
-            net_name,
-            segment_id=net_data['id'],
-            description=net_data.get('description'),
-            vlan_ids=vlan_ids,
-            transport_zone_id=provider_data['physical_net'],
-            tags=tags)
+            net_name, **kwargs)
 
         if not admin_state and cfg.CONF.nsx_p.allow_passthrough:
             # This api uses the passthrough api
@@ -691,10 +697,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             is_backend_network = False
         else:
             provider_data = self._validate_provider_create(
-                context, net_data,
-                az._default_vlan_tz_uuid,
-                az._default_overlay_tz_uuid,
-                az._native_md_proxy_uuid,
+                context, net_data, az,
                 self.nsxpolicy.transport_zone,
                 self.nsxpolicy.segment,
                 transparent_vlan=vlt)
@@ -739,7 +742,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if is_backend_network:
             try:
                 self._create_network_on_backend(
-                    context, created_net, vlt, provider_data)
+                    context, created_net, vlt, provider_data, az)
             except Exception as e:
                 LOG.exception("Failed to create NSX network network: %s", e)
                 with excutils.save_and_reraise_exception():
@@ -752,12 +755,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         resource_extend.apply_funcs('networks', created_net, net_model)
 
         # MD Proxy is currently supported by the passthrough api only
-        if is_backend_network and cfg.CONF.nsx_p.allow_passthrough:
+        if (is_backend_network and not az.use_policy_md and
+            cfg.CONF.nsx_p.allow_passthrough):
             try:
                 # The new segment was not realized yet. Waiting for a bit.
                 time.sleep(cfg.CONF.nsx_p.realization_wait_sec)
                 nsx_net_id = self._get_network_nsx_id(context, net_id)
-                self._create_net_mdproxy_port(
+                self._create_net_mp_mdproxy_port(
                     context, created_net, az, nsx_net_id)
             except Exception as e:
                 LOG.exception("Failed to create mdproxy port for network %s: "
@@ -787,9 +791,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # checks on active ports
         self._retry_delete_network(context, network_id)
 
-        # MD Proxy is currently supported by the passthrough api only.
-        # Use it to delete mdproxy ports
-        if not is_external_net and cfg.CONF.nsx_p.allow_passthrough:
+        # Delete MD proxy port. This is relevant only if the plugin used
+        # MP MD proxy when this network is created.
+        # If not - the port will not be found, and it is ok.
+        # Note(asarfaty): In the future this code can be removed.
+        if (not is_external_net and cfg.CONF.nsx_p.allow_passthrough and
+            not self.nsxpolicy.feature_supported(
+                nsxlib_consts.FEATURE_NSX_POLICY_MDPROXY)):
             self._delete_nsx_port_by_network(network_id)
 
         # Delete the network segment from the backend
@@ -3116,3 +3124,28 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 extra_rules.extend(vpn_rules)
 
         return extra_rules
+
+    def _validate_net_mdproxy_tz(self, az, tz_uuid, mdproxy_uuid):
+        """Validate that the network TZ matches the mdproxy edge cluster"""
+        if not self.nsxlib:
+            # No passthrough api support
+            return True
+
+        if az.use_policy_md:
+            # Policy obj
+            md_ec_path = self.nsxpolicy.md_proxy.get(
+                mdproxy_uuid).get('edge_cluster_path')
+            md_ec = p_utils.path_to_id(md_ec_path)
+        else:
+            # MP obj
+            md_ec = self.nsxlib.native_md_proxy.get(
+                mdproxy_uuid).get('edge_cluster_id')
+
+        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(md_ec)
+        ec_tzs = []
+        for tn_uuid in ec_nodes:
+            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
+                tn_uuid))
+        if tz_uuid not in ec_tzs:
+            return False
+        return True
