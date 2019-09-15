@@ -919,7 +919,8 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
 
     def test_metadata_proxy_with_create_network(self):
         # Test if native metadata proxy is enabled on a network when it is
-        # created.
+        # created (Using MP MDproxy).
+        self.plugin._availability_zones_data._default_az.use_policy_md = False
         with mock.patch.object(nsx_resources.LogicalPort,
                                'create') as create_logical_port:
             with self.network() as network:
@@ -938,7 +939,9 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
 
     def test_metadata_proxy_with_create_az_network(self):
         # Test if native metadata proxy is enabled on a network when it is
-        # created.
+        # created (Using MP MDproxy).
+        azs = self.plugin._availability_zones_data.availability_zones
+        azs[self._az_name].use_policy_md = False
         with mock.patch.object(nsx_resources.LogicalPort,
                                'create') as create_logical_port:
             with self.network(
