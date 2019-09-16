@@ -72,7 +72,7 @@ class TestCreateSubnet(test_subnet.TestCreateSubnet):
         })
 
         self.assertEqual(self.columns, columns)
-        self.assertEqual(self.data, data)
+        self.assertItemEqual(self.data, data)
 
     def _test_create_with_tag(self, add_tags=True):
         self.skipTest('Unblock gate')
