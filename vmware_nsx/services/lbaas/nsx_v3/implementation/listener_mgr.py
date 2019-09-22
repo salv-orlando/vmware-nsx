@@ -357,14 +357,13 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             try:
                 app_client.delete(app_profile_id)
             except nsx_exc.NsxResourceNotFound:
-                msg = (_("application profile not found on nsx: %s") %
-                       app_profile_id)
-                raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
-            except nsxlib_exc.ManagerError:
-                completor(success=False)
-                msg = (_('Failed to delete application profile: %(app)s') %
-                       {'app': app_profile_id})
-                raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
+                LOG.error("application profile not found on nsx: %s",
+                          app_profile_id)
+            except nsxlib_exc.ManagerError as e:
+                # This probably means that the application profile is being
+                # used by a listener outside of openstack
+                LOG.error("Failed to delete application profile %s from the "
+                          "NSX: %s", app_profile_id, e)
 
             # Delete imported NSX cert if there is any
             cert_tags = [{'scope': lb_const.LB_LISTENER_TYPE,

@@ -290,11 +290,11 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         except nsxlib_exc.ResourceNotFound:
             LOG.error("application profile not found on nsx: %s",
                       app_profile_id)
-        except nsxlib_exc.ManagerError:
-            completor(success=False)
-            msg = (_('Failed to delete application profile: %(app)s') %
-                   {'app': app_profile_id})
-            raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
+        except nsxlib_exc.ManagerError as e:
+            # This probably means that the application profile is being
+            # used by a listener outside of openstack
+            LOG.error("Failed to delete application profile %s from the "
+                      "NSX: %s", app_profile_id, e)
 
         # Delete imported NSX cert if there is any
         if listener.get('default_tls_container_id'):
