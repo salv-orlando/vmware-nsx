@@ -15,6 +15,7 @@
 
 import contextlib
 import copy
+import re
 
 import decorator
 
@@ -4102,6 +4103,35 @@ class NsxVTestSecurityGroup(ext_sg.TestSecurityGroups,
         sg = self._plugin_create_security_group(_context)
         sg = self._plugin_update_security_group(_context, sg['id'], True)
         self.assertTrue(sg['logging'])
+
+    def _create_default_sg(self, ctx):
+        self.plugin._ensure_default_security_group(ctx, 'tenant_id')
+
+    def test_create_security_group_default_nsx_name(self):
+        _context = context.get_admin_context()
+        self._create_default_sg(_context)
+        with mock.patch.object(self.plugin.nsx_v.vcns,
+                               'create_security_group',
+                               return_value=({}, '3')) as nsxv_create:
+            self._plugin_create_security_group(_context)
+            created_sg = nsxv_create.call_args[0]
+            created_name = created_sg[0]['securitygroup']['name']
+            self.assertTrue(re.match(r'SG \(.*\)', created_name))
+
+    def test_create_security_group_non_default_nsx_name(self):
+        # Use non default nsx name format
+        cfg.CONF.set_override('nsx_sg_name_format', '%(name)s [%(id)s]',
+            group="nsxv")
+
+        _context = context.get_admin_context()
+        self._create_default_sg(_context)
+        with mock.patch.object(self.plugin.nsx_v.vcns,
+                               'create_security_group',
+                               return_value=({}, '3')) as nsxv_create:
+            self._plugin_create_security_group(_context)
+            created_sg = nsxv_create.call_args[0]
+            created_name = created_sg[0]['securitygroup']['name']
+            self.assertTrue(re.match(r'SG \[.*\]', created_name))
 
     def test_create_security_group_rule_bulk(self):
         """Verify that bulk rule create updates the backend section once"""

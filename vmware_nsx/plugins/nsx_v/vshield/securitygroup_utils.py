@@ -15,6 +15,7 @@
 
 import xml.etree.ElementTree as et
 
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from vmware_nsx.common import utils
@@ -154,7 +155,13 @@ class NsxSecurityGroupUtils(object):
         return et.fromstring(xml_string)
 
     def get_nsx_sg_name(self, sg_data):
-        return '%(name)s (%(id)s)' % sg_data
+        try:
+            return cfg.CONF.nsxv.nsx_sg_name_format % sg_data
+        except Exception as e:
+            # Illegal format:
+            LOG.error("get_nsx_sg_name failed due to invalid format %s: %s",
+                      cfg.CONF.nsxv.nsx_sg_name_format, e)
+            return '%(name)s (%(id)s)' % sg_data
 
     def get_nsx_section_name(self, sg_data):
         return 'SG Section: %s' % self.get_nsx_sg_name(sg_data)
