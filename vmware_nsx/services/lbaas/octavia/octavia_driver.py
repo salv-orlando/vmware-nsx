@@ -15,6 +15,7 @@
 
 import copy
 import socket
+import time
 
 from oslo_config import cfg
 from oslo_log import helpers as log_helpers
@@ -75,7 +76,6 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
     def __init__(self):
         super(NSXOctaviaDriver, self).__init__()
         self._init_rpc_messaging()
-        self._init_rpc_listener()
         self._init_cert_manager()
         self.repositories = repositories.Repositories()
 
@@ -87,20 +87,6 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                                   namespace='control', fanout=False,
                                   version='1.0')
         self.client = messaging.RPCClient(transport, target)
-
-    @log_helpers.log_method_call
-    def _init_rpc_listener(self):
-        # Initialize RPC listener
-        topic = d_const.DRIVER_TO_OCTAVIA_TOPIC
-        server = socket.gethostname()
-        target = messaging.Target(topic=topic, server=server,
-                                  exchange="common", fanout=False)
-        endpoints = [NSXOctaviaDriverEndpoint()]
-        access_policy = dispatcher.DefaultRPCAccessPolicy
-
-        self.octavia_server = get_rpc_server(target, endpoints,
-                                             access_policy)
-        self.octavia_server.start()
 
     @log_helpers.log_method_call
     def _init_cert_manager(self):
@@ -589,3 +575,22 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
         except exceptions.UpdateStatisticsError as e:
             LOG.error("Failed to update Octavia listener statistics. "
                       "Stats %s, Error %s", statistics, e.fault_string)
+
+
+@log_helpers.log_method_call
+def vmware_nsx_provider_agent(exit_event):
+    # Initialize RPC listener
+    topic = d_const.DRIVER_TO_OCTAVIA_TOPIC
+    server = socket.gethostname()
+    target = messaging.Target(topic=topic, server=server,
+                              exchange="common", fanout=False)
+    endpoints = [NSXOctaviaDriverEndpoint()]
+    access_policy = dispatcher.DefaultRPCAccessPolicy
+    get_transport()
+    octavia_server = get_rpc_server(target, endpoints, access_policy)
+    octavia_server.start()
+
+    LOG.info('VMware NSX Octavia provider agent has started.')
+    while not exit_event.is_set():
+        time.sleep(1)
+    LOG.info('VMware NSX Octavia provider agent is exiting.')

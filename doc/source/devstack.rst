@@ -155,6 +155,9 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     [controller_worker]
     network_driver = allowed_address_pairs_driver
 
+    [driver_agent]
+    enabled_provider_agents=vmwareagent
+
 NSX-T
 -----
 
@@ -279,6 +282,8 @@ Add octavia and python-octaviaclient repos as external repositories and configur
     [controller_worker]
     network_driver = allowed_address_pairs_driver
 
+    [driver_agent]
+    enabled_provider_agents=vmwareagent
 
 NSX-P
 -----
@@ -359,6 +364,9 @@ Add octavia and python-octaviaclient repos as external repositories and configur
 
     [controller_worker]
     network_driver = allowed_address_pairs_driver
+
+    [driver_agent]
+    enabled_provider_agents=vmwareagent
 
 Trunk Driver
 ~~~~~~~~~~~~
