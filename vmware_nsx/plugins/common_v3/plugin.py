@@ -978,6 +978,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _validate_provider_create(self, context, network_data,
                                   default_vlan_tz_uuid,
                                   default_overlay_tz_uuid,
+                                  mdproxy_uuid,
                                   nsxlib_tz, nsxlib_network,
                                   transparent_vlan=False):
         """Validate the parameters of a new provider network
@@ -1120,6 +1121,14 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if not err_msg:
                 switch_mode = nsxlib_tz.get_host_switch_mode(physical_net)
 
+        # validate the mdproxy TZ matches this one.
+        if (not err_msg and physical_net and self.nsxlib and
+            self._has_native_dhcp_metadata()):
+            if not self._validate_net_mdproxy_tz(physical_net, mdproxy_uuid):
+                err_msg = (_('Network TZ %(tz)s does not match MD proxy '
+                             '%(md)s edge cluster') %
+                           {'tz': physical_net, 'md': mdproxy_uuid})
+
         if err_msg:
             raise n_exc.InvalidInput(error_message=err_msg)
 
@@ -1134,6 +1143,20 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 'physical_net': physical_net,
                 'vlan_id': vlan_id,
                 'switch_mode': switch_mode}
+
+    def _validate_net_mdproxy_tz(self, tz_uuid, mdproxy_uuid):
+        """Validate that the network TZ matches the mdproxy edge cluster"""
+        # TODO(asarfaty): separate the validation when using policy mdproxy
+        mdproxy_obj = self.nsxlib.native_md_proxy.get(mdproxy_uuid)
+        ec_id = mdproxy_obj['edge_cluster_id']
+        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
+        ec_tzs = []
+        for tn_uuid in ec_nodes:
+            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
+                tn_uuid))
+            if tz_uuid not in ec_tzs:
+                return False
+        return True
 
     def _network_is_nsx_net(self, context, network_id):
         bindings = nsx_db.get_network_bindings(context.session, network_id)

@@ -818,6 +818,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             context, net_data,
             az._default_vlan_tz_uuid,
             az._default_overlay_tz_uuid,
+            az._native_md_proxy_uuid,
             self.nsxlib.transport_zone,
             self.nsxlib.logical_switch,
             transparent_vlan=transparent_vlan)

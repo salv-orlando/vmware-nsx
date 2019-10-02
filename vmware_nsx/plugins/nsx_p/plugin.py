@@ -692,6 +692,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 context, net_data,
                 az._default_vlan_tz_uuid,
                 az._default_overlay_tz_uuid,
+                az._native_md_proxy_uuid,
                 self.nsxpolicy.transport_zone,
                 self.nsxpolicy.segment,
                 transparent_vlan=vlt)
