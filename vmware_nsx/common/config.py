@@ -836,6 +836,10 @@ nsxv_opts = [
                 default=False,
                 help=_("Allow associating multiple IPs to VMs "
                        "without spoofguard limitations")),
+    cfg.StrOpt('nsx_sg_name_format',
+               default='%(name)s (%(id)s)',
+               help=_("(Optional) Format for the NSX name of an openstack "
+                      "security group")),
 ]
 
 # define the configuration of each NSX-V availability zone.
