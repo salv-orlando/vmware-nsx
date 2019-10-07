@@ -34,6 +34,7 @@ from vmware_nsx.common import config  # noqa
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs_utils
 from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as nsxp_utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import migration
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as nsxv_utils
 from vmware_nsx.shell.admin.plugins.nsxv3.resources import utils as nsxv3_utils
 from vmware_nsx.shell import resources
@@ -61,6 +62,7 @@ class AbstractTestAdminUtils(base.BaseTestCase):
         # remove resource registration conflicts
         resource_registry.unregister_all_resources()
 
+        self.edgeapi = nsxv_utils.NeutronDbClient()
         # Init the neutron config
         neutron_config.init(args=['--config-file', BASE_CONF_PATH,
                                   '--config-file', NSX_INI_PATH])
@@ -115,9 +117,7 @@ class AbstractTestAdminUtils(base.BaseTestCase):
         data = {'router': {'tenant_id': tenant_id}}
         data['router']['name'] = 'dummy'
         data['router']['admin_state_up'] = True
-
-        edgeapi = nsxv_utils.NeutronDbClient()
-        return self._plugin.create_router(edgeapi.context, data)
+        return self._plugin.create_router(self.edgeapi.context, data)
 
 
 class TestNsxvAdminUtils(AbstractTestAdminUtils,
@@ -160,12 +160,16 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
                    side_effect=get_plugin_mock).start()
 
         # Create a router to make sure we have deployed an edge
-        self.router = self.create_router()
+        self.router = self._create_router()
+        self.network = self._create_net()
 
     def tearDown(self):
         if self.router and self.router.get('id'):
-            edgeapi = nsxv_utils.NeutronDbClient()
-            self._plugin.delete_router(edgeapi.context, self.router['id'])
+            self._plugin.delete_router(
+                self.edgeapi.context, self.router['id'])
+        if self.network and self.network.get('id'):
+            self._plugin.delete_network(
+                self.edgeapi.context, self.network['id'])
         super(TestNsxvAdminUtils, self).tearDown()
 
     def test_nsxv_resources(self):
@@ -176,7 +180,7 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
         args['property'].extend(params)
         self._test_resource('edges', 'nsx-update', **args)
 
-    def create_router(self):
+    def _create_router(self):
         # Create an exclusive router (with an edge)
         tenant_id = uuidutils.generate_uuid()
         data = {'router': {'tenant_id': tenant_id}}
@@ -184,12 +188,31 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
         data['router']['admin_state_up'] = True
         data['router']['router_type'] = 'exclusive'
 
-        edgeapi = nsxv_utils.NeutronDbClient()
-        return self._plugin.create_router(edgeapi.context, data)
+        return self._plugin.create_router(self.edgeapi.context, data)
+
+    def _create_net(self):
+        tenant_id = uuidutils.generate_uuid()
+        data = {'network': {'tenant_id': tenant_id,
+                            'name': 'dummy',
+                            'admin_state_up': True,
+                            'shared': False}}
+        net = self._plugin.create_network(self.edgeapi.context, data)
+        data = {'subnet': {'tenant_id': tenant_id,
+                           'name': 'dummy',
+                           'admin_state_up': True,
+                           'network_id': net['id'],
+                           'cidr': '1.1.1.0/16',
+                           'enable_dhcp': True,
+                           'ip_version': 4,
+                           'dns_nameservers': None,
+                           'host_routes': None,
+                           'allocation_pools': None}}
+        self._plugin.create_subnet(self.edgeapi.context, data)
+        return net
 
     def get_edge_id(self):
-        edgeapi = nsxv_utils.NeutronDbClient()
-        bindings = nsxv_db.get_nsxv_router_bindings(edgeapi.context.session)
+        bindings = nsxv_db.get_nsxv_router_bindings(
+            self.edgeapi.context.session)
         for binding in bindings:
             if binding.edge_id:
                 return binding.edge_id
@@ -242,6 +265,17 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
         edge_id = self.get_edge_id()
         args = {'property': ["edge-id=%s" % edge_id]}
         self._test_resource('routers', 'nsx-recreate', **args)
+
+    def test_migration_validation(self):
+        # check that validation fails
+        args = {'property': ["transit-network=1.1.1.0/24"]}
+        try:
+            migration.validate_config_for_migration(
+                'nsx-migrate-v2t', 'validate', None, **args)
+        except SystemExit:
+            return
+        else:
+            self.assertTrue(False)
 
 
 class TestNsxv3AdminUtils(AbstractTestAdminUtils,

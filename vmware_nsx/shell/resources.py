@@ -243,6 +243,8 @@ nsxv_resources = {
     constants.BGP_NEIGHBOUR: Resource(constants.BGP_NEIGHBOUR,
                                       [Operations.CREATE.value,
                                        Operations.DELETE.value]),
+    constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
+                                        [Operations.VALIDATE.value]),
 }
 
 
