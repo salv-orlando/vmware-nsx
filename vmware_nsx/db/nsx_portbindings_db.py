@@ -95,6 +95,11 @@ class NsxPortBindingMixin(pbin_db.PortBindingMixin):
     def _process_portbindings_create_and_update(
         self, context, port, port_res,
         vif_type=nsx_constants.VIF_TYPE_DVS):
+
+        # Allow clearing the host id
+        if pbin.HOST_ID in port and port[pbin.HOST_ID] is None:
+            port[pbin.HOST_ID] = ''
+
         super(NsxPortBindingMixin,
               self)._process_portbindings_create_and_update(
                   context, port, port_res)

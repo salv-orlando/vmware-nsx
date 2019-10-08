@@ -1929,6 +1929,22 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
     def test_requested_subnet_id_v4_and_v6(self):
         return super(TestPortsV2, self).test_requested_subnet_id_v4_and_v6()
 
+    def test_port_binding_host(self):
+        with self.port() as port:
+            # add host
+            data = {'port': {portbindings.HOST_ID: 'abc'}}
+            req = self.new_update_request('ports',
+                                          data, port['port']['id'])
+            res = self.deserialize('json', req.get_response(self.api))
+            self.assertEqual('abc', res['port'][portbindings.HOST_ID])
+
+            # remove host
+            data = {'port': {portbindings.HOST_ID: None}}
+            req = self.new_update_request('ports',
+                                          data, port['port']['id'])
+            res = self.deserialize('json', req.get_response(self.api))
+            self.assertEqual('', res['port'][portbindings.HOST_ID])
+
 
 class DHCPOptsTestCase(test_dhcpopts.TestExtraDhcpOpt,
                        NsxV3PluginTestCaseMixin):
