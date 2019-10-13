@@ -148,7 +148,9 @@ class NsxPPluginTestCaseMixin(
         mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportNode."
                    "get_transport_zones",
                    return_value=[NSX_OVERLAY_TZ_NAME,
-                                 NSX_VLAN_TZ_NAME]).start()
+                                 NSX_VLAN_TZ_NAME, mock.ANY]).start()
+        mock.patch("vmware_nsxlib.v3.core_resources.NsxLibEdgeCluster."
+                   "get_transport_nodes", return_value=["dummy"]).start()
 
     def _mock_nsxlib_backend_calls(self):
         """Mock nsxlib backend calls used as passthrough
