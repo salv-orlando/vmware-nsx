@@ -1000,7 +1000,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         physical_net = network_data.get(pnet.PHYSICAL_NETWORK)
         if not validators.is_attr_set(physical_net):
             physical_net = None
-
         vlan_id = network_data.get(pnet.SEGMENTATION_ID)
         if not validators.is_attr_set(vlan_id):
             vlan_id = None
@@ -1154,8 +1153,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         for tn_uuid in ec_nodes:
             ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
                 tn_uuid))
-            if tz_uuid not in ec_tzs:
-                return False
+        if tz_uuid not in ec_tzs:
+            return False
         return True
 
     def _network_is_nsx_net(self, context, network_id):

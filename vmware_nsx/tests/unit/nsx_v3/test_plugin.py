@@ -182,6 +182,13 @@ def _mock_nsx_backend_calls():
     mock.patch('vmware_nsxlib.v3.core_resources.NsxLibTransportZone.'
                'get_transport_type', return_value='OVERLAY').start()
 
+    mock.patch("vmware_nsxlib.v3.core_resources.NsxLibEdgeCluster."
+               "get_transport_nodes", return_value=['dummy']).start()
+
+    mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportNode."
+               "get_transport_zones",
+               return_value=[NSX_TZ_NAME, mock.ANY]).start()
+
 
 class NsxV3PluginTestCaseMixin(test_plugin.NeutronDbPluginV2TestCase,
                                nsxlib_testcase.NsxClientTestCase):
@@ -2797,7 +2804,7 @@ class TestL3NatTestCase(L3NatTest,
                     router_id, ext_subnet['network_id'])
                 # Checking that router update is being called with
                 # edge_cluster_uuid, for creating a service router
-                change_sr.assert_called_once_with(
+                change_sr.assert_any_call(
                     mock.ANY, edge_cluster_id=NSX_EDGE_CLUSTER_UUID,
                     enable_standby_relocation=True)
 
@@ -3161,7 +3168,7 @@ class TestL3NatTestCase(L3NatTest,
                 router_id = r['router']['id']
                 self._add_external_gateway_to_router(
                     router_id, ext_subnet['network_id'])
-                change_sr.assert_called_once_with(
+                change_sr.assert_any_call(
                     mock.ANY, edge_cluster_id=edge_cluster,
                     enable_standby_relocation=True)
         self.mock_get_edge_cluster.start()
