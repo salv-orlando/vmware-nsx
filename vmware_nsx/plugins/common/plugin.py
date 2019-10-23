@@ -41,6 +41,7 @@ from neutron_lib.utils import net as nl_net_utils
 
 from vmware_nsx._i18n import _
 from vmware_nsx.common import exceptions as nsx_exc
+from vmware_nsx.extensions import secgroup_rule_local_ip_prefix as sg_prefix
 from vmware_nsx.services.qos.common import utils as qos_com_utils
 
 LOG = logging.getLogger(__name__)
@@ -425,6 +426,19 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
             msg = _('Associating floatingip to %s port is '
                     'restricted') % dev_owner
             raise n_exc.BadRequest(resource='floatingip', msg=msg)
+
+    def _fix_sg_rule_dict_ips(self, sg_rule):
+        # 0.0.0.0/# and ::/ are not valid entries for local and remote so we
+        # need to change this to None
+        if (sg_rule.get('remote_ip_prefix') and
+            (sg_rule['remote_ip_prefix'].startswith('0.0.0.0/') or
+             sg_rule['remote_ip_prefix'].startswith('::/'))):
+            sg_rule['remote_ip_prefix'] = None
+        if (sg_rule.get(sg_prefix.LOCAL_IP_PREFIX) and
+            validators.is_attr_set(sg_rule[sg_prefix.LOCAL_IP_PREFIX]) and
+            (sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('0.0.0.0/') or
+             sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('::/'))):
+            sg_rule[sg_prefix.LOCAL_IP_PREFIX] = None
 
     def get_housekeeper(self, context, name, fields=None):
         # run the job in readonly mode and get the results
