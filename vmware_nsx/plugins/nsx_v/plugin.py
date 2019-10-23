@@ -4786,6 +4786,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 rule = r['security_group_rule']
                 if not self._check_local_ip_prefix(context, rule):
                     rule[secgroup_rule_local_ip_prefix.LOCAL_IP_PREFIX] = None
+                self._fix_sg_rule_dict_ips(rule)
                 rule['id'] = rule.get('id') or uuidutils.generate_uuid()
                 ruleids.add(rule['id'])
                 nsx_rules.append(
