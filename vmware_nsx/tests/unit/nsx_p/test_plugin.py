@@ -1983,6 +1983,20 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                     r['router']['id'], n['network']['id'],
                     expected_code=exc.HTTPBadRequest.code)
 
+    def test_route_update_illegal_ip_ver(self):
+        routes = [{'destination': '21.0.0.0/24',
+                   'nexthop': 'fd00::d6c'}]
+        with self.router() as r:
+            with self.subnet(cidr='fd00::0/64', ip_version=6,
+                             enable_dhcp=False) as s:
+                fixed_ip_data = [{'ip_address': 'fd00::2'}]
+                with self.port(subnet=s, fixed_ips=fixed_ip_data) as p:
+                    self._router_interface_action(
+                        'add', r['router']['id'], None, p['port']['id'])
+                    self._update('routers', r['router']['id'],
+                                 {'router': {'routes': routes}},
+                                 expected_code=400)
+
     def test_router_update_on_external_port(self):
         with self.router() as r:
             with self._create_l3_ext_network() as ext_net,\

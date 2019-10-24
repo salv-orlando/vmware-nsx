@@ -1461,6 +1461,19 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     LOG.error(error_message)
                     raise n_exc.InvalidInput(error_message=error_message)
 
+    def _validate_routes(self, context, router_id, routes):
+        super(NsxPluginV3Base, self)._validate_routes(
+            context, router_id, routes)
+        # routes with mixed ip versions are not allowed
+        for route in routes:
+            if route.get('destination') and route.get('nexthop'):
+                dest_ver = netaddr.IPNetwork(route['destination']).version
+                nexthop_ver = netaddr.IPAddress(route['nexthop']).version
+                if dest_ver != nexthop_ver:
+                    msg = _("Static route network CIDR and next hop IP "
+                            "addresses must be same address family.")
+                    raise n_exc.BadRequest(resource='router', msg=msg)
+
     def _get_static_routes_diff(self, context, router_id, gw_info,
                                 router_data):
         new_routes = router_data['routes']
