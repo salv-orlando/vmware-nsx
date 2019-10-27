@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
+
 from neutron_lib.api.definitions import network as net_def
 from neutron_lib.api.definitions import port as port_def
 from neutron_lib.api.definitions import subnet as subnet_def
@@ -538,7 +540,8 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if ((fields and as_providers.ADV_SERVICE_PROVIDERS in fields) or
             (filters and filters.get(as_providers.ADV_SERVICE_PROVIDERS))):
             for plugin in self.as_providers.values():
-                subnets = plugin.get_subnets(context, filters=filters,
+                f = copy.copy(filters)
+                subnets = plugin.get_subnets(context, filters=f,
                                              fields=fields, sorts=sorts,
                                              limit=limit, marker=marker,
                                              page_reverse=page_reverse)
