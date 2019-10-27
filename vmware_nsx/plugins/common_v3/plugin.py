@@ -1516,7 +1516,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             dhcp_profile_id=az._native_dhcp_profile_uuid,
             tags=net_tags)
 
-    def _enable_native_dhcp(self, context, network, subnet):
+    def _enable_native_dhcp(self, context, network, subnet, az=None):
         # Enable native DHCP service on the backend for this network.
         # First create a Neutron DHCP port and use its assigned IP
         # address as the DHCP server address in an API call to create a
@@ -1545,7 +1545,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.error(msg)
             raise nsx_exc.NsxPluginException(err_msg=msg)
 
-        az = self.get_network_az_by_net_id(context, network['id'])
+        if not az:
+            az = self.get_network_az_by_net_id(context, network['id'])
         port_data = {
             "name": "",
             "admin_state_up": True,
@@ -2044,6 +2045,32 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.error(msg)
             raise n_exc.InvalidInput(error_message=msg)
 
+    def _validate_net_dhcp_profile(self, context, network, az):
+        """Validate that the dhcp profile edge cluster match the one of
+           the network TZ
+        """
+        if not self.nsxlib:
+            msg = (_("Native DHCP is not supported since "
+                     "passthough API is disabled"))
+            LOG.error(msg)
+            raise n_exc.InvalidInput(error_message=msg)
+
+        net_tz = self._get_net_tz(context, network['id'])
+        dhcp_profile = az._native_dhcp_profile_uuid
+        dhcp_obj = self.nsxlib.native_dhcp_profile.get(dhcp_profile)
+        ec_id = dhcp_obj['edge_cluster_id']
+        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
+        ec_tzs = []
+        for tn_uuid in ec_nodes:
+            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
+                tn_uuid))
+        if net_tz not in ec_tzs:
+            msg = (_('Network TZ %(tz)s does not match DHCP profile '
+                     '%(dhcp)s edge cluster') %
+                   {'tz': net_tz, 'dhcp': dhcp_profile})
+            LOG.error(msg)
+            raise n_exc.InvalidInput(error_message=msg)
+
     def _create_subnet(self, context, subnet):
         self._validate_number_of_subnet_static_routes(subnet)
         self._validate_host_routes_input(subnet)
@@ -2058,14 +2085,28 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
             self._validate_external_subnet(context, net_id)
             self._ensure_native_dhcp()
+            net_az = self.get_network_az_by_net_id(context, net_id)
+            self._validate_net_dhcp_profile(context, network, net_az)
             lock = 'nsxv3_network_' + net_id
             ddi_support, ddi_type = self._is_ddi_supported_on_net_with_type(
                 context, net_id, network=network)
+            dhcp_relay = self._get_net_dhcp_relay(context, net_id)
             with locking.LockManager.get_lock(lock):
+                msg = None
                 # Check if it is on an overlay network and is the first
                 # DHCP-enabled subnet to create.
                 if ddi_support:
                     if self._has_no_dhcp_enabled_subnet(context, network):
+
+                        if not dhcp_relay and not self.nsxlib:
+                            # cannot create DHCP for this subnet
+                            msg = (_("Native DHCP is not supported since "
+                                     "passthough API is disabled"))
+                            LOG.error(msg)
+                            raise n_exc.InvalidInput(error_message=msg)
+
+                        # Create the neutron subnet.
+                        # Any failure from here and on will require rollback.
                         created_subnet = super(
                             NsxPluginV3Base, self).create_subnet(context,
                                                                  subnet)
@@ -2080,25 +2121,20 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                             with excutils.save_and_reraise_exception():
                                 super(NsxPluginV3Base, self).delete_subnet(
                                     context, created_subnet['id'])
+
                         self._extension_manager.process_create_subnet(context,
                             subnet['subnet'], created_subnet)
-                        dhcp_relay = self._get_net_dhcp_relay(context, net_id)
                         if not dhcp_relay:
-                            if self.nsxlib:
-                                try:
-                                    self._enable_native_dhcp(context, network,
-                                                             created_subnet)
-                                except nsx_lib_exc.ManagerError:
-                                    with excutils.save_and_reraise_exception():
-                                        super(NsxPluginV3Base,
-                                              self).delete_subnet(
-                                            context, created_subnet['id'])
-                            else:
-                                msg = (_("Native DHCP is not supported since "
-                                         "passthough API is disabled"))
-                            self._enable_native_dhcp(context, network,
-                                                     created_subnet)
-                        msg = None
+                            try:
+                                self._enable_native_dhcp(
+                                    context, network, created_subnet,
+                                    az=net_az)
+                            except (nsx_lib_exc.ManagerError,
+                                    nsx_exc.NsxPluginException):
+                                with excutils.save_and_reraise_exception():
+                                    super(NsxPluginV3Base,
+                                          self).delete_subnet(
+                                        context, created_subnet['id'])
                     else:
                         msg = (_("Can not create more than one DHCP-enabled "
                                 "subnet in network %s") % net_id)
@@ -2110,6 +2146,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     LOG.error(msg)
                     raise n_exc.InvalidInput(error_message=msg)
         else:
+            # Subnet without DHCP
             created_subnet = super(NsxPluginV3Base, self).create_subnet(
                 context, subnet)
             try:
@@ -2310,13 +2347,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         if ddi_support:
                             if self._has_no_dhcp_enabled_subnet(
                                 context, network):
+                                net_az = self.get_network_az_by_net_id(
+                                    context, orig_subnet['network_id'])
+                                self._validate_net_dhcp_profile(
+                                    context, network, net_az)
                                 updated_subnet = super(
                                     NsxPluginV3Base, self).update_subnet(
                                     context, subnet_id, subnet)
                                 self._extension_manager.process_update_subnet(
                                     context, subnet['subnet'], updated_subnet)
-                                self._enable_native_dhcp(context, network,
-                                                         updated_subnet)
+                                self._enable_native_dhcp(
+                                    context, network, updated_subnet,
+                                    az=net_az)
                                 msg = None
                             else:
                                 msg = (_("Multiple DHCP-enabled subnets is "
