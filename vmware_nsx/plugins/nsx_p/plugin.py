@@ -136,7 +136,9 @@ NAT_RULE_PRIORITY_GW = 3000
 
 NSX_P_CLIENT_SSL_PROFILE = 'neutron-client-ssl-profile'
 
-NET_NSX_ID_CACHE = {}
+# Cache for mapping between network ids in neutron and NSX (MP)
+NET_NEUTRON_2_NSX_ID_CACHE = {}
+NET_NSX_2_NEUTRON_ID_CACHE = {}
 
 
 @resource_extend.has_resource_extenders
@@ -810,9 +812,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                        {'id': network_id, 'e': e})
                 raise nsx_exc.NsxPluginException(err_msg=msg)
 
-        # Remove from cache
-        if network_id in NET_NSX_ID_CACHE:
-            del NET_NSX_ID_CACHE[network_id]
+        # Remove from caches
+        if network_id in NET_NEUTRON_2_NSX_ID_CACHE:
+            nsx_id = NET_NEUTRON_2_NSX_ID_CACHE[network_id]
+            del NET_NEUTRON_2_NSX_ID_CACHE[network_id]
+            del NET_NSX_2_NEUTRON_ID_CACHE[nsx_id]
 
     def update_network(self, context, network_id, network):
         original_net = super(NsxPolicyPlugin, self).get_network(
@@ -967,23 +971,24 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         If it was not realized or timed out retrying, it will return None
         The nova api will use this to attach to the instance.
         """
-        if network_id in NET_NSX_ID_CACHE:
-            return NET_NSX_ID_CACHE[network_id]
+        if network_id in NET_NEUTRON_2_NSX_ID_CACHE:
+            return NET_NEUTRON_2_NSX_ID_CACHE[network_id]
 
         if not self._network_is_external(context, network_id):
             segment_id = self._get_network_nsx_segment_id(context, network_id)
             try:
                 nsx_id = self.nsxpolicy.segment.get_realized_logical_switch_id(
                     segment_id)
-                # Add result to cache
-                NET_NSX_ID_CACHE[network_id] = nsx_id
+                # Add result to caches
+                NET_NEUTRON_2_NSX_ID_CACHE[network_id] = nsx_id
+                NET_NSX_2_NEUTRON_ID_CACHE[nsx_id] = network_id
                 return nsx_id
             except nsx_lib_exc.ManagerError:
                 LOG.error("Network %s was not realized", network_id)
                 # Do not cache this result
         else:
             # Add empty result to cache
-            NET_NSX_ID_CACHE[network_id] = None
+            NET_NEUTRON_2_NSX_ID_CACHE[network_id] = None
 
     def _get_network_nsx_segment_id(self, context, network_id):
         """Return the NSX segment ID matching the neutron network id
@@ -2961,7 +2966,31 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return True
 
     def _get_neutron_net_ids_by_nsx_id(self, context, lswitch_id):
-        return [lswitch_id]
+        """Translate nsx ls IDs given by Nova to neutron network ids.
+
+        Since there is no DB mapping for this, the plugin will query the NSX
+        for this, and cache the results.
+        """
+        if lswitch_id not in NET_NSX_2_NEUTRON_ID_CACHE:
+            # Go to the nsx using passthrough api to get the neutron id
+            if not cfg.CONF.nsx_p.allow_passthrough:
+                LOG.warning("Cannot get neutron id for ls %s without "
+                            "passthrough api", lswitch_id)
+                return []
+            ls = self.nsxlib.logical_switch.get(lswitch_id)
+            neutron_id = None
+            for tag in ls.get('tags', []):
+                if tag['scope'] == 'os-neutron-net-id':
+                    neutron_id = tag['tag']
+                    break
+            if neutron_id:
+                # Cache the result
+                NET_NSX_2_NEUTRON_ID_CACHE[lswitch_id] = neutron_id
+                NET_NEUTRON_2_NSX_ID_CACHE[neutron_id] = lswitch_id
+
+        if NET_NSX_2_NEUTRON_ID_CACHE.get(lswitch_id):
+            return [NET_NSX_2_NEUTRON_ID_CACHE[lswitch_id]]
+        return []
 
     def _get_net_tz(self, context, net_id):
         bindings = nsx_db.get_network_bindings(context.session, net_id)

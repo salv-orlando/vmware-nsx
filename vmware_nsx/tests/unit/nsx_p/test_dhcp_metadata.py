@@ -967,11 +967,16 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
                 self.assertEqual(len(subnets), 2)
                 self.assertEqual(set([s['id'] for s in subnets]),
                                  set([s1['subnet']['id'], s2['subnet']['id']]))
-                lswitch_id = n1['network']['id']
+                lswitch_id = 'dummy'
+                neutron_id = n1['network']['id']
+                nsx_tag = {'tag': neutron_id, 'scope': 'os-neutron-net-id'}
                 # Get only the subnets associated with a particular advanced
                 # service provider (i.e. logical switch).
-                subnets = self._list('subnets', query_params='%s=%s' %
-                                     (as_providers.ADV_SERVICE_PROVIDERS,
-                                      lswitch_id))['subnets']
-                self.assertEqual(len(subnets), 1)
-                self.assertEqual(subnets[0]['id'], s1['subnet']['id'])
+                with mock.patch('vmware_nsxlib.v3.core_resources.'
+                                'NsxLibLogicalSwitch.get',
+                                return_value={'tags': [nsx_tag]}):
+                    subnets = self._list('subnets', query_params='%s=%s' %
+                                         (as_providers.ADV_SERVICE_PROVIDERS,
+                                          lswitch_id))['subnets']
+                    self.assertEqual(len(subnets), 1)
+                    self.assertEqual(subnets[0]['id'], s1['subnet']['id'])
