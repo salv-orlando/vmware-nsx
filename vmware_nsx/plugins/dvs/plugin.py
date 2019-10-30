@@ -132,6 +132,21 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
     def is_tvd_plugin():
         return False
 
+    def plugin_extend_port_dict_binding(self, context, result):
+        result[pbin.VIF_TYPE] = nsx_constants.VIF_TYPE_DVS
+        if not result['id']:
+            return
+        db_vnic_type = nsxv_db.get_nsxv_ext_attr_port_vnic_type(
+            context.session, result['id'])
+        if db_vnic_type:
+            result[pbin.VNIC_TYPE] = db_vnic_type
+        else:
+            result[pbin.VNIC_TYPE] = pbin.VNIC_NORMAL
+        result[pbin.VIF_DETAILS] = {
+            # TODO(rkukura): Replace with new VIF security details
+            # security-groups extension supported by this plugin
+            pbin.CAP_PORT_FILTER: True}
+
     @staticmethod
     def _extend_port_dict_binding(result, portdb):
         result[pbin.VIF_TYPE] = nsx_constants.VIF_TYPE_DVS
@@ -492,12 +507,7 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
         # DB Operation is complete, perform DVS operation
         port_data = port['port']
 
-        # this extra lookup is necessary to get the
-        # latest db model for the extension functions
-        port_model = self._get_port(context, port_data['id'])
-        resource_extend.apply_funcs('ports', port_data, port_model)
-        self._extend_port_dict_binding(port_data, port_model)
-
+        self.plugin_extend_port_dict_binding(context, port_data)
         self.handle_port_dhcp_access(context, port_data, action='create_port')
         return port_data
 
@@ -595,21 +605,13 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
                       limit, marker, page_reverse))
             # Add port extensions
             for port in ports:
-                if 'id' in port:
-                    port_model = self._get_port(context, port['id'])
-                    resource_extend.apply_funcs('ports', port, port_model)
-                    self._extend_port_dict_binding(port, port_model)
+                self.plugin_extend_port_dict_binding(context, port)
         return (ports if not fields else
                 [db_utils.resource_fields(port, fields) for port in ports])
 
     def get_port(self, context, id, fields=None):
         port = super(NsxDvsV2, self).get_port(context, id, fields=None)
-        if 'id' in port:
-            port_model = self._get_port(context, port['id'])
-            resource_extend.apply_funcs('ports', port, port_model)
-            self._extend_port_dict_binding(port, port_model)
-        else:
-            port[pbin.VIF_TYPE] = nsx_constants.VIF_TYPE_DVS
+        self.plugin_extend_port_dict_binding(context, port)
         return db_utils.resource_fields(port, fields)
 
     def create_router(self, context, router):
