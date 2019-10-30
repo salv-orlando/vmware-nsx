@@ -815,10 +815,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _create_network_at_the_backend(self, context, net_data, az,
                                        transparent_vlan):
         provider_data = self._validate_provider_create(
-            context, net_data,
-            az._default_vlan_tz_uuid,
-            az._default_overlay_tz_uuid,
-            az._native_md_proxy_uuid,
+            context, net_data, az,
             self.nsxlib.transport_zone,
             self.nsxlib.logical_switch,
             transparent_vlan=transparent_vlan)
@@ -978,7 +975,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             resource_extend.apply_funcs('networks', created_net, net_model)
 
             if is_backend_network:
-                self._create_net_mdproxy_port(
+                self._create_net_mp_mdproxy_port(
                     context, created_net, az, nsx_net_id)
 
         except Exception:
@@ -3442,3 +3439,16 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if len(port_tags) != orig_len:
             self.nsxlib.logical_port.update(
                 nsx_lport_id, False, tags=port_tags)
+
+    def _validate_net_mdproxy_tz(self, az, tz_uuid, mdproxy_uuid):
+        """Validate that the network TZ matches the mdproxy edge cluster"""
+        mdproxy_obj = self.nsxlib.native_md_proxy.get(mdproxy_uuid)
+        ec_id = mdproxy_obj['edge_cluster_id']
+        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
+        ec_tzs = []
+        for tn_uuid in ec_nodes:
+            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
+                tn_uuid))
+        if tz_uuid not in ec_tzs:
+            return False
+        return True
