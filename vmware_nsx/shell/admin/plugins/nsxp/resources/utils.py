@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import logging
 from oslo_config import cfg
 
 from neutron.db import l3_dvr_db  # noqa
@@ -19,7 +20,6 @@ from neutron import manager
 from neutron_lib import context
 from neutron_lib.plugins import constants as const
 from neutron_lib.plugins import directory
-from oslo_log import log as logging
 
 from vmware_nsx.common import config
 from vmware_nsx.plugins.common_v3 import utils as v3_utils
@@ -41,16 +41,28 @@ def get_nsxp_client(nsx_username=None, nsx_password=None,
 
 
 def get_connected_nsxpolicy(nsx_username=None, nsx_password=None,
-                            use_basic_auth=False):
+                            use_basic_auth=False, conf_path=None,
+                            verbose=False):
     global _NSXPOLICY
 
-    # for non-default agruments, initiate new lib
+    if not verbose:
+        # Suppress logs for nsxpolicy init
+        logging.disable(logging.INFO)
+
+    # for non-default arguments, initiate new lib
     if nsx_username or use_basic_auth:
+        if not verbose:
+            # Return logs to normal
+            logging.disable(logging.NOTSET)
         return v3_utils.get_nsxpolicy_wrapper(nsx_username,
                                               nsx_password,
-                                              use_basic_auth)
+                                              use_basic_auth,
+                                              conf_path=conf_path)
     if _NSXPOLICY is None:
-        _NSXPOLICY = v3_utils.get_nsxpolicy_wrapper()
+        _NSXPOLICY = v3_utils.get_nsxpolicy_wrapper(conf_path=conf_path)
+    if not verbose:
+        # Return logs to normal
+        logging.disable(logging.NOTSET)
     return _NSXPOLICY
 
 
@@ -76,12 +88,20 @@ def get_realization_info(resource, *realization_args):
 
 
 class NsxPolicyPluginWrapper(plugin.NsxPolicyPlugin):
-    def __init__(self):
+    def __init__(self, verbose=False):
+        if not verbose:
+            # Suppress logs for plugin init
+            logging.disable(logging.INFO)
+
         # initialize the availability zones
         config.register_nsxp_azs(cfg.CONF, cfg.CONF.nsx_p.availability_zones)
         super(NsxPolicyPluginWrapper, self).__init__()
         self.context = context.get_admin_context()
         admin_utils._init_plugin_mock_quota()
+
+        if not verbose:
+            # Return logs to normal
+            logging.disable(logging.NOTSET)
 
     def __enter__(self):
         directory.add_plugin(const.CORE, self)

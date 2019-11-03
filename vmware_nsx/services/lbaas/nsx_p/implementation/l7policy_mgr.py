@@ -52,6 +52,7 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
         policy_name = utils.get_name_and_uuid(old_policy['name'] or 'policy',
                                               old_policy['id'])
+        short_name = utils.get_name_short_uuid(old_policy['id'])
         rule_body = lb_utils.convert_l7policy_to_lb_rule(
             self.core_plugin.nsxpolicy, new_policy)
         try:
@@ -59,6 +60,7 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 new_policy['listener_id'],
                 policy_name,
                 position=new_policy.get('position', 0) - 1,
+                compare_name_suffix=short_name,
                 **rule_body)
 
         except Exception as e:
@@ -70,11 +72,11 @@ class EdgeL7PolicyManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     def delete(self, context, policy, completor):
         vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
-        policy_name = utils.get_name_and_uuid(policy['name'] or 'policy',
-                                              policy['id'])
+        policy_name = utils.get_name_short_uuid(policy['id'])
         try:
             vs_client.remove_lb_rule(policy['listener_id'],
-                                     policy_name)
+                                     policy_name,
+                                     check_name_suffix=True)
         except nsxlib_exc.ResourceNotFound:
             pass
         except nsxlib_exc.ManagerError:
