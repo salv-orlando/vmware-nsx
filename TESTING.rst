@@ -84,7 +84,7 @@ environments for running test cases. It uses `Testr`_ for managing the running
 of the test cases.
 
 Tox handles the creation of a series of `virtualenvs`_ that target specific
-versions of Python (2.7, 3.3, etc).
+versions of Python.
 
 Testr handles the parallel execution of series of test cases as well as
 the tracking of long-running tests and other things.
@@ -131,7 +131,7 @@ vmware_nsx/tests/unit/nsx_v/test_plugin.py::
 
 or::
 
-      $ tox -e py27 vmware_nsx.tests.unit.nsx_v.test_plugin.TestSubnetsV2
+      $ tox -e py37 vmware_nsx.tests.unit.nsx_v.test_plugin.TestSubnetsV2
 
 Adding more tests
 ~~~~~~~~~~~~~~~~~
