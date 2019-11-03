@@ -48,7 +48,6 @@ class TestNsxProviderDriver(testtools.TestCase):
             return
         # init the NSX driver without the RPC & certificate
         with mock.patch(DRIVER + '._init_rpc_messaging'), \
-            mock.patch(DRIVER + '._init_rpc_listener'), \
             mock.patch(DRIVER + '._init_cert_manager'):
             self.driver = driver.NSXOctaviaDriver()
             self.driver.client = mock.Mock()
