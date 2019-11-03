@@ -98,6 +98,7 @@ from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import core_defs as policy_defs
+from vmware_nsxlib.v3.policy import transaction as policy_trans
 from vmware_nsxlib.v3.policy import utils as p_utils
 from vmware_nsxlib.v3 import security
 from vmware_nsxlib.v3 import utils as nsxlib_utils
@@ -1067,27 +1068,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         segment_id = self._get_network_nsx_segment_id(
             context, port_data['network_id'])
-        self.nsxpolicy.segment_port.create_or_overwrite(
-            name, segment_id,
-            port_id=port_data['id'],
-            description=port_data.get('description', ''),
-            address_bindings=address_bindings,
-            vif_id=vif_id,
-            tags=tags)
 
-        # add the security profiles to the port
+        # Calculate the port security profiles
         if is_psec_on:
             spoofguard_profile = SPOOFGUARD_PROFILE_ID
             seg_sec_profile = SEG_SECURITY_PROFILE_ID
         else:
             spoofguard_profile = NO_SPOOFGUARD_PROFILE_ID
             seg_sec_profile = NO_SEG_SECURITY_PROFILE_ID
-        self.nsxpolicy.segment_port_security_profiles.create_or_overwrite(
-            name, segment_id, port_data['id'],
-            spoofguard_profile_id=spoofguard_profile,
-            segment_security_profile_id=seg_sec_profile)
-
-        # add the mac discovery profile to the port
         mac_disc_profile_must = False
         if is_psec_on:
             address_pairs = port_data.get(addr_apidef.ADDRESS_PAIRS)
@@ -1100,15 +1088,36 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             mac_discovery_profile = MAC_DISCOVERY_PROFILE_ID
         else:
             mac_discovery_profile = NO_MAC_DISCOVERY_PROFILE_ID
-        self.nsxpolicy.segment_port_discovery_profiles.create_or_overwrite(
-            name, segment_id, port_data['id'],
-            mac_discovery_profile_id=mac_discovery_profile)
 
-        # Add QoS segment profile (only if QoS is enabled)
-        if directory.get_plugin(plugin_const.QOS):
-            self.nsxpolicy.segment_port_qos_profiles.create_or_overwrite(
+        # Prepare the args for the segment port creation
+        kwargs = {'port_id': port_data['id'],
+                  'description': port_data.get('description', ''),
+                  'address_bindings': address_bindings,
+                  'tags': tags}
+        if vif_id:
+            kwargs['vif_id'] = vif_id
+
+        # Create/ update the backend port in a single transaction
+        with policy_trans.NsxPolicyTransaction():
+            self.nsxpolicy.segment_port.create_or_overwrite(
+                name, segment_id, **kwargs)
+
+            # add the security profiles to the port
+            self.nsxpolicy.segment_port_security_profiles.create_or_overwrite(
                 name, segment_id, port_data['id'],
-                qos_profile_id=qos_policy_id)
+                spoofguard_profile_id=spoofguard_profile,
+                segment_security_profile_id=seg_sec_profile)
+
+            # add the mac discovery profile to the port
+            self.nsxpolicy.segment_port_discovery_profiles.create_or_overwrite(
+                name, segment_id, port_data['id'],
+                mac_discovery_profile_id=mac_discovery_profile)
+
+            # Add QoS segment profile (only if QoS is enabled)
+            if directory.get_plugin(plugin_const.QOS):
+                self.nsxpolicy.segment_port_qos_profiles.create_or_overwrite(
+                    name, segment_id, port_data['id'],
+                    qos_profile_id=qos_policy_id)
 
         # Update port admin status using passthrough api, only if it changed
         # or new port with disabled admin state
