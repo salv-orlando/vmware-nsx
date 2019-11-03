@@ -29,6 +29,7 @@ class EdgeL7RuleManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         policy = rule['policy']
         policy_name = utils.get_name_and_uuid(policy['name'] or 'policy',
                                               policy['id'])
+        short_name = utils.get_name_short_uuid(policy['id'])
         if delete:
             lb_utils.remove_rule_from_policy(rule)
         else:
@@ -39,6 +40,7 @@ class EdgeL7RuleManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             vs_client.update_lb_rule(policy['listener_id'],
                                      policy_name,
                                      position=policy.get('position', 0) - 1,
+                                     compare_name_suffix=short_name,
                                      **rule_body)
         except Exception as e:
             with excutils.save_and_reraise_exception():

@@ -822,13 +822,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # MP MD proxy when this network is created.
         # If not - the port will not be found, and it is ok.
         # Note(asarfaty): In the future this code can be removed.
-        if not is_external_net and cfg.CONF.nsx_p.allow_passthrough:
+        # TODO(asarfaty): For migrated networks when the DB was not cleaned up
+        # This may actually delete a port the policy now control
+        if (not is_external_net and not is_nsx_net and
+            cfg.CONF.nsx_p.allow_passthrough):
             self._delete_nsx_port_by_network(network_id)
 
         # Delete the network segment from the backend
         if not is_external_net and not is_nsx_net:
             try:
                 self.nsxpolicy.segment.delete(network_id)
+                # In case of migrated network, a dhcp server config with
+                # the same id should also be deleted
+                self.nsxpolicy.dhcp_server_config.delete(network_id)
             except nsx_lib_exc.ResourceNotFound:
                 # If the resource was not found on the backend do not worry
                 # about it. The conditions has already been logged, so there
@@ -3921,7 +3927,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 rule_entry = self._create_security_group_backend_rule(
                     context, sg_id, rule, secgroup_logging,
                     is_provider_sg=is_provider_sg,
-                    create_related_resource=False)
+                    create_related_resource=True)
                 backend_rules.append(rule_entry)
 
             # Update the policy with all the rules.
