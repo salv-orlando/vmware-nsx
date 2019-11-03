@@ -1757,7 +1757,8 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
                                ) as mock_vs_remove_rule:
             self.edge_driver.l7policy.delete(
                 self.context, self.l7policy_dict, self.completor)
-            mock_vs_remove_rule.assert_called_with(LB_VS_ID, mock.ANY)
+            mock_vs_remove_rule.assert_called_with(LB_VS_ID, mock.ANY,
+                                                   check_name_suffix=True)
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 

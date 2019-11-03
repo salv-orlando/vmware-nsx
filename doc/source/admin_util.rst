@@ -604,6 +604,17 @@ Config
 
     nsxadmin -r config -o validate
 
+T2P migration
+~~~~~~~~~~~~~
+
+- Migrate NSX resources and neutron DB from NSX-T (MP) to Policy::
+
+    nsxadmin -r nsx-migrate-t2p -o import (--verbose)
+
+- Delete DB tables related to the MP plugin after migration::
+
+    nsxadmin -r nsx-migrate-t2p -o clean-all
+
 NSXtvd Plugin
 -------------
 
@@ -654,6 +665,10 @@ NSX Policy Plugin
 
 - Update tags on a loadbalancer service
     nsxadmin -r lb-services -o nsx-update-tags
+
+- Delete DB tables related to the MP plugin after migration from MP plugin to policy::
+
+    nsxadmin -r nsx-migrate-t2p -o clean-all
 
 
 Client Certificate

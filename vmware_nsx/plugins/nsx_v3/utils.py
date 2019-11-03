@@ -175,34 +175,44 @@ def get_nsxlib_wrapper(nsx_username=None, nsx_password=None, basic_auth=False,
 
 
 def get_nsxpolicy_wrapper(nsx_username=None, nsx_password=None,
-                          basic_auth=False):
-    #TODO(asarfaty) move to a different file? (under common_v3)
+                          basic_auth=False, conf_path=None):
+    if not conf_path:
+        conf_path = cfg.CONF.nsx_p
     client_cert_provider = None
     if not basic_auth:
         # if basic auth requested, dont use cert file even if provided
         client_cert_provider = get_client_cert_provider(
-            conf_path=cfg.CONF.nsx_p)
+            conf_path=conf_path)
 
     nsxlib_config = config.NsxLibConfig(
-        username=nsx_username or cfg.CONF.nsx_p.nsx_api_user,
-        password=nsx_password or cfg.CONF.nsx_p.nsx_api_password,
+        username=nsx_username or conf_path.nsx_api_user,
+        password=nsx_password or conf_path.nsx_api_password,
         client_cert_provider=client_cert_provider,
-        retries=cfg.CONF.nsx_p.http_retries,
-        insecure=cfg.CONF.nsx_p.insecure,
-        ca_file=cfg.CONF.nsx_p.ca_file,
-        concurrent_connections=cfg.CONF.nsx_p.concurrent_connections,
-        http_timeout=cfg.CONF.nsx_p.http_timeout,
-        http_read_timeout=cfg.CONF.nsx_p.http_read_timeout,
-        conn_idle_timeout=cfg.CONF.nsx_p.conn_idle_timeout,
+        retries=conf_path.http_retries,
+        insecure=conf_path.insecure,
+        ca_file=conf_path.ca_file,
+        concurrent_connections=conf_path.concurrent_connections,
+        http_timeout=conf_path.http_timeout,
+        http_read_timeout=conf_path.http_read_timeout,
+        conn_idle_timeout=conf_path.conn_idle_timeout,
         http_provider=None,
-        max_attempts=cfg.CONF.nsx_p.retries,
-        nsx_api_managers=cfg.CONF.nsx_p.nsx_api_managers,
+        max_attempts=conf_path.retries,
+        nsx_api_managers=conf_path.nsx_api_managers,
         plugin_scope=OS_NEUTRON_ID_SCOPE,
         plugin_tag=NSX_NEUTRON_PLUGIN,
         plugin_ver=n_version.version_info.release_string(),
-        allow_passthrough=cfg.CONF.nsx_p.allow_passthrough,
-        realization_max_attempts=cfg.CONF.nsx_p.realization_max_attempts,
-        realization_wait_sec=cfg.CONF.nsx_p.realization_wait_sec)
+        dns_nameservers=conf_path.nameservers,
+        dns_domain=conf_path.dns_domain,
+        allow_passthrough=(conf_path.allow_passthrough
+                           if hasattr(conf_path, 'allow_passthrough')
+                           else False),
+        realization_max_attempts=(conf_path.realization_max_attempts
+                                  if hasattr(conf_path,
+                                             'realization_max_attempts')
+                                  else 50),
+        realization_wait_sec=(conf_path.realization_wait_sec
+                              if hasattr(conf_path, 'realization_wait_sec')
+                              else 1))
     return policy.NsxPolicyLib(nsxlib_config)
 
 
