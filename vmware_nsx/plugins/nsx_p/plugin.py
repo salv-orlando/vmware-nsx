@@ -1787,13 +1787,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             r, resource_type='os-neutron-router-id',
             project_name=context.tenant_name)
         try:
-            self.nsxpolicy.tier1.create_or_overwrite(
-                router_name, router['id'],
-                tier0=None,
-                ipv6_ndra_profile_id=NO_SLAAC_NDRA_PROFILE_ID,
-                tags=tags)
-            # Also create the empty locale-service as it must always exist
-            self.nsxpolicy.tier1.create_locale_service(router['id'])
+            with policy_trans.NsxPolicyTransaction():
+                self.nsxpolicy.tier1.create_or_overwrite(
+                    router_name, router['id'],
+                    tier0=None,
+                    ipv6_ndra_profile_id=NO_SLAAC_NDRA_PROFILE_ID,
+                    tags=tags)
+                # Also create the empty locale-service as it must always exist
+                self.nsxpolicy.tier1.create_locale_service(router['id'])
 
         #TODO(annak): narrow down the exception
         except Exception as ex:
@@ -1859,14 +1860,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                           route['nexthop'])
 
     def _add_static_routes(self, router_id, routes):
-        for route in routes:
-            dest = route['destination']
-            self.nsxpolicy.tier1_static_route.create_or_overwrite(
-                'Static route for %s' % dest,
-                router_id,
-                static_route_id=self._get_static_route_id(route),
-                network=dest,
-                next_hop=route['nexthop'])
+        with policy_trans.NsxPolicyTransaction():
+            for route in routes:
+                dest = route['destination']
+                self.nsxpolicy.tier1_static_route.create_or_overwrite(
+                    'Static route for %s' % dest,
+                    router_id,
+                    static_route_id=self._get_static_route_id(route),
+                    network=dest,
+                    next_hop=route['nexthop'])
 
     def _delete_static_routes(self, router_id, routes):
         for route in routes:
@@ -2169,6 +2171,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return 'D-' + fip_id
 
     def _add_fip_nat_rules(self, tier1_id, fip_id, ext_ip, int_ip):
+        #TODO(asarfaty): Ass policy transactions here
         self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
             'snat for fip %s' % fip_id,
             tier1_id,
@@ -2189,6 +2192,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
 
     def _delete_fip_nat_rules(self, tier1_id, fip_id):
+        #TODO(asarfaty): Ass policy transactions here
         self.nsxpolicy.tier1_nat_rule.delete(
             tier1_id,
             nat_rule_id=self._get_fip_snat_rule_id(fip_id))
