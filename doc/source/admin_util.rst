@@ -313,6 +313,13 @@ Metadata
 
     nsxadmin -r metadata -o status [--property network_id=<net_id>]
 
+V2T migration
+~~~~~~~~~~~~~
+
+- Validate the configuration of the NSX-V plugin befor migrating to NSX-T::
+
+    nsxadmin -r nsx-migrate-v2t -o validate [--property transit-network=<cidr>]
+
 Config
 ~~~~~~
 
