@@ -1689,17 +1689,17 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             org_tier0_uuid, orgaddr, org_enable_snat,
             new_tier0_uuid, newaddr, new_enable_snat,
             tier1_services_exist, sr_currently_exists)
-
         try:
             if actions['add_service_router']:
                 self.create_service_router(context, router_id, router=router)
 
-            if actions['remove_snat_rules']:
-                for subnet in router_subnets:
-                    self._del_subnet_snat_rule(router_id, subnet)
-            if actions['remove_no_dnat_rules']:
-                for subnet in router_subnets:
-                    self._del_subnet_no_dnat_rule(router_id, subnet)
+            with policy_trans.NsxPolicyTransaction():
+                if actions['remove_snat_rules']:
+                    for subnet in router_subnets:
+                        self._del_subnet_snat_rule(router_id, subnet)
+                if actions['remove_no_dnat_rules']:
+                    for subnet in router_subnets:
+                        self._del_subnet_no_dnat_rule(router_id, subnet)
 
             if (actions['remove_router_link_port'] or
                 actions['add_router_link_port']):
@@ -1719,19 +1719,21 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     nat=actions['advertise_route_nat_flag'],
                     subnets=actions['advertise_route_connected_flag'])
 
-            if actions['add_snat_rules']:
-                # Add SNAT rules for all the subnets which are in different
-                # scope than the GW
-                gw_address_scope = self._get_network_address_scope(
-                    context, router.gw_port.network_id)
-                for subnet in router_subnets:
-                    self._add_subnet_snat_rule(context, router_id,
-                                               subnet, gw_address_scope,
-                                               newaddr)
+            with policy_trans.NsxPolicyTransaction():
+                if actions['add_snat_rules']:
+                    # Add SNAT rules for all the subnets which are in different
+                    # scope than the GW
+                    gw_address_scope = self._get_network_address_scope(
+                        context, router.gw_port.network_id)
+                    for subnet in router_subnets:
+                        self._add_subnet_snat_rule(context, router_id,
+                                                   subnet, gw_address_scope,
+                                                   newaddr)
 
-            if actions['add_no_dnat_rules']:
-                for subnet in router_subnets:
-                    self._add_subnet_no_dnat_rule(context, router_id, subnet)
+                if actions['add_no_dnat_rules']:
+                    for subnet in router_subnets:
+                        self._add_subnet_no_dnat_rule(
+                            context, router_id, subnet)
 
             # always advertise ipv6 subnets if gateway is set
             advertise_ipv6_subnets = True if info else False
@@ -2171,34 +2173,34 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return 'D-' + fip_id
 
     def _add_fip_nat_rules(self, tier1_id, fip_id, ext_ip, int_ip):
-        #TODO(asarfaty): Add policy transactions here
-        self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
-            'snat for fip %s' % fip_id,
-            tier1_id,
-            nat_rule_id=self._get_fip_snat_rule_id(fip_id),
-            action=policy_constants.NAT_ACTION_SNAT,
-            translated_network=ext_ip,
-            source_network=int_ip,
-            sequence_number=NAT_RULE_PRIORITY_FIP,
-            firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
-        self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
-            'dnat for fip %s' % fip_id,
-            tier1_id,
-            nat_rule_id=self._get_fip_dnat_rule_id(fip_id),
-            action=policy_constants.NAT_ACTION_DNAT,
-            translated_network=int_ip,
-            destination_network=ext_ip,
-            sequence_number=NAT_RULE_PRIORITY_FIP,
-            firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
+        with policy_trans.NsxPolicyTransaction():
+            self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
+                'snat for fip %s' % fip_id,
+                tier1_id,
+                nat_rule_id=self._get_fip_snat_rule_id(fip_id),
+                action=policy_constants.NAT_ACTION_SNAT,
+                translated_network=ext_ip,
+                source_network=int_ip,
+                sequence_number=NAT_RULE_PRIORITY_FIP,
+                firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
+            self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
+                'dnat for fip %s' % fip_id,
+                tier1_id,
+                nat_rule_id=self._get_fip_dnat_rule_id(fip_id),
+                action=policy_constants.NAT_ACTION_DNAT,
+                translated_network=int_ip,
+                destination_network=ext_ip,
+                sequence_number=NAT_RULE_PRIORITY_FIP,
+                firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
 
     def _delete_fip_nat_rules(self, tier1_id, fip_id):
-        #TODO(asarfaty): Add policy transactions here
-        self.nsxpolicy.tier1_nat_rule.delete(
-            tier1_id,
-            nat_rule_id=self._get_fip_snat_rule_id(fip_id))
-        self.nsxpolicy.tier1_nat_rule.delete(
-            tier1_id,
-            nat_rule_id=self._get_fip_dnat_rule_id(fip_id))
+        with policy_trans.NsxPolicyTransaction():
+            self.nsxpolicy.tier1_nat_rule.delete(
+                tier1_id,
+                nat_rule_id=self._get_fip_snat_rule_id(fip_id))
+            self.nsxpolicy.tier1_nat_rule.delete(
+                tier1_id,
+                nat_rule_id=self._get_fip_dnat_rule_id(fip_id))
 
     def _update_lb_vip(self, port, vip_address):
         # update the load balancer virtual server's VIP with
