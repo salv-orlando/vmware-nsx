@@ -2171,7 +2171,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return 'D-' + fip_id
 
     def _add_fip_nat_rules(self, tier1_id, fip_id, ext_ip, int_ip):
-        #TODO(asarfaty): Ass policy transactions here
+        #TODO(asarfaty): Add policy transactions here
         self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
             'snat for fip %s' % fip_id,
             tier1_id,
@@ -2192,7 +2192,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
 
     def _delete_fip_nat_rules(self, tier1_id, fip_id):
-        #TODO(asarfaty): Ass policy transactions here
+        #TODO(asarfaty): Add policy transactions here
         self.nsxpolicy.tier1_nat_rule.delete(
             tier1_id,
             nat_rule_id=self._get_fip_snat_rule_id(fip_id))
