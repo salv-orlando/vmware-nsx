@@ -3740,7 +3740,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
     def _prepare_edge_extra_routes(self, context, router_id):
         routes = self._get_extra_routes_by_router_id(context, router_id)
         filters = {'device_id': [router_id]}
-        ports = self.get_ports(context, filters)
+        ports = self.get_ports(context.elevated(), filters)
         self._add_network_info_for_routes(context, routes, ports)
         return routes
 
