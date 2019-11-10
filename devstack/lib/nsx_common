@@ -43,7 +43,7 @@ function install_neutron_projects {
         elif use_library_from_git $pkg; then
             echo "Project $pkg enabled explicitly from LIBS_FROM_GIT"
         else
-            sudo -H pip install -e "git+https://opendev.org/openstack/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
+            sudo -H ${PIP} install -e "git+https://opendev.org/openstack/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
             sudo chown -R ${USER}:${USER} src/${pkg}
         fi
     done
@@ -55,7 +55,7 @@ function install_neutron_projects {
     if is_service_enabled neutron; then
        echo "service Neutron is enabled explicitly by devstack"
     else
-        sudo -H pip install -e "git+https://opendev.org/openstack/neutron@${NEUTRON_BRANCH}#egg=neutron"
+        sudo -H ${PIP} install -e "git+https://opendev.org/openstack/neutron@${NEUTRON_BRANCH}#egg=neutron"
         sudo chown -R ${USER}:${USER} src/neutron
     fi
 
@@ -66,7 +66,7 @@ function install_neutron_projects {
     if is_service_enabled octavia; then
        echo "service octavia is enabled explicitly by devstack"
     else
-        sudo -H pip install -e "git+https://opendev.org/openstack/octavia@${NEUTRON_BRANCH}#egg=octavia"
+        sudo -H ${PIP} install -e "git+https://opendev.org/openstack/octavia@${NEUTRON_BRANCH}#egg=octavia"
         sudo chown -R ${USER}:${USER} src/octavia
     fi
 }

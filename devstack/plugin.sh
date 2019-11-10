@@ -22,8 +22,10 @@ GITREPO['vmware-nsxlib']=${NSXLIB_REPO:-${GIT_BASE}/openstack/vmware-nsxlib.git}
 GITBRANCH['vmware-nsxlib']=${NSXLIB_BRANCH:-master}
 
 PYTHON='python'
+PIP='pip'
 if [[ $USE_PYTHON3 == "True" ]]; then
     PYTHON='python3'
+    PIP='pip3'
 fi
 
 dir=${GITDIR['vmware-nsx']}/devstack
