@@ -94,8 +94,13 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             kwargs['tags'] = tags
         if listener['connection_limit'] != -1:
             kwargs['max_concurrent_connections'] = listener['connection_limit']
-        if listener['default_pool_id']:
-            kwargs['pool_id'] = listener['default_pool_id']
+        if 'default_pool_id' in listener:
+            if listener['default_pool_id']:
+                kwargs['pool_id'] = listener['default_pool_id']
+            else:
+                # Remove the default pool
+                kwargs['pool_id'] = ''
+                kwargs['lb_persistence_profile_id'] = ''
         if certificate:
             ssl_profile_binding = self._upload_certificate(
                 listener['id'], listener['default_tls_container_id'], tags,
