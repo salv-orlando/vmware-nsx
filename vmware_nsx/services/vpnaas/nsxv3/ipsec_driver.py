@@ -619,10 +619,15 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
                     raise nsx_exc.NsxPluginException(err_msg=msg)
                 return srv['id']
 
+    def _get_service_tier0_uuid(self, context, vpnservice):
+        router_id = vpnservice['router_id']
+        router_db = self._core_plugin._get_router(context, router_id)
+        return self._core_plugin._get_tier0_uuid_by_router(context, router_db)
+
     def _create_vpn_service_if_needed(self, context, vpnservice):
         # The service is created on the TIER0 router attached to the router GW
         # The NSX can keep only one service per tier0 router so we reuse it
-        tier0_uuid = self._get_tier0_uuid(context, vpnservice)
+        tier0_uuid = self._get_service_tier0_uuid(context, vpnservice)
         if self._find_vpn_service(tier0_uuid):
             return
 
@@ -633,11 +638,11 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         # Delete the VPN service on the NSX if no other service connected
         # to the same tier0 use it
         elev_context = context.elevated()
-        tier0_uuid = self._get_tier0_uuid(elev_context, vpnservice)
+        tier0_uuid = self._get_service_tier0_uuid(elev_context, vpnservice)
         all_services = self.vpn_plugin.get_vpnservices(elev_context)
         for srv in all_services:
             if (srv['id'] != vpnservice['id'] and
-                self._get_tier0_uuid(elev_context, srv) == tier0_uuid):
+                self._get_service_tier0_uuid(elev_context, srv) == tier0_uuid):
                 LOG.info("Not deleting vpn service from the NSX as other "
                          "neutron vpn services still use it.")
                 return
@@ -667,7 +672,7 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
             self._delete_local_endpoint_by_router(elev_context, router_id)
 
     def _get_nsx_vpn_service(self, context, vpnservice):
-        tier0_uuid = self._get_tier0_uuid(context, vpnservice)
+        tier0_uuid = self._get_service_tier0_uuid(context, vpnservice)
         return self._find_vpn_service(tier0_uuid, validate=False)
 
     def create_vpnservice(self, context, vpnservice):
