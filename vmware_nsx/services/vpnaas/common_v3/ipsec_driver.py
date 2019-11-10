@@ -82,10 +82,6 @@ class NSXcommonIPsecVpnDriver(service_drivers.VpnDriver):
         if ports:
             return ports[0]
 
-    def _get_tier0_uuid(self, context, router_id):
-        router_db = self._core_plugin._get_router(context, router_id)
-        return self._core_plugin._get_tier0_uuid_by_router(context, router_db)
-
     def _get_service_local_address(self, context, vpnservice):
         """Find/Allocate a port on the external network
         to allocate the ip to be used as the local ip of this service
