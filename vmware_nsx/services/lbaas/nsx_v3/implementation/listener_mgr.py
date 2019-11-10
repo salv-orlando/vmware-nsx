@@ -57,12 +57,18 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         if listener['connection_limit'] != -1:
             kwargs['max_concurrent_connections'] = \
                 listener['connection_limit']
-        if listener['default_pool_id']:
-            pool_binding = nsx_db.get_nsx_lbaas_pool_binding(
-                context.session, listener['loadbalancer']['id'],
-                listener['default_pool_id'])
-            if pool_binding:
-                kwargs['pool_id'] = pool_binding.get('lb_pool_id')
+        if 'default_pool_id' in listener:
+            if listener['default_pool_id']:
+                pool_binding = nsx_db.get_nsx_lbaas_pool_binding(
+                    context.session, listener['loadbalancer']['id'],
+                    listener['default_pool_id'])
+                if pool_binding:
+                    kwargs['pool_id'] = pool_binding.get('lb_pool_id')
+            else:
+                # Remove the default pool
+                kwargs['pool_id'] = None
+                kwargs['persistence_profile_id'] = ''
+
         ssl_profile_binding = self._get_ssl_profile_binding(
             tags, certificate=certificate)
         if (listener['protocol'] == lb_const.LB_PROTOCOL_TERMINATED_HTTPS and

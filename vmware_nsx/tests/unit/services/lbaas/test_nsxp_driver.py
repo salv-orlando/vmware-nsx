@@ -453,7 +453,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 name=mock.ANY,
                 ports=[listener['protocol_port']],
                 max_concurrent_connections=None,
-                virtual_server_id=listener_id)
+                virtual_server_id=listener_id,
+                pool_id='',
+                lb_persistence_profile_id='')
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
@@ -489,7 +491,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 name=mock.ANY,
                 ports=[self.terminated_https_listener_dict['protocol_port']],
                 max_concurrent_connections=None,
-                virtual_server_id=HTTPS_LISTENER_ID)
+                virtual_server_id=HTTPS_LISTENER_ID,
+                pool_id='',
+                lb_persistence_profile_id='')
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
