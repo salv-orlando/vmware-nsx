@@ -28,8 +28,6 @@ from vmware_nsx.extensions import providersecuritygroup as provider_sg
 from vmware_nsx.tests.unit.nsx_p import test_plugin as test_nsxp_plugin
 from vmware_nsx.tests.unit.nsx_v import test_plugin as test_nsxv_plugin
 from vmware_nsx.tests.unit.nsx_v3 import test_plugin as test_nsxv3_plugin
-from vmware_nsxlib.v3 import nsx_constants
-from vmware_nsxlib.v3.policy import constants as policy_constants
 
 
 PLUGIN_NAME = ('vmware_nsx.tests.unit.extensions.'
@@ -404,23 +402,7 @@ class TestNSXpProviderSecurityGrp(test_nsxp_plugin.NsxPPluginTestCaseMixin,
         sg_id = provider_secgroup['security_group']['id']
 
         with mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                        "NsxPolicyCommunicationMapApi.create_entry"
-                        ) as entry_create:
-            with self.security_group_rule(security_group_id=sg_id) as rule:
-                rule_data = rule['security_group_rule']
-                rule_id = rule_data['id']
-                scope = [self.plugin.nsxpolicy.group.get_path(
-                    policy_constants.DEFAULT_DOMAIN, sg_id)]
-                entry_create.assert_called_once_with(
-                    rule_id, policy_constants.DEFAULT_DOMAIN,
-                    sg_id, entry_id=rule_id,
-                    description='',
-                    direction=nsx_constants.IN,
-                    ip_protocol=nsx_constants.IPV4,
-                    action=policy_constants.ACTION_DENY,
-                    service_ids=mock.ANY,
-                    source_groups=mock.ANY,
-                    dest_groups=mock.ANY,
-                    scope=scope,
-                    logged=False,
-                    tag=rule_data['project_id'])
+                        "NsxPolicyCommunicationMapApi.update_with_entries"
+                        ) as entry_create,\
+            self.security_group_rule(security_group_id=sg_id):
+            entry_create.assert_called_once()

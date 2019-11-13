@@ -1213,7 +1213,7 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
                         ) as group_create,\
             mock.patch("vmware_nsxlib.v3.policy.core_resources."
                        "NsxPolicyCommunicationMapApi."
-                       "create_with_entries") as comm_map_create,\
+                       "create_or_overwrite_map_only") as comm_map_create,\
             self.security_group(name, description) as sg:
             sg_id = sg['security_group']['id']
             nsx_name = utils.get_name_and_uuid(name, sg_id)
@@ -1225,7 +1225,6 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
                 nsx_name, policy_constants.DEFAULT_DOMAIN, map_id=sg_id,
                 description=description,
                 tags=mock.ANY,
-                entries=mock.ANY,
                 category=policy_constants.CATEGORY_ENVIRONMENT)
 
     def _create_provider_security_group(self):
@@ -1299,28 +1298,13 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
         with self.security_group(name, description) as sg:
             sg_id = sg['security_group']['id']
             with mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                            "NsxPolicyCommunicationMapApi.create_entry"
-                            ) as entry_create,\
+                            "NsxPolicyCommunicationMapApi.update_with_entries"
+                            ) as update_policy,\
                 self.security_group_rule(sg_id, direction,
                                          protocol, port_range_min,
                                          port_range_max,
-                                         remote_ip_prefix) as rule:
-                rule_id = rule['security_group_rule']['id']
-                scope = [self.plugin.nsxpolicy.group.get_path(
-                    policy_constants.DEFAULT_DOMAIN, sg_id)]
-                entry_create.assert_called_once_with(
-                    rule_id, policy_constants.DEFAULT_DOMAIN,
-                    sg_id, entry_id=rule_id,
-                    description='',
-                    direction=nsx_constants.IN,
-                    ip_protocol=nsx_constants.IPV4,
-                    action=policy_constants.ACTION_ALLOW,
-                    service_ids=mock.ANY,
-                    source_groups=mock.ANY,
-                    dest_groups=mock.ANY,
-                    scope=scope,
-                    logged=False,
-                    tag=mock.ANY)
+                                         remote_ip_prefix):
+                update_policy.assert_called_once()
 
     def test_create_security_group_rule_with_remote_group(self):
         with self.security_group() as sg1, self.security_group() as sg2:
