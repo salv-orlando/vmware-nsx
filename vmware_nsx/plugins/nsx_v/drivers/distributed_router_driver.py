@@ -14,7 +14,6 @@
 
 import netaddr
 from oslo_log import log as logging
-from oslo_utils import excutils
 
 from neutron.db import l3_db
 
@@ -265,41 +264,32 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
         address_groups = self.plugin._get_address_groups(
             context, router_id, network_id)
         edge_id = self._get_edge_id(context, router_id)
-        interface_created = False
-        try:
-            with locking.LockManager.get_lock(str(edge_id)):
-                edge_utils.add_vdr_internal_interface(self.nsx_v, context,
-                                                      router_id, network_id,
-                                                      address_groups,
-                                                      router_db.admin_state_up)
-                interface_created = True
-                # Update edge's firewall rules to accept subnets flows.
-                self.plugin._update_subnets_and_dnat_firewall(context,
-                                                              router_db)
+        with locking.LockManager.get_lock(str(edge_id)):
+            edge_utils.add_vdr_internal_interface(self.nsx_v, context,
+                                                  router_id, network_id,
+                                                  address_groups,
+                                                  router_db.admin_state_up)
+            # Update edge's firewall rules to accept subnets flows.
+            self.plugin._update_subnets_and_dnat_firewall(context,
+                                                          router_db)
 
-                if router_db.gw_port:
-                    plr_id = self.edge_manager.get_plr_by_tlr_id(context,
-                                                                 router_id)
-                    if router_db.enable_snat:
-                        self.plugin._update_nat_rules(context,
-                                                      router_db, plr_id)
+            if router_db.gw_port:
+                plr_id = self.edge_manager.get_plr_by_tlr_id(context,
+                                                             router_id)
+                if router_db.enable_snat:
+                    self.plugin._update_nat_rules(context,
+                                                  router_db, plr_id)
 
-                    # Open firewall flows on plr
-                    self.plugin._update_subnets_and_dnat_firewall(
-                        context, router_db, router_id=plr_id)
-                    # Update static routes of plr
-                    nexthop = self.plugin._get_external_attachment_info(
-                        context, router_db)[2]
+                # Open firewall flows on plr
+                self.plugin._update_subnets_and_dnat_firewall(
+                    context, router_db, router_id=plr_id)
+                # Update static routes of plr
+                nexthop = self.plugin._get_external_attachment_info(
+                    context, router_db)[2]
 
-                    self._update_routes(context, router_id,
-                                        nexthop)
-
-        except Exception:
-            with excutils.save_and_reraise_exception():
-                if not interface_created:
-                    super(nsx_v.NsxVPluginV2,
-                          self.plugin).remove_router_interface(
-                              context, router_id, interface_info)
+                self._update_routes(context, router_id,
+                                    nexthop)
+        # In case of failure, rollbak will be done in teh plugin level
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):
