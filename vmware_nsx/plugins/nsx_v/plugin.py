@@ -4098,14 +4098,19 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         try:
             return router_driver.add_router_interface(
                 context, router_id, interface_info)
-        except vsh_exc.VcnsApiException:
-            with excutils.save_and_reraise_exception():
-                LOG.error("Failed to add interface_info %(info)s on "
-                          "router %(router_id)s",
-                          {'info': str(interface_info),
-                           'router_id': router_id})
+        except vsh_exc.VcnsApiException as e:
+            LOG.error("Failed to add interface_info %(info)s on "
+                      "router %(router_id)s: %(e)s",
+                      {'info': str(interface_info),
+                       'router_id': router_id,
+                       'e': e.message})
+            try:
                 router_driver.remove_router_interface(
                     context, router_id, interface_info)
+            except Exception:
+                # Rollback may fail if creation failed too early
+                pass
+            raise nsx_exc.NsxPluginException(err_msg=e.message)
 
     def remove_router_interface(self, context, router_id, interface_info):
         # Get the router interface port id
