@@ -758,10 +758,17 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # MD Proxy is currently supported by the passthrough api only
         if (is_backend_network and not az.use_policy_md and
             cfg.CONF.nsx_p.allow_passthrough):
+
+            # The new segment was not realized yet. Waiting for a bit.
+            time.sleep(cfg.CONF.nsx_p.realization_wait_sec)
+            nsx_net_id = self._get_network_nsx_id(context, net_id)
+            if not nsx_net_id:
+                msg = ("Unable to obtain backend network id for metadata "
+                       "proxy creation for network %s" % net_id)
+                LOG.error(msg)
+                raise nsx_exc.NsxPluginException(err_msg=msg)
+
             try:
-                # The new segment was not realized yet. Waiting for a bit.
-                time.sleep(cfg.CONF.nsx_p.realization_wait_sec)
-                nsx_net_id = self._get_network_nsx_id(context, net_id)
                 self._create_net_mp_mdproxy_port(
                     context, created_net, az, nsx_net_id)
             except Exception as e:
