@@ -3150,7 +3150,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             md_ec = self.nsxlib.native_md_proxy.get(
                 mdproxy_uuid).get('edge_cluster_id')
 
-        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(md_ec)
+        ec_nodes = self.nsxpolicy.edge_cluster.get_edge_node_ids(md_ec)
         ec_tzs = []
         for tn_uuid in ec_nodes:
             ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
