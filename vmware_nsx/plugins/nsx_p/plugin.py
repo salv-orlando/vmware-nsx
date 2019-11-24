@@ -526,7 +526,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                         NSX_P_CLIENT_SSL_PROFILE,
                         client_ssl_profile_id=NSX_P_CLIENT_SSL_PROFILE,
                         description='Neutron LB Client SSL Profile',
-                        tags=self.nsxlib.build_v3_api_version_tag())
+                        tags=self.nsxpolicy.build_v3_api_version_tag())
                 except nsx_lib_exc.StaleRevision as e:
                     # This means that another controller is also creating this
                     LOG.info("Failed to configure LB client_ssl_profile: %s",
