@@ -972,12 +972,12 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
                                  set([s1['subnet']['id'], s2['subnet']['id']]))
                 lswitch_id = 'dummy'
                 neutron_id = n1['network']['id']
-                nsx_tag = {'tag': neutron_id, 'scope': 'os-neutron-net-id'}
+                segment_path = '/infra/segments/%s' % neutron_id
                 # Get only the subnets associated with a particular advanced
                 # service provider (i.e. logical switch).
-                with mock.patch('vmware_nsxlib.v3.core_resources.'
-                                'NsxLibLogicalSwitch.get',
-                                return_value={'tags': [nsx_tag]}):
+                with mock.patch('vmware_nsxlib.v3.policy.NsxPolicyLib.'
+                                'search_resource_by_realized_id',
+                                return_value=[segment_path]):
                     subnets = self._list('subnets', query_params='%s=%s' %
                                          (as_providers.ADV_SERVICE_PROVIDERS,
                                           lswitch_id))['subnets']
