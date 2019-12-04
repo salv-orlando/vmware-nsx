@@ -810,9 +810,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # MP MD proxy when this network is created.
         # If not - the port will not be found, and it is ok.
         # Note(asarfaty): In the future this code can be removed.
-        if (not is_external_net and cfg.CONF.nsx_p.allow_passthrough and
-            not self.nsxpolicy.feature_supported(
-                nsxlib_consts.FEATURE_NSX_POLICY_MDPROXY)):
+        if not is_external_net and cfg.CONF.nsx_p.allow_passthrough:
             self._delete_nsx_port_by_network(network_id)
 
         # Delete the network segment from the backend
