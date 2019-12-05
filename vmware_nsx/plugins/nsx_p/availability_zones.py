@@ -195,6 +195,7 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
             msg = (_("%(type)s %(id)s of availability zone %(az)s with edge "
                      "cluster %(ec)s does not match the default vlan tz "
                      "%(tz)s") % {
+                'type': obj_type,
                 'id': obj_id,
                 'ec': ec_uuid,
                 'tz': self._default_vlan_tz_uuid,
