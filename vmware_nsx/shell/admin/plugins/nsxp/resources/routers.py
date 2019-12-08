@@ -24,6 +24,9 @@ from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as p_utils
 from vmware_nsx.shell import resources as shell
 
+from vmware_nsxlib.v3.policy import constants as policy_constants
+from vmware_nsxlib.v3.policy import transaction as policy_trans
+
 LOG = logging.getLogger(__name__)
 
 
@@ -114,6 +117,48 @@ def update_tier0(resource, event, trigger, **kwargs):
     LOG.info("Done.")
 
 
+@admin_utils.output_header
+def update_nat_firewall_match(resource, event, trigger, **kwargs):
+    """Update the firewall_match value in neutron nat rules with a new value"""
+    errmsg = ("Need to specify internal/external firewall_match value. "
+              "Add --property firewall-match=<match>")
+    if not kwargs.get('property'):
+        LOG.error("%s", errmsg)
+        return
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    firewall_match_str = properties.get('firewall-match')
+    if (not firewall_match_str or
+        firewall_match_str.lower() not in ('internal', 'external')):
+        LOG.error("%s", errmsg)
+        return
+
+    if firewall_match_str.lower() == 'internal':
+        new_firewall_match = policy_constants.NAT_FIREWALL_MATCH_INTERNAL
+        old_firewall_match = policy_constants.NAT_FIREWALL_MATCH_EXTERNAL
+    else:
+        new_firewall_match = policy_constants.NAT_FIREWALL_MATCH_EXTERNAL
+        old_firewall_match = policy_constants.NAT_FIREWALL_MATCH_INTERNAL
+
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+    plugin = RoutersPlugin()
+    ctx = context.get_admin_context()
+    neutron_routers = plugin.get_routers(ctx)
+    for router in neutron_routers:
+        rules = nsxpolicy.tier1_nat_rule.list(router['id'])
+        for rule in rules:
+            with policy_trans.NsxPolicyTransaction():
+                if rule['firewall_match'] == old_firewall_match:
+                    nsxpolicy.tier1_nat_rule.update(
+                        router['id'], rule['id'],
+                        firewall_match=new_firewall_match)
+
+    LOG.info("Done.")
+
+
 registry.subscribe(update_tier0,
                    constants.ROUTERS,
                    shell.Operations.UPDATE_TIER0.value)
+
+registry.subscribe(update_nat_firewall_match,
+                   constants.ROUTERS,
+                   shell.Operations.UPDATE_FIREWALL_MATCH.value)

@@ -72,6 +72,7 @@ class Operations(enum.Enum):
     VALIDATE = 'validate'
     REUSE = 'reuse'
     UPDATE_TIER0 = 'update-tier0'
+    UPDATE_FIREWALL_MATCH = 'update-nat-firewall-match'
 
 
 ops = [op.value for op in Operations]
@@ -262,7 +263,8 @@ nsxp_resources = {
                                  [Operations.LIST.value]),
     constants.ROUTERS: Resource(constants.ROUTERS,
                                 [Operations.LIST.value,
-                                 Operations.UPDATE_TIER0.value]),
+                                 Operations.UPDATE_TIER0.value,
+                                 Operations.UPDATE_FIREWALL_MATCH.value]),
     constants.CERTIFICATE: Resource(constants.CERTIFICATE,
                                     [Operations.GENERATE.value,
                                      Operations.SHOW.value,
