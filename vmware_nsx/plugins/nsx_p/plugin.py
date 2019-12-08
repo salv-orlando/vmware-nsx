@@ -3001,17 +3001,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         for this, and cache the results.
         """
         if lswitch_id not in NET_NSX_2_NEUTRON_ID_CACHE:
-            # Go to the nsx using passthrough api to get the neutron id
-            if not cfg.CONF.nsx_p.allow_passthrough:
-                LOG.warning("Cannot get neutron id for ls %s without "
-                            "passthrough api", lswitch_id)
+            segments_path = self.nsxpolicy.search_resource_by_realized_id(
+                lswitch_id, "RealizedLogicalSwitch")
+            if not segments_path or len(segments_path) != 1:
+                LOG.warning("Could not find policy segment with realized id "
+                            "%s", lswitch_id)
                 return []
-            ls = self.nsxlib.logical_switch.get(lswitch_id)
-            neutron_id = None
-            for tag in ls.get('tags', []):
-                if tag['scope'] == 'os-neutron-net-id':
-                    neutron_id = tag['tag']
-                    break
+            neutron_id = p_utils.path_to_id(segments_path[0])
             if neutron_id:
                 # Cache the result
                 NET_NSX_2_NEUTRON_ID_CACHE[lswitch_id] = neutron_id
