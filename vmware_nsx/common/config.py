@@ -542,6 +542,11 @@ nsx_p_opts = nsx_v3_and_p + [
                default=1.0,
                help=_("(Optional) Number of seconds to wait between attempts "
                       "for a resource to be realized")),
+    cfg.BoolOpt('firewall_match_internal_addr',
+                default=True,
+                help=_("If True, edge firewall rules will match internal "
+                       "addresses. Else they will match the external "
+                       "addresses")),
 ]
 
 
