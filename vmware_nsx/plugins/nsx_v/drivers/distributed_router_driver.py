@@ -25,6 +25,7 @@ from neutron_lib.exceptions import l3 as l3_exc
 
 from vmware_nsx.common import locking
 from vmware_nsx.db import nsxv_db
+from vmware_nsx.extensions import routersize
 from vmware_nsx.plugins.nsx_v.drivers import (
     abstract_router_driver as router_driver)
 from vmware_nsx.plugins.nsx_v import plugin as nsx_v
@@ -83,8 +84,7 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
                                          availability_zone=az)
 
     def _validate_no_size(self, router):
-        if (validators.is_attr_set(router.get('routes')) and
-            len(router['routes']) > 0):
+        if validators.is_attr_set(router.get(routersize.ROUTER_SIZE)):
             msg = _("Cannot specify router-size for distributed router")
             raise n_exc.InvalidInput(error_message=msg)
 

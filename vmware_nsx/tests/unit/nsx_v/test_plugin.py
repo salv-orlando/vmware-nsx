@@ -4652,6 +4652,17 @@ class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
                                                   p['port']['id'],
                                                   expected_code=exp_code)
 
+    def test_router_update_with_size_fail(self):
+        """Distributed router currently does not support router size update
+        """
+        with self.router() as r:
+            router_id = r['router']['id']
+            body = self._show('routers', router_id)
+            body['router']['router_size'] = 'small'
+            self._update('routers', router_id, body,
+                         expected_code=400,
+                         neutron_context=context.get_admin_context())
+
 
 class TestNSXvAllowedAddressPairs(NsxVPluginV2TestCase,
                                   test_addr_pair.TestAllowedAddressPairs):
@@ -5851,7 +5862,7 @@ class TestSharedRouterTestCase(L3NatTest, L3NatTestCaseBase,
         self._test_create_router_with_az_hint(False)
 
     def test_router_update_with_size_fail(self):
-        """Shared router currently does not support static routes
+        """Shared router currently does not support router size update
         """
         with self.router() as r:
             router_id = r['router']['id']
