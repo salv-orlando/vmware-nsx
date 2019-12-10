@@ -49,7 +49,13 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
 
         # Start some mocks
         self.router = {'id': FAKE_ROUTER_ID,
-                       'external_gateway_info': {'network_id': 'external'}}
+                       'external_gateway_info': {'network_id': 'external'},
+                       'nsx_attributes': {'distributed': False,
+                                          'router_type': 'exclusive'}}
+        self.distributed_router = {'id': FAKE_ROUTER_ID,
+                       'external_gateway_info': {'network_id': 'external'},
+                       'nsx_attributes': {'distributed': True,
+                                          'router_type': 'exclusive'}}
         mock.patch.object(self.plugin, '_get_router',
                           return_value=self.router).start()
         mock.patch.object(self.plugin, 'get_router',
@@ -121,11 +127,13 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
             if is_ingress:
                 if (not rule.get('destination_ip_address') or
                     rule['destination_ip_address'].startswith('0.0.0.0')):
-                    rule['destination_vnic_groups'] = ['vnic-index-1']
+                    if nsx_port_id:
+                        rule['destination_vnic_groups'] = [nsx_port_id]
             else:
                 if (not rule.get('source_ip_address') or
                     rule['source_ip_address'].startswith('0.0.0.0')):
-                    rule['source_vnic_groups'] = ['vnic-index-1']
+                    if nsx_port_id:
+                        rule['source_vnic_groups'] = [nsx_port_id]
             if rule.get('destination_ip_address'):
                 if rule['destination_ip_address'].startswith('0.0.0.0'):
                     del rule['destination_ip_address']
@@ -177,13 +185,19 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
         return self._fake_firewall_group(
             rule_list, is_ingress=is_ingress, admin_state_up=False)
 
-    def _fake_apply_list(self):
-        router_inst = self.router
+    def _fake_apply_list_template(self, router):
+        router_inst = router
         router_info_inst = mock.Mock()
         router_info_inst.router = router_inst
         router_info_inst.router_id = FAKE_ROUTER_ID
         apply_list = [(router_info_inst, FAKE_PORT_ID)]
         return apply_list
+
+    def _fake_apply_list(self):
+        return self._fake_apply_list_template(self.router)
+
+    def _fake_distributed_apply_list(self):
+        return self._fake_apply_list_template(self.distributed_router)
 
     def test_create_firewall_no_rules(self):
         apply_list = self._fake_apply_list()
@@ -311,3 +325,74 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
             update_fw.assert_called_once_with(
                 self.plugin.nsx_v, mock.ANY, FAKE_ROUTER_ID,
                 {'firewall_rule_list': []})
+
+    def _setup_dist_router_firewall_with_rules(self, func, is_ingress=True,
+                                               is_conflict=False,
+                                               cidr='10.24.4.0/24'):
+        apply_list = self._fake_distributed_apply_list()
+        rule_list = self._fake_rules_v4(is_ingress=is_ingress,
+                                        is_conflict=is_conflict, cidr=cidr)
+        firewall = self._fake_firewall_group(rule_list, is_ingress=is_ingress)
+        with mock.patch.object(self.plugin.fwaas_callbacks, 'get_port_fwg',
+                              return_value=firewall),\
+            mock.patch.object(self.plugin.fwaas_callbacks,
+                              '_get_port_firewall_group_id',
+                              return_value=FAKE_FW_ID),\
+            mock.patch.object(self.plugin.fwaas_callbacks,
+                              '_get_fw_group_from_plugin',
+                              return_value=firewall),\
+            mock.patch.object(edge_utils, "update_firewall") as update_fw,\
+            mock.patch.object(edge_utils, 'get_router_edge_id',
+                              return_value='edge-1'),\
+            mock.patch.object(self.plugin.edge_manager, 'get_plr_by_tlr_id',
+                              return_value=FAKE_ROUTER_ID),\
+            mock.patch.object(self.plugin, '_get_router',
+                              return_value=self.distributed_router),\
+            mock.patch.object(self.plugin, 'get_router',
+                              return_value=self.distributed_router):
+            func('nsx', apply_list, firewall)
+            expected_rules = self._fake_translated_rules(
+                rule_list, None, is_ingress=is_ingress) + [
+                {'name': "Block port ingress",
+                 'action': edge_firewall_driver.FWAAS_DENY,
+                 'logged': False},
+                {'name': "Block port egress",
+                 'action': edge_firewall_driver.FWAAS_DENY,
+                 'logged': False}]
+
+            update_fw.assert_called_once_with(
+                self.plugin.nsx_v, mock.ANY, FAKE_ROUTER_ID,
+                {'firewall_rule_list': expected_rules})
+
+    def test_create_dist_router_firewall_with_ingress_rules(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.create_firewall_group)
+
+    def test_update_dist_router_firewall_with_ingress_rules(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.update_firewall_group)
+
+    def test_create_dist_router_firewall_with_egress_rules(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.create_firewall_group,
+            is_ingress=False)
+
+    def test_create_dist_router_firewall_with_illegal_cidr(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.create_firewall_group,
+            cidr='0.0.0.0/24')
+
+    def test_update_dist_router_firewall_with_egress_rules(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.update_firewall_group,
+            is_ingress=False)
+
+    def test_update_dist_router_firewall_with_egress_conflicting_rules(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.update_firewall_group,
+            is_ingress=False, is_conflict=True)
+
+    def test_update_dist_router_firewall_with_ingress_conflicting_rules(self):
+        self._setup_dist_router_firewall_with_rules(
+            self.firewall.update_firewall_group,
+            is_ingress=True, is_conflict=True)
