@@ -75,7 +75,8 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
 
         return True
 
-    def get_fwaas_rules_for_router(self, context, router_id, edge_id):
+    def get_fwaas_rules_for_router(self, context, router_id, router_db,
+                                   edge_id):
         """Return the list of (translated) FWaaS rules for this router."""
         ctx_elevated = context.elevated()
         router_interfaces = self.core_plugin._get_router_interfaces(
@@ -86,10 +87,18 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
         for port in router_interfaces:
             fwg = self.get_port_fwg(ctx_elevated, port['id'])
             if fwg:
-                # get the interface vnic
-                edge_vnic_bind = nsxv_db.get_edge_vnic_binding(
-                    context.session, edge_id, port['network_id'])
-                vnic_id = 'vnic-index-%s' % edge_vnic_bind.vnic_index
+                router_dict = {}
+                self.core_plugin._extend_nsx_router_dict(
+                    router_dict, router_db)
+                if router_dict['distributed']:
+                    # The vnic_id is ignored for distributed routers, so
+                    # each rule will be applied to all the interfaces.
+                    vnic_id = None
+                else:
+                    # get the interface vnic
+                    edge_vnic_bind = nsxv_db.get_edge_vnic_binding(
+                        context.session, edge_id, port['network_id'])
+                    vnic_id = 'vnic-index-%s' % edge_vnic_bind.vnic_index
                 # Add the FWaaS rules for this port
                 fw_rules.extend(
                     self.get_port_translated_rules(vnic_id, fwg))
@@ -117,15 +126,16 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
                 is_ingress=False))
 
         # Add ingress/egress block rules for this port
-        port_rules.extend([
-            {'name': "Block port ingress",
+        default_ingress = {'name': "Block port ingress",
              'action': edge_firewall_driver.FWAAS_DENY,
-             'destination_vnic_groups': [vnic_id],
-             'logged': logged},
-            {'name': "Block port egress",
+             'logged': logged}
+        default_egress = {'name': "Block port egress",
              'action': edge_firewall_driver.FWAAS_DENY,
-             'source_vnic_groups': [vnic_id],
-             'logged': logged}])
+             'logged': logged}
+        if vnic_id:
+            default_ingress['destination_vnic_groups'] = [vnic_id]
+            default_egress['source_vnic_groups'] = [vnic_id]
+        port_rules.extend([default_ingress, default_egress])
 
         return port_rules
 
