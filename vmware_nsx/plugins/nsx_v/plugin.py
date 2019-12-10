@@ -3890,26 +3890,25 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 context.elevated(), router['id'])
             gw_address_scope = self._get_network_address_scope(
                 context.elevated(), gw_port['network_id'])
-            if gw_address_scope:
-                for subnet in subnets:
-                    # Do not build NAT rules for v6
-                    if subnet.get('ip_version') == 6:
-                        continue
-                    # if the subnets address scope is the same as the gateways:
-                    # no need for SNAT
-                    subnet_address_scope = self._get_subnetpool_address_scope(
-                        context.elevated(), subnet['subnetpool_id'])
-                    if gw_address_scope == subnet_address_scope:
-                        LOG.info("No need for SNAT rule for router %(router)s "
-                                 "and subnet %(subnet)s because they use the "
-                                 "same address scope %(addr_scope)s.",
-                                 {'router': router['id'],
-                                  'subnet': subnet['id'],
-                                  'addr_scope': gw_address_scope})
-                        continue
-
-                    snat.append(self._get_default_nat_rule(
-                        context, router['id'], subnet, snat_ip))
+            for subnet in subnets:
+                # Do not build NAT rules for v6
+                if subnet.get('ip_version') == 6:
+                    continue
+                # if the subnets address scope is the same as the gateways:
+                # no need for SNAT
+                subnet_address_scope = self._get_subnetpool_address_scope(
+                    context.elevated(), subnet['subnetpool_id'])
+                if (gw_address_scope and
+                    gw_address_scope == subnet_address_scope):
+                    LOG.info("No need for SNAT rule for router %(router)s "
+                             "and subnet %(subnet)s because they use the "
+                             "same address scope %(addr_scope)s.",
+                             {'router': router['id'],
+                              'subnet': subnet['id'],
+                              'addr_scope': gw_address_scope})
+                    continue
+                snat.append(self._get_default_nat_rule(
+                    context, router['id'], subnet, snat_ip))
         return (snat, dnat)
 
     def _get_default_nat_rule(self, context, router_id, subnet, snat_ip):
