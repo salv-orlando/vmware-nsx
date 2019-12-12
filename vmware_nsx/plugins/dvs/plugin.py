@@ -603,6 +603,7 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
                 super(NsxDvsV2, self).get_ports(
                       context, filters, fields, sorts,
                       limit, marker, page_reverse))
+            self._log_get_ports(ports, filters)
             # Add port extensions
             for port in ports:
                 self.plugin_extend_port_dict_binding(context, port)

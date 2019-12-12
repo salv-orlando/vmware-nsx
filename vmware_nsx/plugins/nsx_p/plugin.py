@@ -1477,6 +1477,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 super(NsxPolicyPlugin, self).get_ports(
                     context, filters, fields, sorts,
                     limit, marker, page_reverse))
+            self._log_get_ports(ports, filters)
             # Add port extensions
             for port in ports[:]:
                 self._extend_nsx_port_dict_binding(context, port)

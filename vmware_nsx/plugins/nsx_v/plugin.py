@@ -2721,6 +2721,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 super(NsxVPluginV2, self).get_ports(
                     context, filters, fields, sorts,
                     limit, marker, page_reverse))
+            self._log_get_ports(ports, filters)
             # Add the relevant port extensions
             for port in ports[:]:
                 self._extend_get_port_dict_qos_and_binding(context, port)
