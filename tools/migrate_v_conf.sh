@@ -2,26 +2,26 @@
 
 set -eu
 
-# This script will generate a set of neutron config files for the nsx policy
-# plugin given the nsx-v config files
+# This script will generate a set of neutron config files for the NSX policy
+# plugin given the NSX-V config files
 
 usage () {
     >&2  echo "
 Usage: $0 [OPTION]...
 
 Generate neutron NSX-P config files
-    
+
   --v-neutron-conf-path <path>  Path for the original NSX-V neutron.conf (mandatory)
   --v-nsx-ini-path <path>       Path for the original NSX-V nsx.ini (mandatory)
   --p-neutron-conf-path <path>  Path for the generated NSX-P neutron.conf (optional)
   --p-nsx-ini-path <path>       Path for the generated NSX-P nsx.ini (optional)
-  --nsx-api-manager <ip>        IP of the nsx manager (mandatory)
-  --nsx-api-user <user>         User for the nsx manager authentication (defaults to admin)
-  --nsx-api-password <password> Password for the nsx manager authentication (defaults to Admin!23)
-  --metadata-proxy <uuid>       Nsx metadata proxy name or UUID (mandatory)
-  --dhcp-profile <uuid>         Nsx DHCP profile name or UUID (mandatory)
-  --default-overlay-tz <uuid>   Nsx overlay transport zone name or UUID (mandatory)
-  --default-vlan-tz <uuid>      Nsx VLAN transport zone name or UUID (optional)
+  --nsx-api-manager <ip>        IP of the NSX manager (mandatory)
+  --nsx-api-user <user>         User for the NSX manager authentication (defaults to admin)
+  --nsx-api-password <password> Password for the NSX manager authentication (defaults to Admin!23)
+  --metadata-proxy <uuid>       NSX metadata proxy name or UUID (mandatory)
+  --dhcp-profile <uuid>         NSX DHCP profile name or UUID (mandatory)
+  --default-overlay-tz <uuid>   NSX overlay transport zone name or UUID (mandatory)
+  --default-vlan-tz <uuid>      NSX VLAN transport zone name or UUID (optional)
   --default-tier0-router <uuid> NSX tier0 router name or UUID (mandatory)
   -h, --help                    Print this usage message"
     exit 0
@@ -109,17 +109,18 @@ function create_neutron_conf {
     # Copy the nsx-v conf file
     cp $v_neutron_conf $p_neutron_conf
 
-    # change the core plugin
+    # Change the core plugin
     sed -i 's/^core_plugin = vmware_nsxv/core_plugin = vmware_nsxp/' $p_neutron_conf
 
-    # remove unsupported services
+    # Remove unsupported services
     sed -i 's/neutron_dynamic_routing.services.bgp.bgp_plugin.BgpPlugin//' $p_neutron_conf
     sed -i 's/networking_l2gw.services.l2gateway.plugin.L2GatewayPlugin//' $p_neutron_conf
 
     # Replace service plugins
     sed -i 's/vmware_nsxv_qos/neutron.services.qos.qos_plugin.QoSPlugin/' $p_neutron_conf
 
-    # replace nsx-v drivers
+    # Replace nsx-v FWaaS driver
+    sed -i 's/vmware_nsxv_edge_v2/vmware_nsxp_edge_v2/' $p_neutron_conf
     sed -i 's/vmware_nsxv_edge/vmware_nsxp_edge_v2/' $p_neutron_conf
 
     echo "Created $p_neutron_conf for policy plugin neutron.conf"
@@ -128,8 +129,7 @@ function create_neutron_conf {
 function create_nsx_ini {
     cp $v_nsx_ini $p_nsx_ini
 
-    # replace nsx-v drivers
-    # TODO(asarfaty): add more
+    # Replace nsx-v drivers
     sed -i 's/vmware_nsxv_dns/vmware_nsxp_dns/' $p_nsx_ini
 
     # Add the nsxp section
@@ -138,7 +138,6 @@ function create_nsx_ini {
     echo "nsx_api_managers = $nsx_api_manager" >> $p_nsx_ini
     echo "nsx_api_password = $nsx_api_password" >> $p_nsx_ini
     echo "nsx_api_user = $nsx_api_user" >> $p_nsx_ini
-    # DEBUG ADIT - should get as parameters (for each az)
     echo "metadata_proxy = $metadata_proxy" >> $p_nsx_ini
     echo "dhcp_profile = $dhcp_profile" >> $p_nsx_ini
     echo "default_overlay_tz = $default_overlay_tz" >> $p_nsx_ini
@@ -146,14 +145,23 @@ function create_nsx_ini {
         echo "default_vlan_tz = $default_vlan_tz" >> $p_nsx_ini
     fi
     echo "default_tier0_router = $default_tier0_router" >> $p_nsx_ini
+    # Add the nat-firewall flag to match the existing nsx-v status
+    echo "firewall_match_internal_addr = false" >> $p_nsx_ini
+
     grep "availability_zones" $v_nsx_ini >> $p_nsx_ini
     echo "" >> $p_nsx_ini
 
-    # Add the api_replay flag under the default section so that the migration can start
-    sed -i '/[DEFAULT]/a api_replay_mode = true' $p_nsx_ini
+    # Add the api_replay flag under the DEFAULT section so that the migration can start
+    sed -i '/\[DEFAULT\]/a api_replay_mode = true' $p_nsx_ini
 
-    # DEBUG ADIT - update availability zones config (will require additional args or mapping)
+    # Add comment to manually update the AZs later
+    sed -i '/^\[az\:.*\]/a # Please add mandatory availability zone config here' $p_nsx_ini
+
     echo "Created $p_nsx_ini for policy plugin nsx.ini"
+
+    if grep -q "Please add mandatory" "$p_nsx_ini"; then
+        echo "Please add mandatory configuration fields to availability zones in nsx.ini"
+    fi
 }
 
 testargs=
