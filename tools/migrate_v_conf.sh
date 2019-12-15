@@ -123,6 +123,9 @@ function create_neutron_conf {
     sed -i 's/vmware_nsxv_edge_v2/vmware_nsxp_edge_v2/' $p_neutron_conf
     sed -i 's/vmware_nsxv_edge/vmware_nsxp_edge_v2/' $p_neutron_conf
 
+    # Replace the FWaaS service provider temporarily to allow the migration
+    sed -i 's/neutron_fwaas.services.firewall.service_drivers.agents.agents.FirewallAgentDriver/vmware_nsx.services.fwaas.common.api_replay_driver.ApiReplayFirewallAgentDriver/' $p_neutron_conf
+
     echo "Created $p_neutron_conf for policy plugin neutron.conf"
 }
 
