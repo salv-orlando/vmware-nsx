@@ -25,6 +25,8 @@ from neutron_lib import context as n_context
 
 from vmware_nsx.common import nsxv_constants
 from vmware_nsx.common import utils as c_utils
+from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
@@ -150,14 +152,47 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 LOG.error("Interface network of router %s cannot overlap with "
                           "router GW network", router['id'])
 
-            # TODO(asarfaty): missing validations:
-            # - Vlan provider network with the same VLAN tag as the uplink
-            #   profile tag used in the relevant transport node
-            #   (cannot check this without access to the T manager)
-            # - Unsupported load balancing topologies
-            #   (e.g.: Load Balancer with members from various subnets
-            #    not uplinked to the same edge router)
-            #   First need to decide if this is for nlbaas or Octavia
+        # TODO(asarfaty): missing validations:
+        # - Vlan provider network with the same VLAN tag as the uplink
+        #   profile tag used in the relevant transport node
+        #   (cannot check this without access to the T manager)
+
+        # Octavia loadbalancers validation:
+        filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
+                                    oct_const.DEVICE_OWNER_OCTAVIA]}
+        lb_ports = plugin.get_ports(admin_context, filters=filters)
+        lb_routers = []
+        for port in lb_ports:
+            fixed_ips = port.get('fixed_ips', [])
+            if fixed_ips:
+                subnet_id = fixed_ips[0]['subnet_id']
+                network = lb_utils.get_network_from_subnet(
+                    admin_context, plugin, subnet_id)
+                router_id = lb_utils.get_router_from_network(
+                    admin_context, plugin, subnet_id)
+                # Loadbalancer vip subnet must be connected to a router or
+                # belong to an external network
+                if (not router_id and network and
+                    not network.get('router:external')):
+                    n_errors = n_errors + 1
+                    LOG.error("Loadbalancer %s subnet %s is not external "
+                              "nor connected to a router.",
+                              port.get('device_id'), subnet_id)
+                # Multiple loadbalancers on the same router cannot be supported
+                if router_id in lb_routers:
+                    n_errors = n_errors + 1
+                    LOG.error("Router %s has multiple loadbalancers which is "
+                              "not supported.", router_id)
+                else:
+                    lb_routers.append(router_id)
+
+            # TODO(asarfaty): Multiple listeners on the same pool is not
+            # supported, but currently the admin utility has no access to this
+            # information from octavia
+
+            # TODO(asarfaty): Member on external subnet must have fip as ip,
+            # but currently the admin utility has no access to this information
+            # from octavia
 
         # General validations:
         # TODO(asarfaty): multiple transport zones (migrator limitation)?
