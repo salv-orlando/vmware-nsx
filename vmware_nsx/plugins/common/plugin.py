@@ -441,6 +441,14 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
              sg_rule[sg_prefix.LOCAL_IP_PREFIX].startswith('::/'))):
             sg_rule[sg_prefix.LOCAL_IP_PREFIX] = None
 
+    def _log_get_ports(self, ports, filters):
+        if len(ports) > 0:
+            LOG.debug("Getting %(num)s port%(plural)s with %(filters)s",
+                      {'len': len(ports),
+                       'plural': 's' if len(ports) > 1 else '',
+                       'filters': ('filters ' + str(filters) if filters
+                                   else 'no filters')})
+
     def get_housekeeper(self, context, name, fields=None):
         # run the job in readonly mode and get the results
         self.housekeeper.run(context, name, readonly=True)
