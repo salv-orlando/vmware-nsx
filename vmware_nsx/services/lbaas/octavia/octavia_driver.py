@@ -130,7 +130,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                     project_id = db_lb.project_id
 
         if not project_id:
-            LOG.warning("Could bot find the tenant id for %(type)s "
+            LOG.warning("Could not find the tenant id for %(type)s "
                         "%(obj)s", {'type': obj_type, 'obj': obj_dict})
         return project_id
 
