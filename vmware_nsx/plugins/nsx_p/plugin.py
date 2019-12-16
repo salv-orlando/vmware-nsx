@@ -1291,26 +1291,42 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # a l3 router.  If so, we should prevent deletion here
         if l3_port_check:
             self.prevent_l3_port_deletion(context, port_id)
-        port = self.get_port(context, port_id)
         # Prevent DHCP port deletion if native support is enabled
         if (cfg.CONF.nsx_p.allow_passthrough and
             not force_delete_dhcp and
-            port['device_owner'] in [const.DEVICE_OWNER_DHCP]):
+            port_data['device_owner'] in [const.DEVICE_OWNER_DHCP]):
             msg = (_('Can not delete DHCP port %s') % port_id)
             raise n_exc.BadRequest(resource='port', msg=msg)
         if not force_delete_vpn:
-            self._assert_on_vpn_port_change(port)
-
-        if self._is_backend_port(context, port_data):
-            self._delete_port_on_backend(context, net_id, port_id)
+            self._assert_on_vpn_port_change(port_data)
 
         self.disassociate_floatingips(context, port_id)
 
         # Remove Mac/IP binding from native DHCP server and neutron DB.
         if cfg.CONF.nsx_p.allow_passthrough:
-            self._delete_dhcp_binding(context, port)
+            self._delete_dhcp_binding(context, port_data)
 
         super(NsxPolicyPlugin, self).delete_port(context, port_id)
+
+        # Delete the backend port last to prevent recreation by another process
+        if self._is_backend_port(context, port_data):
+            try:
+                self._delete_port_on_backend(context, net_id, port_id)
+            except nsx_lib_exc.ResourceNotFound:
+                # If the resource was not found on the backend do not worry
+                # about it. The conditions has already been logged, so there
+                # is no need to do further logging
+                pass
+            except nsx_lib_exc.ManagerError as e:
+                # If there is a failure in deleting the resource, fail the
+                # neutron operation even though the neutron object was already
+                # deleted. This way the user will be aware of zombie resources
+                # that may fail future actions.
+                msg = (_("Backend segment port deletion for neutron port "
+                         "%(id)s failed. The object was however removed from "
+                         "the Neutron database: %(e)s") %
+                       {'id': port_id, 'e': e})
+                raise nsx_exc.NsxPluginException(err_msg=msg)
 
     def _update_port_on_backend(self, context, lport_id,
                                 original_port, updated_port,
