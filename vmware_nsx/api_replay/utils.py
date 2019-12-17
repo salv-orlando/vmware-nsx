@@ -73,7 +73,6 @@ class PrepareObjectForMigration(object):
 
     drop_subnet_fields = basic_ignore_fields + [
         'advanced_service_providers',
-        'id',
         'service_types']
 
     drop_port_fields = basic_ignore_fields + [
@@ -103,14 +102,14 @@ class PrepareObjectForMigration(object):
     drop_fwaas_group_fields = ['status']
 
     lb_ignore_fields = ['created_at', 'updated_at', 'operating_status',
-                        'provisioning_status', 'id']
+                        'provisioning_status']
     drop_lb_loadbalancer_fields = lb_ignore_fields + [
-        'listeners', 'pools',  # Those objects will be created laster
-        'vip_subnet_id',  # vip_port_id will be used
+        'listeners', 'pools',  # Those objects will be created later
         'flavor_id',  # not supported by the driver
+        'vip_qos_policy_id',  # not supported by the driver
     ]
     drop_lb_listener_fields = lb_ignore_fields + [
-        'loadbalancers', 'l7policies', 'default_pool_id']
+        'l7policies', 'default_pool_id']
     drop_lb_pool_fields = lb_ignore_fields + [
         'loadbalancers', 'healthmonitor_id', 'listeners', 'members']
     drop_lb_member_fields = lb_ignore_fields
@@ -192,6 +191,7 @@ class PrepareObjectForMigration(object):
         # external networks needs some special care
         if body.get('router:external'):
             fields_reset = False
+            # TODO(asarfaty): map external network neutron ids to Policy tier0
             for field in ['provider:network_type', 'provider:segmentation_id',
                           'provider:physical_network']:
                 if field in body:
@@ -264,10 +264,6 @@ class PrepareObjectForMigration(object):
             if 'device_owner' not in body:
                 body['device_owner'] = ""
 
-        if body.get('device_owner') == 'Octavia':
-            # remove device id & owner. Octavia will re-set it.
-            body['device_id'] = ""
-            body['device_owner'] = ""
         return body
 
     def prepare_floatingip(self, fip, direct_call=False):
@@ -297,20 +293,31 @@ class PrepareObjectForMigration(object):
     def prepare_lb_loadbalancer(self, lb_obj):
         return self.drop_fields(lb_obj, self.drop_lb_loadbalancer_fields)
 
-    def prepare_lb_listener(self, lb_obj):
-        return self.drop_fields(lb_obj, self.drop_lb_listener_fields)
+    def prepare_lb_listener(self, listener_obj, lb_body):
+        body = self.drop_fields(listener_obj, self.drop_lb_listener_fields)
+        body['loadbalancer'] = lb_body
+        body['loadbalancer_id'] = lb_body['id']
+        return body
 
-    def prepare_lb_pool(self, lb_obj):
-        return self.drop_fields(lb_obj, self.drop_lb_pool_fields)
+    def prepare_lb_pool(self, pool_obj, lb_body):
+        body = self.drop_fields(pool_obj, self.drop_lb_pool_fields)
+        body['loadbalancer'] = lb_body
+        body['loadbalancer_id'] = lb_body['id']
+        return body
 
-    def prepare_lb_member(self, lb_obj):
-        return self.drop_fields(lb_obj, self.drop_lb_member_fields)
+    def prepare_lb_member(self, mem_obj, lb_body):
+        body = self.drop_fields(mem_obj, self.drop_lb_member_fields)
+        body['loadbalancer'] = lb_body
+        body['loadbalancer_id'] = lb_body['id']
+        return body
 
     def prepare_lb_hm(self, lb_obj):
         return self.drop_fields(lb_obj, self.drop_lb_hm_fields)
 
     def prepare_lb_l7policy(self, lb_obj):
-        return self.drop_fields(lb_obj, self.drop_lb_l7policy_fields)
+        body = self.drop_fields(lb_obj, self.drop_lb_l7policy_fields)
+        body['rules'] = []
+        return body
 
     def prepare_lb_l7rule(self, lb_obj):
         return self.drop_fields(lb_obj, self.drop_lb_l7rule_fields)
