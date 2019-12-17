@@ -38,18 +38,6 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         return router_id
 
-    def _get_info_from_fip(self, context, fip):
-        filters = {'floating_ip_address': [fip]}
-        floating_ips = self.core_plugin.get_floatingips(context,
-                                                        filters=filters)
-        if floating_ips:
-            return (floating_ips[0]['fixed_ip_address'],
-                    floating_ips[0]['router_id'])
-        else:
-            msg = (_('Member IP %(fip)s is an external IP, and is expected to '
-                     'be a floating IP') % {'fip': fip})
-            raise n_exc.BadRequest(resource='lbaas-vip', msg=msg)
-
     def create(self, context, lb, completor):
         lb_id = lb['id']
 
