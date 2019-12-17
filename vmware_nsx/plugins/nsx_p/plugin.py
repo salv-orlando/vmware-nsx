@@ -837,7 +837,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if network_id in NET_NEUTRON_2_NSX_ID_CACHE:
             nsx_id = NET_NEUTRON_2_NSX_ID_CACHE[network_id]
             del NET_NEUTRON_2_NSX_ID_CACHE[network_id]
-            del NET_NSX_2_NEUTRON_ID_CACHE[nsx_id]
+            if nsx_id in NET_NSX_2_NEUTRON_ID_CACHE:
+                del NET_NSX_2_NEUTRON_ID_CACHE[nsx_id]
 
     def update_network(self, context, network_id, network):
         original_net = super(NsxPolicyPlugin, self).get_network(
@@ -944,6 +945,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.nsxpolicy.tier1.update(router_id,
                                         ipv6_ndra_profile_id=profile_id)
 
+    @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
         return self._create_subnet(context, subnet)
 

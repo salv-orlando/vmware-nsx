@@ -44,7 +44,10 @@ class NSXOctaviaListener(object):
                                 loadbalancer, member, pool)
 
     def _init_rpc_messaging(self):
-        topic = constants.DRIVER_TO_OCTAVIA_TOPIC
+        if cfg.CONF.api_replay_mode:
+            topic = constants.DRIVER_TO_OCTAVIA_MIGRATION_TOPIC
+        else:
+            topic = constants.DRIVER_TO_OCTAVIA_TOPIC
         transport = messaging.get_rpc_transport(cfg.CONF)
         target = messaging.Target(topic=topic, exchange="common",
                                   namespace='control', fanout=False,
@@ -54,7 +57,10 @@ class NSXOctaviaListener(object):
     def _init_rpc_listener(self, healthmonitor, l7policy, l7rule, listener,
                            loadbalancer, member, pool):
         # Initialize RPC listener
-        topic = constants.OCTAVIA_TO_DRIVER_TOPIC
+        if cfg.CONF.api_replay_mode:
+            topic = constants.OCTAVIA_TO_DRIVER_MIGRATION_TOPIC
+        else:
+            topic = constants.OCTAVIA_TO_DRIVER_TOPIC
         server = socket.gethostname()
         transport = messaging.get_rpc_transport(cfg.CONF)
         target = messaging.Target(topic=topic, server=server,
@@ -299,6 +305,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver loadbalancer_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def loadbalancer_delete_cascade(self, ctxt, loadbalancer):
@@ -336,6 +344,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver loadbalancer_delete_cascade failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def loadbalancer_delete(self, ctxt, loadbalancer, cascade=False):
@@ -350,6 +360,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver loadbalancer_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def loadbalancer_update(self, ctxt, old_loadbalancer, new_loadbalancer):
@@ -362,6 +374,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver loadbalancer_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     # Listener
     @log_helpers.log_method_call
@@ -375,6 +389,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver listener_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def listener_delete(self, ctxt, listener):
@@ -386,6 +402,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver listener_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def listener_update(self, ctxt, old_listener, new_listener, cert):
@@ -398,6 +416,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver listener_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     # Pool
     @log_helpers.log_method_call
@@ -410,6 +430,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver pool_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def pool_delete(self, ctxt, pool):
@@ -421,6 +443,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver pool_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def pool_update(self, ctxt, old_pool, new_pool):
@@ -432,6 +456,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver pool_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     # Member
     @log_helpers.log_method_call
@@ -444,6 +470,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver member_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def member_delete(self, ctxt, member):
@@ -455,6 +483,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver member_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def member_update(self, ctxt, old_member, new_member):
@@ -466,6 +496,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver member_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     # Health Monitor
     @log_helpers.log_method_call
@@ -478,6 +510,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver healthmonitor_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def healthmonitor_delete(self, ctxt, healthmonitor):
@@ -489,6 +523,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver healthmonitor_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def healthmonitor_update(self, ctxt, old_healthmonitor, new_healthmonitor):
@@ -501,6 +537,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver healthmonitor_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     # L7 Policy
     @log_helpers.log_method_call
@@ -513,6 +551,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver l7policy_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def l7policy_delete(self, ctxt, l7policy):
@@ -524,6 +564,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver l7policy_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def l7policy_update(self, ctxt, old_l7policy, new_l7policy):
@@ -535,6 +577,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver l7policy_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     # L7 Rule
     @log_helpers.log_method_call
@@ -546,6 +590,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver l7rule_create failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def l7rule_delete(self, ctxt, l7rule):
@@ -557,6 +603,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver l7rule_delete failed %s', e)
             completor(success=False)
+            return False
+        return True
 
     @log_helpers.log_method_call
     def l7rule_update(self, ctxt, old_l7rule, new_l7rule):
@@ -567,6 +615,8 @@ class NSXOctaviaListenerEndpoint(object):
         except Exception as e:
             LOG.error('NSX driver l7rule_update failed %s', e)
             completor(success=False)
+            return False
+        return True
 
 
 class NSXOctaviaStatisticsCollector(object):

@@ -10,8 +10,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
 import logging
-import time
+import socket
 
 import six
 
@@ -20,13 +21,20 @@ from keystoneauth1 import session
 from neutronclient.common import exceptions as n_exc
 from neutronclient.v2_0 import client
 from octaviaclient.api.v2 import octavia
+from oslo_config import cfg
+import oslo_messaging as messaging
+from oslo_messaging.rpc import dispatcher
 from oslo_utils import excutils
+
+from neutron.common import config as neutron_config
+from octavia_lib.api.drivers import driver_lib
 
 from vmware_nsx.api_replay import utils
 from vmware_nsx.common import nsxv_constants
+from vmware_nsx.services.lbaas.octavia import constants as d_const
 
-logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
+LOG.setLevel(logging.INFO)
 
 # For internal testing only
 use_old_keystone_on_dest = False
@@ -41,7 +49,15 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  dest_os_username, dest_os_user_domain_id,
                  dest_os_tenant_name, dest_os_tenant_domain_id,
                  dest_os_password, dest_os_auth_url, dest_plugin,
-                 use_old_keystone, logfile, max_retry):
+                 use_old_keystone,
+                 octavia_os_username, octavia_os_user_domain_id,
+                 octavia_os_tenant_name, octavia_os_tenant_domain_id,
+                 octavia_os_password, octavia_os_auth_url,
+                 neutron_conf, logfile, max_retry):
+
+        # Init config and logging
+        if neutron_conf:
+            neutron_config.init(args=['--config-file', neutron_conf])
 
         if logfile:
             f_handler = logging.FileHandler(logfile)
@@ -54,6 +70,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         # connect to both clients
         if use_old_keystone:
+            LOG.info("Using old keystone for source neutron")
             # Since we are not sure what keystone version will be used on the
             # source setup, we add an option to use the v2 client
             self.source_neutron = client.Client(
@@ -61,7 +78,6 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_name=source_os_tenant_name,
                 password=source_os_password,
                 auth_url=source_os_auth_url)
-            self.source_octavia = None
         else:
             self.source_neutron = self.connect_to_client(
                 username=source_os_username,
@@ -70,21 +86,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_domain_id=source_os_tenant_domain_id,
                 password=source_os_password,
                 auth_url=source_os_auth_url)
-            self.source_octavia = self.connect_to_octavia(
-                username=source_os_username,
-                user_domain_id=source_os_user_domain_id,
-                tenant_name=source_os_tenant_name,
-                tenant_domain_id=source_os_tenant_domain_id,
-                password=source_os_password,
-                auth_url=source_os_auth_url)
 
         if use_old_keystone_on_dest:
+            LOG.info("Using old keystone for destination neutron")
             self.dest_neutron = client.Client(
                 username=dest_os_username,
                 tenant_name=dest_os_tenant_name,
                 password=dest_os_password,
                 auth_url=dest_os_auth_url)
-            self.dest_octavia = None
         else:
             self.dest_neutron = self.connect_to_client(
                 username=dest_os_username,
@@ -93,13 +102,17 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_domain_id=dest_os_tenant_domain_id,
                 password=dest_os_password,
                 auth_url=dest_os_auth_url)
-            self.dest_octavia = self.connect_to_octavia(
-                username=dest_os_username,
-                user_domain_id=dest_os_user_domain_id,
-                tenant_name=dest_os_tenant_name,
-                tenant_domain_id=dest_os_tenant_domain_id,
-                password=dest_os_password,
-                auth_url=dest_os_auth_url)
+
+        if octavia_os_auth_url:
+            self.octavia = self.connect_to_octavia(
+                username=octavia_os_username,
+                user_domain_id=octavia_os_user_domain_id,
+                tenant_name=octavia_os_tenant_name,
+                tenant_domain_id=octavia_os_tenant_domain_id,
+                password=octavia_os_password,
+                auth_url=octavia_os_auth_url)
+        else:
+            self.octavia = None
 
         self.dest_plugin = dest_plugin
 
@@ -112,7 +125,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.migrate_floatingips()
         self.migrate_routers_routes(routers_routes)
         self.migrate_fwaas()
-        if self.source_octavia and self.dest_octavia:
+        if self.octavia:
             self.migrate_octavia()
         LOG.info("NSX migration is Done.")
 
@@ -430,6 +443,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         source_networks = self.source_neutron.list_networks()['networks']
         dest_networks = self.dest_neutron.list_networks()['networks']
         dest_ports = self.dest_neutron.list_ports()['ports']
+        dest_subnets = self.dest_neutron.list_subnets()['subnets']
 
         remove_qos = False
         if not self.dest_qos_support:
@@ -485,6 +499,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             dhcp_subnets = []
             count_dhcp_subnet = 0
             for subnet_id in network['subnets']:
+
+                # only create subnet if the dest server doesn't have it
+                if self.have_id(subnet_id, dest_subnets):
+                    LOG.info("Skip network %s: Already exists on the "
+                             "destination", network['id'])
+                    continue
                 subnet = self.find_subnet_by_id(subnet_id, source_subnets)
                 body = self.prepare_subnet(subnet)
 
@@ -528,10 +548,6 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except n_exc.BadRequest as e:
                     LOG.error("Failed to create subnet: %(subnet)s: %(e)s",
                               {'subnet': subnet, 'e': e})
-                    # NOTE(arosen): this occurs here if you run the script
-                    # multiple times as we don't currently
-                    # preserve the subnet_id. Also, 409 would be a better
-                    # response code for this in neutron :(
 
             # create the ports on the network
             ports = self.get_ports_on_network(network['id'], source_ports)
@@ -741,93 +757,75 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         LOG.info("FWaaS V2 migration done")
 
-    def _wait_for_lb_up(self, lb_id):
-        retry_num = 0
-        while retry_num < self.max_retry:
-            lb = self.dest_octavia.load_balancer_show(lb_id)
-            if not lb['provisioning_status'].startswith('PENDING'):
-                if lb['provisioning_status'] == 'ACTIVE':
-                    return True
-                # No point in trying any more
-                return False
-            retry_num = retry_num + 1
-            time.sleep(1)
-        return False
+    def _delete_octavia_lb(self, body):
+        kw = {'loadbalancer': body}
+        self.octavia_rpc_client.call({}, 'loadbalancer_delete_cascade', **kw)
 
     def _migrate_octavia_lb(self, lb, orig_map):
+        # Creating all loadbalancers resources on the new nsx driver
+        # using RPC calls to the plugin listener.
+
         # Create the loadbalancer:
-        body = self.prepare_lb_loadbalancer(lb)
-        try:
-            new_lb = self.dest_octavia.load_balancer_create(
-                json={'loadbalancer': body})['loadbalancer']
-        except Exception as e:
-            LOG.error("Failed to create loadbalancer (%(lb)s): %(e)s",
-                      {'lb': lb, 'e': e})
+        lb_body = self.prepare_lb_loadbalancer(lb)
+        kw = {'loadbalancer': lb_body}
+        if not self.octavia_rpc_client.call({}, 'loadbalancer_create', **kw):
+            LOG.error("Failed to create loadbalancer (%s)", lb_body)
+            self._delete_octavia_lb(lb_body)
             return
-        new_lb_id = new_lb['id']
-        if not self._wait_for_lb_up(new_lb_id):
-            LOG.error("New loadbalancer %s does not become active", new_lb_id)
-            return
+
+        lb_id = lb['id']
+        lb_body_for_deletion = copy.deepcopy(lb_body)
+        lb_body_for_deletion['listeners'] = []
+        lb_body_for_deletion['pools'] = []
 
         listeners_map = {}
         for listener_dict in lb.get('listeners', []):
             listener_id = listener_dict['id']
             listener = orig_map['listeners'][listener_id]
-            body = self.prepare_lb_listener(listener)
-            # Update loadbalancer in listener
-            body['loadbalancer_id'] = new_lb_id
-            try:
-                new_listener = self.dest_octavia.listener_create(
-                    json={'listener': body})['listener']
-            except Exception as e:
-                LOG.error("Failed to create listener (%(list)s): %(e)s",
-                          {'list': listener, 'e': e})
+            body = self.prepare_lb_listener(listener, lb_body)
+            body['loadbalancer'] = lb_body
+            body['loadbalancer_id'] = lb_id
+            kw = {'listener': body, 'cert': None}
+            if not self.octavia_rpc_client.call({}, 'listener_create', **kw):
+                LOG.error("Failed to create loadbalancer %(lb)s listener "
+                          "(%(list)s)", {'list': listener, 'lb': lb_id})
+                self._delete_octavia_lb(lb_body_for_deletion)
                 return
-            if not self._wait_for_lb_up(new_lb_id):
-                LOG.error("New loadbalancer %s does not become active after "
-                          "listener creation", new_lb_id)
-                return
-            # map old-id to new
-            listeners_map[listener_id] = new_listener['id']
+            listeners_map[listener_id] = body
+            lb_body_for_deletion['listeners'].append(body)
 
-        pools_map = {}
         for pool_dict in lb.get('pools', []):
             pool_id = pool_dict['id']
             pool = orig_map['pools'][pool_id]
-            body = self.prepare_lb_pool(pool)
-            # Update loadbalancer and listeners in pool
-            body['loadbalancer_id'] = new_lb_id
+            pool_body = self.prepare_lb_pool(pool, lb_body)
+            # Update listeners in pool
             if pool.get('listeners'):
-                body['listener_id'] = listeners_map[pool['listeners'][0]['id']]
-            try:
-                new_pool = self.dest_octavia.pool_create(
-                    json={'pool': body})['pool']
-            except Exception as e:
-                LOG.error("Failed to create pool (%(pool)s): %(e)s",
-                          {'pool': pool, 'e': e})
+                listener_id = pool['listeners'][0]['id']
+                pool_body['listener_id'] = listener_id
+                pool_body['listener'] = listeners_map.get(listener_id)
+            kw = {'pool': pool_body}
+            if not self.octavia_rpc_client.call({}, 'pool_create', **kw):
+                LOG.error("Failed to create loadbalancer %(lb)s pool "
+                          "(%(pool)s)", {'pool': pool, 'lb': lb_id})
+                self._delete_octavia_lb(lb_body_for_deletion)
                 return
-            if not self._wait_for_lb_up(new_lb_id):
-                LOG.error("New loadbalancer %s does not become active after "
-                          "pool creation", new_lb_id)
-                return
-            # map old-id to new
-            pools_map[pool_id] = new_pool['id']
+            lb_body_for_deletion['pools'].append(pool)
 
             # Add members to this pool
-            source_members = self.source_octavia.member_list(pool_id)[
-                'members']
-            for member in source_members:
-                body = self.prepare_lb_member(member)
-                try:
-                    self.dest_octavia.member_create(
-                        new_pool['id'], json={'member': body})['member']
-                except Exception as e:
-                    LOG.error("Failed to create member (%(member)s): %(e)s",
-                              {'member': member, 'e': e})
-                    return
-                if not self._wait_for_lb_up(new_lb_id):
-                    LOG.error("New loadbalancer %s does not become active "
-                              "after member creation", new_lb_id)
+            pool_members = self.octavia.member_list(pool_id)['members']
+            for member in pool_members:
+                body = self.prepare_lb_member(member, lb_body)
+                if not member['subnet_id']:
+                    # Add the loadbalancer subnet
+                    body['subnet_id'] = lb_body['vip_subnet_id']
+
+                body['pool'] = pool_body
+                kw = {'member': body}
+                if not self.octavia_rpc_client.call({}, 'member_create', **kw):
+                    LOG.error("Failed to create pool %(pool)s member "
+                              "(%(member)s)",
+                              {'member': member, 'pool': pool_id})
+                    self._delete_octavia_lb(lb_body_for_deletion)
                     return
 
             # Add pool health monitor
@@ -835,61 +833,41 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 hm_id = pool['healthmonitor_id']
                 hm = orig_map['hms'][hm_id]
                 body = self.prepare_lb_hm(hm)
+                body['pool'] = pool_body
                 # Update pool id in hm
-                body['pool_id'] = new_pool['id']
-                try:
-                    self.dest_octavia.health_monitor_create(
-                        json={'healthmonitor': body})['healthmonitor']
-                except Exception as e:
-                    LOG.error("Failed to create healthmonitor (%(hm)s): %(e)s",
-                              {'hm': hm, 'e': e})
+                kw = {'healthmonitor': body}
+                if not self.octavia_rpc_client.call(
+                        {}, 'healthmonitor_create', **kw):
+                    LOG.error("Failed to create pool %(pool)s healthmonitor "
+                              "(%(hm)s)", {'hm': hm, 'pool': pool_id})
+                    self._delete_octavia_lb(lb_body_for_deletion)
                     return
-                if not self._wait_for_lb_up(new_lb_id):
-                    LOG.error("New loadbalancer %s does not become active "
-                              "after health monitor creation", new_lb_id)
-                    return
+                lb_body_for_deletion['pools'][-1]['healthmonitor'] = body
 
             # Add listeners L7 policies
-            for listener_id in listeners_map:
+            for listener_id in listeners_map.keys():
                 listener = orig_map['listeners'][listener_id]
                 for l7pol_dict in listener.get('l7policies', []):
-                    l7pol = orig_map['l7pols'][l7pol_dict['id']]
-                    body = self.prepare_lb_l7policy(l7pol)
-                    # Update pool id in l7 policy
-                    body['listener_id'] = listeners_map[listener_id]
-                    # update redirect_pool_id
-                    if l7pol.get('redirect_pool_id'):
-                        body['redirect_pool_id'] = pools_map[
-                            l7pol['redirect_pool_id']]
-                    try:
-                        new_pol = self.dest_octavia.l7policy_create(
-                            json={'l7policy': body})['l7policy']
-                    except Exception as e:
-                        LOG.error("Failed to create l7policy (%(l7pol)s): "
-                                  "%(e)s", {'l7pol': l7pol, 'e': e})
-                        return
-                    if not self._wait_for_lb_up(new_lb_id):
-                        LOG.error("New loadbalancer %s does not become active "
-                                  "after L7 policy creation", new_lb_id)
-                        return
+                    l7_pol_id = l7pol_dict['id']
+                    l7pol = orig_map['l7pols'][l7_pol_id]
+                    pol_body = self.prepare_lb_l7policy(l7pol)
 
                     # Add the rules of this policy
-                    source_l7rules = self.source_octavia.l7rule_list(
-                        l7pol['id'])['rules']
+                    source_l7rules = self.octavia.l7rule_list(
+                        l7_pol_id)['rules']
                     for rule in source_l7rules:
-                        body = self.prepare_lb_l7rule(rule)
-                        try:
-                            self.dest_octavia.l7rule_create(
-                                new_pol['id'], json={'rule': body})['rule']
-                        except Exception as e:
-                            LOG.error("Failed to create l7rule (%(rule)s): "
-                                      "%(e)s", {'rule': rule, 'e': e})
-                            return
-                        if not self._wait_for_lb_up(new_lb_id):
-                            LOG.error("New loadbalancer %s does not become "
-                                      "active after L7 rule creation",
-                                      new_lb_id)
-                            return
+                        rule_body = self.prepare_lb_l7rule(rule)
+                        pol_body['rules'].append(rule_body)
+
+                    kw = {'l7policy': pol_body}
+                    if not self.octavia_rpc_client.call(
+                            {}, 'l7policy_create', **kw):
+                        LOG.error("Failed to create l7policy (%(l7pol)s)",
+                                  {'l7pol': l7pol})
+                        self._delete_octavia_lb(lb_body_for_deletion)
+                        return
+
+        LOG.info("Created loadbalancer %s", lb_id)
 
     def _map_orig_objects_of_type(self, source_objects):
         result = {}
@@ -908,35 +886,58 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         return result
 
     def migrate_octavia(self):
-        """Migrates Octavia objects from source to dest neutron.
-
-        Right now the Octavia objects are created with new IDS, and
-        do not keep their original IDs
+        """Migrates Octavia NSX objects to the new neutron driver.
+        The Octavia proccess & DB will remain unchanged.
+        Using RPC connection to connect directly with the new plugin driver.
         """
-        # TODO(asarfaty): Keep original ids
+        # Read all existing octavia resources
         try:
-            source_loadbalancers = self.source_octavia.\
-                load_balancer_list()['loadbalancers']
-            source_listeners = self.source_octavia.listener_list()['listeners']
-            source_pools = self.source_octavia.pool_list()['pools']
-            source_hms = self.source_octavia.\
-                health_monitor_list()['healthmonitors']
-            source_l7pols = self.source_octavia.l7policy_list()['l7policies']
+            loadbalancers = self.octavia.load_balancer_list()['loadbalancers']
+            listeners = self.octavia.listener_list()['listeners']
+            pools = self.octavia.pool_list()['pools']
+            hms = self.octavia.health_monitor_list()['healthmonitors']
+            l7pols = self.octavia.l7policy_list()['l7policies']
         except Exception as e:
             # Octavia might be disabled in the source
-            LOG.info("Octavia was not found on the source server: %s", e)
+            LOG.info("Octavia was not found on the server: %s", e)
             return
 
-        try:
-            self.dest_octavia.load_balancer_list()
-        except Exception as e:
-            # Octavia might be disabled in the destination
-            LOG.warning("Skipping Octavia migration. Octavia was not found "
-                        "on the destination server: %s", e)
-            return
-        orig_map = self._map_orig_lb_objects(source_listeners, source_pools,
-                                             source_hms, source_l7pols)
-        total_num = len(source_loadbalancers)
+        # Init the RPC connection for sending messages to the octavia driver
+        topic = d_const.OCTAVIA_TO_DRIVER_MIGRATION_TOPIC
+        transport = messaging.get_rpc_transport(cfg.CONF)
+        target = messaging.Target(topic=topic, exchange="common",
+                                  namespace='control', fanout=False,
+                                  version='1.0')
+        self.octavia_rpc_client = messaging.RPCClient(transport, target)
+
+        # Initialize RPC listener for getting status updates from the driver
+        # so that the rsource status will not change in the octavia DB
+        topic = d_const.DRIVER_TO_OCTAVIA_MIGRATION_TOPIC
+        server = socket.gethostname()
+        target = messaging.Target(topic=topic, server=server,
+                                  exchange="common", fanout=False)
+
+        class MigrationOctaviaDriverEndpoint(driver_lib.DriverLibrary):
+            target = messaging.Target(namespace="control", version='1.0')
+
+            def update_loadbalancer_status(self, **kw):
+                # Do nothing
+                pass
+
+        endpoints = [MigrationOctaviaDriverEndpoint]
+        access_policy = dispatcher.DefaultRPCAccessPolicy
+        self.octavia_rpc_server = messaging.get_rpc_server(
+            transport, target, endpoints, executor='threading',
+            access_policy=access_policy)
+        self.octavia_rpc_server.start()
+
+        orig_map = self._map_orig_lb_objects(listeners, pools,
+                                             hms, l7pols)
+        total_num = len(loadbalancers)
         LOG.info("Migrating %d loadbalancer(s)", total_num)
-        for lb in source_loadbalancers:
-            self._migrate_octavia_lb(lb, orig_map)
+        for lb in loadbalancers:
+            if lb['provisioning_status'] == 'ACTIVE':
+                self._migrate_octavia_lb(lb, orig_map)
+            else:
+                LOG.info("Skipping %s loadbalancer %s",
+                         lb['provisioning_status'], lb['id'])

@@ -14,7 +14,9 @@
 #    under the License.
 
 OCTAVIA_TO_DRIVER_TOPIC = 'vmware_nsx__lb_listener'
+OCTAVIA_TO_DRIVER_MIGRATION_TOPIC = 'vmware_nsx__lb_listener_migration'
 DRIVER_TO_OCTAVIA_TOPIC = 'vmware_nsx__driver_listener'
+DRIVER_TO_OCTAVIA_MIGRATION_TOPIC = 'vmware_nsx__driver_listener_migration'
 
 LOADBALANCER = 'loadbalancer'
 LISTENER = 'listener'

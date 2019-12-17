@@ -1220,6 +1220,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 LOG.warning("Failed to update network %(id)s dhcp server on "
                             "the NSX: %(e)s", {'id': network['id'], 'e': e})
 
+    @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
         return self._create_subnet(context, subnet)
 
