@@ -444,7 +444,7 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
     def _log_get_ports(self, ports, filters):
         if len(ports) > 0:
             LOG.debug("Getting %(num)s port%(plural)s with %(filters)s",
-                      {'len': len(ports),
+                      {'num': len(ports),
                        'plural': 's' if len(ports) > 1 else '',
                        'filters': ('filters ' + str(filters) if filters
                                    else 'no filters')})
