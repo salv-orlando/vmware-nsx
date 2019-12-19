@@ -312,8 +312,14 @@ class NSXClient(object):
         Retrieve all the logical routers based on router type. If tier
         is None, it will return all logical routers.
         """
-        lrouters = self.nsxlib.logical_router.list(
+        return self.nsxlib.logical_router.list(
             router_type=tier)['results']
+
+    def get_tier1_logical_routers(self):
+        """
+        Retrieve all tier1 logical routers, and return only neutron ones.
+        """
+        lrouters = self.get_logical_routers(tier='TIER1')
 
         if self.neutron_db:
             db_routers = self.neutron_db.get_logical_routers()
@@ -321,11 +327,17 @@ class NSXClient(object):
                         if lr['id'] in db_routers]
         return lrouters
 
+    def get_tier0_logical_routers(self):
+        """
+        Retrieve all tier0 logical routers.
+        """
+        return self.get_logical_routers(tier='TIER0')
+
     def get_os_logical_routers(self):
         """
         Retrieve all logical routers created from Neutron NSXv3 plugin
         """
-        lrouters = self.get_logical_routers()
+        lrouters = self.get_tier1_logical_routers()
         return self.get_os_resources(lrouters)
 
     def get_logical_router_ports(self, lrouter):
@@ -382,7 +394,9 @@ class NSXClient(object):
         """
         Delete all TIER0 logical router ports created from OpenStack
         """
-        tier0_routers = self.get_logical_routers(tier='TIER0')
+        tier0_routers = self.get_tier0_logical_routers()
+        print("Number of TIER0 Logical Routers whos ports will be deleted: "
+              "%s" % len(tier0_routers))
         for lr in tier0_routers:
             self.cleanup_logical_router_ports(lr)
 
