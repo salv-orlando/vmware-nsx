@@ -161,7 +161,8 @@ class PrepareObjectForMigration(object):
         return self.drop_fields(pool, self.drop_subnetpool_fields)
 
     def prepare_network(self, net, dest_default_public_net=True,
-                        remove_qos=False, dest_azs=None, direct_call=False):
+                        remove_qos=False, dest_azs=None, direct_call=False,
+                        ext_net_map=None):
         self.fix_description(net)
         body = self.drop_fields(net, self.drop_network_fields)
 
@@ -201,6 +202,15 @@ class PrepareObjectForMigration(object):
             if fields_reset:
                 LOG.warning("Ignoring provider network fields while migrating "
                             "external network %s", body['id'])
+            # Get the tier0 into the physical_network
+            if ext_net_map and body['id'] in ext_net_map:
+                body['provider:physical_network'] = ext_net_map[body['id']]
+            else:
+                LOG.warning("Using default Tier0 as provider:physical_network "
+                            "while migrating external network %s", body['id'])
+                if 'provider:physical_network' in body:
+                    del body['provider:physical_network']
+
             if body.get('is_default') and dest_default_public_net:
                 body['is_default'] = False
                 LOG.warning("Public network %s was set to non default network",

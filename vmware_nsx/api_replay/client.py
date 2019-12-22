@@ -24,6 +24,7 @@ from octaviaclient.api.v2 import octavia
 from oslo_config import cfg
 import oslo_messaging as messaging
 from oslo_messaging.rpc import dispatcher
+from oslo_serialization import jsonutils
 from oslo_utils import excutils
 
 from neutron.common import config as neutron_config
@@ -53,7 +54,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  octavia_os_username, octavia_os_user_domain_id,
                  octavia_os_tenant_name, octavia_os_tenant_domain_id,
                  octavia_os_password, octavia_os_auth_url,
-                 neutron_conf, logfile, max_retry):
+                 neutron_conf, ext_net_map, logfile, max_retry):
 
         # Init config and logging
         if neutron_conf:
@@ -115,6 +116,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             self.octavia = None
 
         self.dest_plugin = dest_plugin
+
+        if ext_net_map:
+            with open(ext_net_map, 'r') as myfile:
+                data = myfile.read()
+            self.ext_net_map = jsonutils.loads(data)
+        else:
+            self.ext_net_map = None
 
         LOG.info("Starting NSX migration to %s.", self.dest_plugin)
         # Migrate all the objects
@@ -468,7 +476,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             body = self.prepare_network(
                 network, remove_qos=remove_qos,
                 dest_default_public_net=dest_default_public_net,
-                dest_azs=dest_azs)
+                dest_azs=dest_azs, ext_net_map=self.ext_net_map)
 
             # only create network if the dest server doesn't have it
             if self.have_id(network['id'], dest_networks):

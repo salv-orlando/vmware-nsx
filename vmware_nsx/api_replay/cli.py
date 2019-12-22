@@ -44,6 +44,7 @@ class ApiReplayCli(object):
             octavia_os_password=args.octavia_os_password,
             octavia_os_auth_url=args.octavia_os_auth_url,
             neutron_conf=args.neutron_conf,
+            ext_net_map=args.external_networks_map,
             logfile=args.logfile,
             max_retry=args.max_retry)
 
@@ -157,6 +158,11 @@ class ApiReplayCli(object):
             "--neutron_conf",
             default='/etc/neutron/neutron.conf',
             help="neutron config file path.")
+
+        parser.add_argument(
+            "--external-networks-map",
+            help="Path to a json file mapping external network neutron ID "
+                 "to tier0 ID.")
 
         parser.add_argument(
             "--max-retry",
