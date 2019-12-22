@@ -258,7 +258,7 @@ class Vcns(object):
         count = int(paging_info['totalCount'])
         LOG.debug("There are total %s edges and page size is %s",
                   count, page_size)
-        pages = count / page_size + 1
+        pages = int(count / page_size + 1)
         for i in range(1, pages):
             start_index = page_size * i
             h, d = self._get_edges(start_index)
