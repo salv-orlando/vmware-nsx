@@ -1493,6 +1493,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                             gw_address_scope):
             return
 
+        firewall_match = self._get_nat_firewall_match()
         self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
             'snat for subnet %s' % subnet['id'],
             router_id,
@@ -1501,7 +1502,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             sequence_number=NAT_RULE_PRIORITY_GW,
             translated_network=gw_ip,
             source_network=subnet['cidr'],
-            firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
+            firewall_match=firewall_match)
 
     def _get_snat_rule_id(self, subnet):
         return 'S-' + subnet['id']
@@ -2202,7 +2203,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _get_fip_dnat_rule_id(self, fip_id):
         return 'D-' + fip_id
 
+    def _get_nat_firewall_match(self):
+        if cfg.CONF.nsx_p.firewall_match_internal_addr:
+            return policy_constants.NAT_FIREWALL_MATCH_INTERNAL
+        return policy_constants.NAT_FIREWALL_MATCH_EXTERNAL
+
     def _add_fip_nat_rules(self, tier1_id, fip_id, ext_ip, int_ip):
+        firewall_match = self._get_nat_firewall_match()
         with policy_trans.NsxPolicyTransaction():
             self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
                 'snat for fip %s' % fip_id,
@@ -2212,7 +2219,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 translated_network=ext_ip,
                 source_network=int_ip,
                 sequence_number=NAT_RULE_PRIORITY_FIP,
-                firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
+                firewall_match=firewall_match)
             self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
                 'dnat for fip %s' % fip_id,
                 tier1_id,
@@ -2221,7 +2228,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 translated_network=int_ip,
                 destination_network=ext_ip,
                 sequence_number=NAT_RULE_PRIORITY_FIP,
-                firewall_match=policy_constants.NAT_FIREWALL_MATCH_INTERNAL)
+                firewall_match=firewall_match)
 
     def _delete_fip_nat_rules(self, tier1_id, fip_id):
         with policy_trans.NsxPolicyTransaction():

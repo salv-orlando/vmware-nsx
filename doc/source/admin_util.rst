@@ -638,6 +638,9 @@ NSX Policy Plugin
 
     nsxadmin -r routers -o  update-tier0  --property old-tier0=<id> --property new-tier0=<id> 
 
+- Update the firewall_match value in neutron nat rules with a new value. Should be used when firewall_match_internal_addr config changes::
+
+    nsxadmin -r routers -o  update-nat-firewall-match --property firewall-match=external/internal 
 
 Client Certificate
 ~~~~~~~~~~~~~~~~~~

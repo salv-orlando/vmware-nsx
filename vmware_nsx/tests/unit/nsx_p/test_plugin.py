@@ -56,7 +56,7 @@ from vmware_nsx.tests import unit as vmware
 from vmware_nsx.tests.unit.common_plugin import common_v3
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import nsx_constants
-from vmware_nsxlib.v3.policy import constants as policy_constants
+from vmware_nsxlib.v3.policy import constants as pol_const
 from vmware_nsxlib.v3 import utils as nsxlib_utils
 
 
@@ -117,7 +117,7 @@ class NsxPPluginTestCaseMixin(
                    return_value=-1).start()
         mock.patch("vmware_nsxlib.v3.policy.core_resources."
                    "NsxPolicyResourceBase._wait_until_realized",
-                   return_value={'state': policy_constants.STATE_REALIZED}
+                   return_value={'state': pol_const.STATE_REALIZED}
                    ).start()
         mock.patch("vmware_nsxlib.v3.policy.core_resources."
                    "NsxPolicyTier1Api.update_transport_zone").start()
@@ -1218,14 +1218,14 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
             sg_id = sg['security_group']['id']
             nsx_name = utils.get_name_and_uuid(name, sg_id)
             group_create.assert_called_once_with(
-                nsx_name, policy_constants.DEFAULT_DOMAIN, group_id=sg_id,
+                nsx_name, pol_const.DEFAULT_DOMAIN, group_id=sg_id,
                 description=description,
                 conditions=[mock.ANY], tags=mock.ANY)
             comm_map_create.assert_called_once_with(
-                nsx_name, policy_constants.DEFAULT_DOMAIN, map_id=sg_id,
+                nsx_name, pol_const.DEFAULT_DOMAIN, map_id=sg_id,
                 description=description,
                 tags=mock.ANY,
-                category=policy_constants.CATEGORY_ENVIRONMENT)
+                category=pol_const.CATEGORY_ENVIRONMENT)
 
     def _create_provider_security_group(self):
         body = {'security_group': {'name': 'provider-deny',
@@ -2296,3 +2296,27 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                 self._delete('routers', r['router']['id'])
                 routers = self.plugin.get_routers(self.ctx)
                 self.assertEqual(0, len(routers))
+
+    def _test_nat_rules_firewall_match(self, config_val, call_val):
+        cfg.CONF.set_override('firewall_match_internal_addr', config_val,
+                              'nsx_p')
+        with self.subnet(cidr='20.0.0.0/24') as subnet:
+            self._set_net_external(subnet['subnet']['network_id'])
+            with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                            "NsxPolicyTier1NatRuleApi."
+                            "create_or_overwrite") as add_func,\
+                self.floatingip_with_assoc():
+                add_func.assert_called_with(
+                    mock.ANY, mock.ANY, action='DNAT',
+                    destination_network=mock.ANY,
+                    firewall_match=call_val,
+                    nat_rule_id=mock.ANY, sequence_number=mock.ANY,
+                    translated_network=mock.ANY)
+
+    def test_nat_rules_firewall_match_internal(self):
+        self._test_nat_rules_firewall_match(
+            True, pol_const.NAT_FIREWALL_MATCH_INTERNAL)
+
+    def test_nat_rules_firewall_match_external(self):
+        self._test_nat_rules_firewall_match(
+            False, pol_const.NAT_FIREWALL_MATCH_EXTERNAL)
