@@ -1533,7 +1533,7 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
     def test_port_failure_rollback_dhcp_exception(self):
         self._enable_native_dhcp_md()
         self.plugin = directory.get_plugin()
-        with mock.patch.object(self.plugin, '_add_dhcp_binding',
+        with mock.patch.object(self.plugin, '_add_port_mp_dhcp_binding',
                                side_effect=nsxlib_exc.ManagerError):
             self.port()
             ctx = context.get_admin_context()

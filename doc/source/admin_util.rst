@@ -646,6 +646,9 @@ NSX Policy Plugin
 
     nsxadmin -r routers -o  update-nat-firewall-match --property firewall-match=external/internal 
 
+- Migrate networks DHCP from MP to Policy (for NSX 3.0 upgrades)::
+    nsxadmin -r dhcp-binding -o migrate-to-policy --property dhcp-config=<id>
+
 Client Certificate
 ~~~~~~~~~~~~~~~~~~
 

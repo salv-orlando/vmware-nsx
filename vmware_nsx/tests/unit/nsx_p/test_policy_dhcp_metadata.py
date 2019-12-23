@@ -27,20 +27,16 @@ from neutron_lib.plugins import directory
 
 from vmware_nsx.common import config
 from vmware_nsx.common import exceptions as nsx_exc
-from vmware_nsx.common import utils
-from vmware_nsx.db import db as nsx_db
 from vmware_nsx.extensions import advancedserviceproviders as as_providers
 from vmware_nsx.plugins.nsx_p import availability_zones as nsx_az
 from vmware_nsx.tests.unit.nsx_p import test_plugin
 from vmware_nsxlib.v3 import core_resources
-from vmware_nsxlib.v3 import exceptions as nsxlib_exc
-from vmware_nsxlib.v3 import nsx_constants
-from vmware_nsxlib.v3.policy import core_resources as policy_resources
-from vmware_nsxlib.v3 import resources as nsx_resources
+from vmware_nsxlib.v3.policy import core_resources as nsx_resources
+from vmware_nsxlib.v3 import utils as nsxlib_utils
 
 
 def set_az_in_config(name, metadata_proxy="metadata_proxy1",
-                     dhcp_profile="dhcp_profile1",
+                     dhcp_server_config="dsc1",
                      native_metadata_route="2.2.2.2",
                      dns_domain='aaaa',
                      nameservers=['bbbb']):
@@ -49,7 +45,7 @@ def set_az_in_config(name, metadata_proxy="metadata_proxy1",
     config.register_nsxp_azs(cfg.CONF, [name])
     cfg.CONF.set_override("metadata_proxy", metadata_proxy,
                           group=group_name)
-    cfg.CONF.set_override("dhcp_profile", dhcp_profile,
+    cfg.CONF.set_override("dhcp_profile", dhcp_server_config,
                           group=group_name)
     cfg.CONF.set_override("native_metadata_route", native_metadata_route,
                           group=group_name)
@@ -59,33 +55,29 @@ def set_az_in_config(name, metadata_proxy="metadata_proxy1",
                           group=group_name)
 
 
-class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
+class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
     """Test native dhcp config when using MP DHCP"""
+    #TODO(asarfaty): Add tests for DHCPv6
     def setUp(self):
         self._orig_dhcp_agent_notification = cfg.CONF.dhcp_agent_notification
         cfg.CONF.set_override('dhcp_agent_notification', False)
-        super(NsxNativeDhcpTestCase, self).setUp()
+        cfg.CONF.set_override('dhcp_profile', 'dsc1', 'nsx_p')
+        super(NsxPolicyDhcpTestCase, self).setUp()
         self._az_name = 'zone1'
         self.az_metadata_route = '3.3.3.3'
         set_az_in_config(self._az_name,
                          native_metadata_route=self.az_metadata_route)
-        self._patcher1 = mock.patch.object(core_resources.NsxLibDhcpProfile,
+        self._patcher = mock.patch.object(core_resources.NsxLibDhcpProfile,
                                           'get')
-        self._patcher1.start()
-        self._patcher2 = mock.patch.object(
-            policy_resources.NsxDhcpServerConfigApi,
-            'get', side_effect=nsxlib_exc.ResourceNotFound)
-        self._patcher2.start()
+        self._patcher.start()
         self._initialize_azs()
         self.plugin._init_dhcp_metadata()
-        self.plugin.use_policy_dhcp = False
 
     def tearDown(self):
-        self._patcher1.stop()
-        self._patcher2.stop()
+        self._patcher.stop()
         cfg.CONF.set_override('dhcp_agent_notification',
                               self._orig_dhcp_agent_notification)
-        super(NsxNativeDhcpTestCase, self).tearDown()
+        super(NsxPolicyDhcpTestCase, self).tearDown()
 
     def _make_subnet_data(self,
                           name=None,
@@ -112,6 +104,9 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
             'host_routes': host_routes,
             'shared': shared}}
 
+    def _bind_name(self, port):
+        return 'IPv4 binding for port %s' % port['port']['id']
+
     def _verify_dhcp_service(self, network_id, tenant_id, enabled):
         # Verify if DHCP service is enabled on a network.
         port_res = self._list_ports('json', 200, network_id,
@@ -123,46 +118,61 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
     def _verify_dhcp_binding(self, subnet, port_data, update_data,
                              assert_data):
         # Verify if DHCP binding is updated.
-        with mock.patch(
-            'vmware_nsxlib.v3.resources.LogicalDhcpServer.update_binding'
-        ) as update_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v4') as update_dhcp_binding:
             device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
             device_id = uuidutils.generate_uuid()
             with self.port(subnet=subnet, device_owner=device_owner,
                            device_id=device_id, **port_data) as port:
-                # Retrieve the DHCP binding info created in the DB for the
-                # new port.
-                dhcp_binding = nsx_db.get_nsx_dhcp_bindings(
-                    context.get_admin_context().session, port['port']['id'])[0]
+                binding_name = self._bind_name(port)
+                ip_address = port['port']['fixed_ips'][0]['ip_address']
+                options = {'option121': {'static_routes': [
+                               {'network': '%s' %
+                                cfg.CONF.nsx_p.native_metadata_route,
+                                'next_hop': '0.0.0.0'},
+                               {'network': '%s' %
+                                cfg.CONF.nsx_p.native_metadata_route,
+                                'next_hop': ip_address},
+                               {'network': subnet['subnet']['cidr'],
+                                'next_hop': '0.0.0.0'},
+                               {'network': constants.IPv4_ANY,
+                                'next_hop': subnet['subnet']['gateway_ip']}]}}
+                if 'extra_dhcp_opts' in port_data:
+                    other_opts = []
+                    options['others'] = []
+                    for opt in port_data['extra_dhcp_opts']:
+                        other_opts.append(
+                            {'code': nsxlib_utils.get_dhcp_opt_code(
+                                  opt['opt_name']),
+                             'values': [opt['opt_value']]})
+                    options['others'] = other_opts
+
+                binding_data = {'mac_address': port['port']['mac_address'],
+                                'ip_address': ip_address,
+                                'gateway_address':
+                                    subnet['subnet']['gateway_ip'],
+                                'host_name':
+                                    'host-%s' % ip_address.replace('.', '-'),
+                                'lease_time': 86400,
+                                'options': options}
+                # Verify the initial bindings call.
+                update_dhcp_binding.assert_called_once_with(
+                    binding_name, subnet['subnet']['network_id'],
+                    binding_id=port['port']['id'] + '-ipv4',
+                    **binding_data)
+                update_dhcp_binding.reset_mock()
                 # Update the port with provided data.
                 self.plugin.update_port(
                     context.get_admin_context(), port['port']['id'],
                     update_data)
-                binding_data = {'mac_address': port['port']['mac_address'],
-                                'ip_address': port['port']['fixed_ips'][0][
-                                    'ip_address']}
                 # Extend basic binding data with to-be-asserted data.
                 binding_data.update(assert_data)
                 # Verify the update call.
                 update_dhcp_binding.assert_called_once_with(
-                    dhcp_binding['nsx_service_id'],
-                    dhcp_binding['nsx_binding_id'], **binding_data)
-
-    def test_dhcp_profile_configuration(self):
-        # Test if dhcp_agent_notification and dhcp_profile are
-        # configured correctly.
-        orig_dhcp_agent_notification = cfg.CONF.dhcp_agent_notification
-        cfg.CONF.set_override('dhcp_agent_notification', True)
-        self.assertRaises(nsx_exc.NsxPluginException,
-                          self.plugin._init_dhcp_metadata)
-        cfg.CONF.set_override('dhcp_agent_notification',
-                              orig_dhcp_agent_notification)
-        orig_dhcp_profile_uuid = cfg.CONF.nsx_p.dhcp_profile
-        cfg.CONF.set_override('dhcp_profile', '', 'nsx_p')
-        self.assertRaises(cfg.RequiredOptError,
-                          self.plugin._init_default_config)
-        cfg.CONF.set_override('dhcp_profile', orig_dhcp_profile_uuid,
-                              'nsx_p')
+                    binding_name, subnet['subnet']['network_id'],
+                    binding_id=port['port']['id'] + '-ipv4',
+                    **binding_data)
 
     def test_dhcp_service_with_create_network(self):
         # Test if DHCP service is disabled on a network when it is created.
@@ -232,16 +242,6 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                 self.assertEqual(len(subnets['subnets']),
                                  post_create_subnet.call_count)
 
-            # Check if the bindings to backend DHCP entries are created.
-            dhcp_service = nsx_db.get_nsx_service_binding(
-                context.get_admin_context().session,
-                network1['network']['id'], nsx_constants.SERVICE_DHCP)
-            self.assertTrue(dhcp_service)
-            dhcp_service = nsx_db.get_nsx_service_binding(
-                context.get_admin_context().session,
-                network2['network']['id'], nsx_constants.SERVICE_DHCP)
-            self.assertTrue(dhcp_service)
-
     def test_dhcp_service_with_create_dhcp_subnet_bulk_failure(self):
         # Test if user-provided rollback function is invoked when
         # exception occurred during a create_subnet_bulk operation.
@@ -276,16 +276,6 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                     subnet_arg = rollback_subnet.call_args[0][0]
                     self.assertEqual(network1['network']['id'],
                                      subnet_arg['network_id'])
-
-                # Check if the bindings to backend DHCP entries are removed.
-                dhcp_service = nsx_db.get_nsx_service_binding(
-                    context.get_admin_context().session,
-                    network1['network']['id'], nsx_constants.SERVICE_DHCP)
-                self.assertFalse(dhcp_service)
-                dhcp_service = nsx_db.get_nsx_service_binding(
-                    context.get_admin_context().session,
-                    network2['network']['id'], nsx_constants.SERVICE_DHCP)
-                self.assertFalse(dhcp_service)
 
     def test_dhcp_service_with_create_multiple_dhcp_subnets(self):
         # Test if multiple DHCP-enabled subnets cannot be created in a network.
@@ -348,39 +338,38 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
     def test_dhcp_service_with_update_dhcp_port(self):
         # Test if DHCP server IP is updated when the corresponding DHCP port
         # IP is changed.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'update') as update_logical_dhcp_server:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'NsxPolicySegmentApi.'
+                        'create_or_overwrite') as update_segment_dhcp:
             with self.subnet(cidr='10.0.0.0/24', enable_dhcp=True) as subnet:
-                dhcp_service = nsx_db.get_nsx_service_binding(
-                    context.get_admin_context().session,
-                    subnet['subnet']['network_id'], nsx_constants.SERVICE_DHCP)
-                port = self.plugin.get_port(context.get_admin_context(),
-                                            dhcp_service['port_id'])
+                filters = {
+                    'network_id': [subnet['subnet']['network_id']],
+                    'device_owner': [constants.DEVICE_OWNER_DHCP]
+                }
+                dhcp_ports = self.plugin.get_ports(
+                    context.get_admin_context(), filters=filters)
+                port = dhcp_ports[0]
                 old_ip = port['fixed_ips'][0]['ip_address']
                 new_ip = str(netaddr.IPAddress(old_ip) + 1)
                 data = {'port': {'fixed_ips': [
                     {'subnet_id': subnet['subnet']['id'],
                      'ip_address': new_ip}]}}
+                update_segment_dhcp.reset_mock()
                 self.plugin.update_port(context.get_admin_context(),
-                                        dhcp_service['port_id'], data)
-                update_logical_dhcp_server.assert_called_once_with(
-                    dhcp_service['nsx_service_id'], server_ip=new_ip)
+                                        port['id'], data)
+                update_segment_dhcp.assert_called_once()
 
     def test_dhcp_binding_with_create_port(self):
         # Test if DHCP binding is added when a compute port is created.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'create_binding',
-                               return_value={"id": uuidutils.generate_uuid()}
-                               ) as create_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v4') as create_dhcp_binding:
             with self.subnet(enable_dhcp=True) as subnet:
                 device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
                 device_id = uuidutils.generate_uuid()
                 with self.port(subnet=subnet, device_owner=device_owner,
                                device_id=device_id) as port:
-                    dhcp_service = nsx_db.get_nsx_service_binding(
-                        context.get_admin_context().session,
-                        subnet['subnet']['network_id'],
-                        nsx_constants.SERVICE_DHCP)
+                    binding_name = self._bind_name(port)
                     ip = port['port']['fixed_ips'][0]['ip_address']
                     hostname = 'host-%s' % ip.replace('.', '-')
                     options = {'option121': {'static_routes': [
@@ -395,10 +384,14 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                         {'network': '0.0.0.0/0',
                          'next_hop': subnet['subnet']['gateway_ip']}]}}
                     create_dhcp_binding.assert_called_once_with(
-                        dhcp_service['nsx_service_id'],
-                        port['port']['mac_address'], ip, hostname,
-                        cfg.CONF.nsx_p.dhcp_lease_time, options,
-                        subnet['subnet']['gateway_ip'])
+                        binding_name, subnet['subnet']['network_id'],
+                        binding_id=port['port']['id'] + '-ipv4',
+                        mac_address=port['port']['mac_address'],
+                        ip_address=ip,
+                        host_name=hostname,
+                        lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
+                        options=options,
+                        gateway_address=subnet['subnet']['gateway_ip'])
 
     def test_dhcp_binding_with_create_port_with_opts(self):
         # Test if DHCP binding is added when a compute port is created
@@ -406,10 +399,9 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         opt_name = 'interface-mtu'
         opt_code = 26
         opt_val = '9000'
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'create_binding',
-                               return_value={"id": uuidutils.generate_uuid()}
-                               ) as create_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v4') as create_dhcp_binding:
             with self.subnet(enable_dhcp=True) as subnet:
                 device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
                 device_id = uuidutils.generate_uuid()
@@ -419,10 +411,7 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                                device_id=device_id,
                                extra_dhcp_opts=extra_dhcp_opts,
                                arg_list=('extra_dhcp_opts',)) as port:
-                    dhcp_service = nsx_db.get_nsx_service_binding(
-                        context.get_admin_context().session,
-                        subnet['subnet']['network_id'],
-                        nsx_constants.SERVICE_DHCP)
+                    binding_name = self._bind_name(port)
                     ip = port['port']['fixed_ips'][0]['ip_address']
                     hostname = 'host-%s' % ip.replace('.', '-')
                     options = {'option121': {'static_routes': [
@@ -438,18 +427,21 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                          'next_hop': subnet['subnet']['gateway_ip']}]},
                         'others': [{'code': opt_code, 'values': [opt_val]}]}
                     create_dhcp_binding.assert_called_once_with(
-                        dhcp_service['nsx_service_id'],
-                        port['port']['mac_address'], ip, hostname,
-                        cfg.CONF.nsx_p.dhcp_lease_time, options,
-                        subnet['subnet']['gateway_ip'])
+                        binding_name, subnet['subnet']['network_id'],
+                        binding_id=port['port']['id'] + '-ipv4',
+                        mac_address=port['port']['mac_address'],
+                        ip_address=ip,
+                        host_name=hostname,
+                        lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
+                        options=options,
+                        gateway_address=subnet['subnet']['gateway_ip'])
 
     def test_dhcp_binding_with_create_port_with_opts121(self):
         # Test if DHCP binding is added when a compute port is created
         # with extra option121.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'create_binding',
-                               return_value={"id": uuidutils.generate_uuid()}
-                               ) as create_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v4') as create_dhcp_binding:
             with self.subnet(enable_dhcp=True) as subnet:
                 device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
                 device_id = uuidutils.generate_uuid()
@@ -459,11 +451,8 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                                device_id=device_id,
                                extra_dhcp_opts=extra_dhcp_opts,
                                arg_list=('extra_dhcp_opts',)) as port:
-                    dhcp_service = nsx_db.get_nsx_service_binding(
-                        context.get_admin_context().session,
-                        subnet['subnet']['network_id'],
-                        nsx_constants.SERVICE_DHCP)
                     ip = port['port']['fixed_ips'][0]['ip_address']
+                    binding_name = self._bind_name(port)
                     hostname = 'host-%s' % ip.replace('.', '-')
                     options = {'option121': {'static_routes': [
                         {'network': '%s' %
@@ -479,10 +468,14 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                         {'network': '1.0.0.0/24',
                          'next_hop': '1.2.3.4'}]}}
                     create_dhcp_binding.assert_called_once_with(
-                        dhcp_service['nsx_service_id'],
-                        port['port']['mac_address'], ip, hostname,
-                        cfg.CONF.nsx_p.dhcp_lease_time, options,
-                        subnet['subnet']['gateway_ip'])
+                        binding_name, subnet['subnet']['network_id'],
+                        binding_id=port['port']['id'] + '-ipv4',
+                        mac_address=port['port']['mac_address'],
+                        ip_address=ip,
+                        host_name=hostname,
+                        lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
+                        options=options,
+                        gateway_address=subnet['subnet']['gateway_ip'])
 
     def test_dhcp_binding_with_create_port_with_bad_opts(self):
         with self.subnet(enable_dhcp=True) as subnet:
@@ -514,80 +507,42 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
             self.assertRaises(n_exc.InvalidInput,
                 self.plugin.create_port, ctx, data)
 
-    def test_dhcp_binding_with_disable_enable_dhcp(self):
-        # Test if DHCP binding is preserved after DHCP is disabled and
-        # re-enabled on a subnet.
-        with self.subnet(enable_dhcp=True) as subnet:
-            device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
-            device_id = uuidutils.generate_uuid()
-            with self.port(subnet=subnet, device_owner=device_owner,
-                           device_id=device_id) as port:
-                ip = port['port']['fixed_ips'][0]['ip_address']
-                dhcp_bindings = nsx_db.get_nsx_dhcp_bindings(
-                    context.get_admin_context().session, port['port']['id'])
-                dhcp_service = dhcp_bindings[0]['nsx_service_id']
-                self.assertEqual(1, len(dhcp_bindings))
-                self.assertEqual(ip, dhcp_bindings[0]['ip_address'])
-                # Disable DHCP on subnet.
-                data = {'subnet': {'enable_dhcp': False}}
-                self.plugin.update_subnet(context.get_admin_context(),
-                                          subnet['subnet']['id'], data)
-                dhcp_bindings = nsx_db.get_nsx_dhcp_bindings(
-                    context.get_admin_context().session, port['port']['id'])
-                self.assertEqual([], dhcp_bindings)
-                # Re-enable DHCP on subnet.
-                data = {'subnet': {'enable_dhcp': True}}
-                self.plugin.update_subnet(context.get_admin_context(),
-                                          subnet['subnet']['id'], data)
-                dhcp_bindings = nsx_db.get_nsx_dhcp_bindings(
-                    context.get_admin_context().session, port['port']['id'])
-                self.assertEqual(1, len(dhcp_bindings))
-                self.assertEqual(ip, dhcp_bindings[0]['ip_address'])
-                # The DHCP service ID should be different because a new
-                # logical DHCP server is created for re-enabling DHCP.
-                self.assertNotEqual(dhcp_service,
-                                    dhcp_bindings[0]['nsx_service_id'])
-
     def test_dhcp_binding_with_delete_port(self):
         # Test if DHCP binding is removed when the associated compute port
         # is deleted.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'delete_binding') as delete_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'delete') as delete_dhcp_binding:
             with self.subnet(enable_dhcp=True) as subnet:
                 device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
                 device_id = uuidutils.generate_uuid()
                 with self.port(subnet=subnet, device_owner=device_owner,
                                device_id=device_id) as port:
-                    dhcp_binding = nsx_db.get_nsx_dhcp_bindings(
-                        context.get_admin_context().session,
-                        port['port']['id'])[0]
                     self.plugin.delete_port(
                         context.get_admin_context(), port['port']['id'])
-                    delete_dhcp_binding.assert_called_once_with(
-                        dhcp_binding['nsx_service_id'],
-                        dhcp_binding['nsx_binding_id'])
+                    delete_dhcp_binding.assert_called_with(
+                        port['port']['network_id'],
+                        port['port']['id'] + '-ipv4')
 
     def test_dhcp_binding_with_update_port_delete_ip(self):
         # Test if DHCP binding is deleted when the IP of the associated
         # compute port is deleted.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'delete_binding') as delete_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'delete') as delete_dhcp_binding:
             with self.subnet(enable_dhcp=True) as subnet:
                 device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
                 device_id = uuidutils.generate_uuid()
                 with self.port(subnet=subnet, device_owner=device_owner,
                                device_id=device_id) as port:
-                    dhcp_binding = nsx_db.get_nsx_dhcp_bindings(
-                        context.get_admin_context().session,
-                        port['port']['id'])[0]
                     data = {'port': {'fixed_ips': [],
                                      'admin_state_up': False,
                                      secgrp.SECURITYGROUPS: []}}
                     self.plugin.update_port(
                         context.get_admin_context(), port['port']['id'], data)
-                    delete_dhcp_binding.assert_called_once_with(
-                        dhcp_binding['nsx_service_id'],
-                        dhcp_binding['nsx_binding_id'])
+                    delete_dhcp_binding.assert_called_with(
+                        port['port']['network_id'],
+                        port['port']['id'] + '-ipv4')
 
     def test_dhcp_binding_with_update_port_ip(self):
         # Test if DHCP binding is updated when the IP of the associated
@@ -739,10 +694,10 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                          'fixed_ips': [{'subnet_id': subnet['subnet']['id'],
                                         'ip_address': ip_addr}],
                          'extra_dhcp_opts': [
-                              {'opt_name': 'nis-domain',
-                               'opt_value': 'abc'},
                               {'opt_name': 'interface-mtu',
-                               'opt_value': '9002'}]}
+                               'opt_value': '9002'},
+                              {'opt_name': 'nis-domain',
+                               'opt_value': 'abc'}]}
             update_data = {'port': {'extra_dhcp_opts': [
                               {'opt_name': 'interface-mtu',
                                'opt_value': None}]}}
@@ -766,14 +721,16 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
     def test_dhcp_binding_with_update_port_name(self):
         # Test if DHCP binding is not updated when the name of the associated
         # compute port is changed.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'update_binding') as update_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v4') as update_dhcp_binding:
             with self.subnet(cidr='10.0.0.0/24', enable_dhcp=True) as subnet:
                 device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
                 device_id = uuidutils.generate_uuid()
                 with self.port(subnet=subnet, device_owner=device_owner,
                                device_id=device_id, name='abc') as port:
                     data = {'port': {'name': 'xyz'}}
+                    update_dhcp_binding.reset_mock()
                     self.plugin.update_port(
                         context.get_admin_context(), port['port']['id'], data)
                     update_dhcp_binding.assert_not_called()
@@ -841,10 +798,9 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
 
     def test_dhcp_binding_with_create_az_port(self):
         # Test if DHCP binding is added when a compute port is created.
-        with mock.patch.object(nsx_resources.LogicalDhcpServer,
-                               'create_binding',
-                               return_value={"id": uuidutils.generate_uuid()}
-                               ) as create_dhcp_binding:
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v4') as create_dhcp_binding:
             with self.network(
                 availability_zone_hints=[self._az_name],
                 arg_list=('availability_zone_hints',)) as network:
@@ -853,10 +809,7 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                     device_id = uuidutils.generate_uuid()
                     with self.port(subnet=subnet, device_owner=device_owner,
                                    device_id=device_id) as port:
-                        dhcp_service = nsx_db.get_nsx_service_binding(
-                            context.get_admin_context().session,
-                            subnet['subnet']['network_id'],
-                            nsx_constants.SERVICE_DHCP)
+                        binding_name = self._bind_name(port)
                         ip = port['port']['fixed_ips'][0]['ip_address']
                         hostname = 'host-%s' % ip.replace('.', '-')
                         options = {'option121': {'static_routes': [
@@ -871,10 +824,14 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                             {'network': '0.0.0.0/0',
                              'next_hop': subnet['subnet']['gateway_ip']}]}}
                         create_dhcp_binding.assert_called_once_with(
-                            dhcp_service['nsx_service_id'],
-                            port['port']['mac_address'], ip, hostname,
-                            cfg.CONF.nsx_p.dhcp_lease_time, options,
-                            subnet['subnet']['gateway_ip'])
+                            binding_name, subnet['subnet']['network_id'],
+                            binding_id=port['port']['id'] + '-ipv4',
+                            mac_address=port['port']['mac_address'],
+                            ip_address=ip,
+                            host_name=hostname,
+                            lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
+                            options=options,
+                            gateway_address=subnet['subnet']['gateway_ip'])
 
     def test_create_subnet_with_dhcp_port(self):
         with self.subnet(enable_dhcp=True) as subnet:
@@ -888,13 +845,13 @@ class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
             self.assertEqual(False, ports[0]['port_security_enabled'])
 
 
-class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
+class NsxPolicyMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
     """Test native metadata config when using MP MDProxy"""
 
     def setUp(self):
         self._orig_dhcp_agent_notification = cfg.CONF.dhcp_agent_notification
         cfg.CONF.set_override('dhcp_agent_notification', False)
-        super(NsxNativeMetadataTestCase, self).setUp()
+        super(NsxPolicyMetadataTestCase, self).setUp()
         self._az_name = 'zone1'
         self._az_metadata_proxy = 'dummy'
         set_az_in_config(self._az_name, metadata_proxy=self._az_metadata_proxy)
@@ -908,7 +865,7 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
         self._patcher.stop()
         cfg.CONF.set_override('dhcp_agent_notification',
                               self._orig_dhcp_agent_notification)
-        super(NsxNativeMetadataTestCase, self).tearDown()
+        super(NsxPolicyMetadataTestCase, self).tearDown()
 
     def test_metadata_proxy_configuration(self):
         # Test if dhcp_agent_notification and metadata_proxy are
@@ -928,58 +885,52 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
 
     def test_metadata_proxy_with_create_network(self):
         # Test if native metadata proxy is enabled on a network when it is
-        # created (Using MP MDproxy).
-        self.plugin._availability_zones_data._default_az.use_policy_md = False
-        with mock.patch.object(nsx_resources.LogicalPort,
-                               'create') as create_logical_port:
+        # created (Using Policy MDproxy).
+        self.plugin._availability_zones_data._default_az.use_policy_md = True
+        with mock.patch.object(nsx_resources.NsxPolicySegmentApi,
+                               'create_or_overwrite') as create:
             with self.network() as network:
-                nsx_net_id = self.plugin._get_network_nsx_id(
-                    context.get_admin_context(), network['network']['id'])
-                tags = self.plugin.nsxlib.build_v3_tags_payload(
-                    network['network'], resource_type='os-neutron-net-id',
-                    project_name=None)
-                name = utils.get_name_and_uuid('%s-%s' % (
-                    'mdproxy', network['network']['name'] or 'network'),
-                                               network['network']['id'])
-                create_logical_port.assert_called_once_with(
-                    nsx_net_id, cfg.CONF.nsx_p.metadata_proxy,
-                    tags=tags, name=name,
-                    attachment_type=nsx_constants.ATTACHMENT_MDPROXY)
+                create.assert_called_once_with(
+                    mock.ANY,
+                    segment_id=network['network']['id'],
+                    description=mock.ANY,
+                    vlan_ids=mock.ANY,
+                    transport_zone_id=mock.ANY,
+                    tags=mock.ANY,
+                    metadata_proxy_id=test_plugin.NSX_MD_PROXY_ID)
 
     def test_metadata_proxy_with_create_az_network(self):
         # Test if native metadata proxy is enabled on a network when it is
-        # created (Using MP MDproxy).
+        # created (Using Plolicy MDproxy).
         azs = self.plugin._availability_zones_data.availability_zones
-        azs[self._az_name].use_policy_md = False
-        with mock.patch.object(nsx_resources.LogicalPort,
-                               'create') as create_logical_port:
+        azs[self._az_name].use_policy_md = True
+        with mock.patch.object(nsx_resources.NsxPolicySegmentApi,
+                               'create_or_overwrite') as create:
             with self.network(
                 availability_zone_hints=[self._az_name],
                 arg_list=('availability_zone_hints',)) as network:
-                nsx_net_id = self.plugin._get_network_nsx_id(
-                    context.get_admin_context(), network['network']['id'])
-                tags = self.plugin.nsxlib.build_v3_tags_payload(
-                    network['network'], resource_type='os-neutron-net-id',
-                    project_name=None)
-                name = utils.get_name_and_uuid('%s-%s' % (
-                    'mdproxy', network['network']['name'] or 'network'),
-                                               network['network']['id'])
-                create_logical_port.assert_called_once_with(
-                    nsx_net_id, self._az_metadata_proxy,
-                    tags=tags, name=name,
-                    attachment_type=nsx_constants.ATTACHMENT_MDPROXY)
+                create.assert_called_once_with(
+                    mock.ANY,
+                    segment_id=network['network']['id'],
+                    description=mock.ANY,
+                    vlan_ids=mock.ANY,
+                    transport_zone_id=mock.ANY,
+                    tags=mock.ANY,
+                    metadata_proxy_id='dummy')
 
     def test_metadata_proxy_with_get_subnets(self):
         # Test if get_subnets() handles advanced-service-provider extension,
         # which is used when processing metadata requests.
+        self.plugin._availability_zones_data._default_az.use_policy_md = True
         with self.network() as n1, self.network() as n2:
-            with self.subnet(network=n1) as s1, self.subnet(network=n2) as s2:
+            with self.subnet(network=n1, enable_dhcp=False) as s1, \
+                self.subnet(network=n2, enable_dhcp=False) as s2:
                 # Get all the subnets.
                 subnets = self._list('subnets')['subnets']
                 self.assertEqual(len(subnets), 2)
                 self.assertEqual(set([s['id'] for s in subnets]),
                                  set([s1['subnet']['id'], s2['subnet']['id']]))
-                lswitch_id = 'dummy'
+                lswitch_id = uuidutils.generate_uuid()
                 neutron_id = n1['network']['id']
                 segment_path = '/infra/segments/%s' % neutron_id
                 # Get only the subnets associated with a particular advanced

@@ -275,14 +275,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self._enable_ipv6_routing()
 
         # Validate other mandatory configuration
-        if cfg.CONF.nsx_p.allow_passthrough:
-            if not cfg.CONF.nsx_p.dhcp_profile:
-                raise cfg.RequiredOptError("dhcp_profile",
-                                           group=cfg.OptGroup('nsx_p'))
+        if not cfg.CONF.nsx_p.dhcp_profile:
+            raise cfg.RequiredOptError("dhcp_profile",
+                                       group=cfg.OptGroup('nsx_p'))
 
-            if not cfg.CONF.nsx_p.metadata_proxy:
-                raise cfg.RequiredOptError("metadata_proxy",
-                                           group=cfg.OptGroup('nsx_p'))
+        if not cfg.CONF.nsx_p.metadata_proxy:
+            raise cfg.RequiredOptError("metadata_proxy",
+                                       group=cfg.OptGroup('nsx_p'))
 
         # If using tags to find the objects, make sure tag scope is configured
         if (cfg.CONF.nsx_p.init_objects_by_tags and
@@ -357,12 +356,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return None, None
 
     def _init_dhcp_metadata(self):
-        if (cfg.CONF.dhcp_agent_notification and
-            cfg.CONF.nsx_p.allow_passthrough):
+        if cfg.CONF.dhcp_agent_notification:
             msg = _("Need to disable dhcp_agent_notification when "
                     "native DHCP & Metadata is enabled")
             raise nsx_exc.NsxPluginException(err_msg=msg)
-        self._init_native_dhcp()
+
+        default_az = self.get_default_az()
+        if default_az.use_policy_dhcp:
+            self.use_policy_dhcp = True
+        else:
+            self._init_native_dhcp()
+            self.use_policy_dhcp = False
+
         self._init_native_metadata()
 
     def init_availability_zones(self):
@@ -593,14 +598,17 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _setup_rpc(self):
         self.endpoints = [agents_db.AgentExtRpcCallback()]
 
+    def _net_nsx_name(self, network):
+        return utils.get_name_and_uuid(network['name'] or 'network',
+                                       network['id'])
+
     def _create_network_on_backend(self, context, net_data,
                                    transparent_vlan,
                                    provider_data, az):
         net_data['id'] = net_data.get('id') or uuidutils.generate_uuid()
 
         # update the network name to indicate the neutron id too.
-        net_name = utils.get_name_and_uuid(net_data['name'] or 'network',
-                                           net_data['id'])
+        net_name = self._net_nsx_name(net_data)
         tags = self.nsxpolicy.build_v3_tags_payload(
             net_data, resource_type='os-neutron-net-id',
             project_name=context.tenant_name)
@@ -803,13 +811,22 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return created_net
 
     def delete_network(self, context, network_id):
-        if cfg.CONF.nsx_p.allow_passthrough:
-            self._delete_network_disable_dhcp(context, network_id)
-
-        is_nsx_net = self._network_is_nsx_net(context, network_id)
         is_external_net = self._network_is_external(context, network_id)
 
-        # First call DB operation for delete network as it will perform
+        if not is_external_net:
+            # First disable DHCP & delete its port
+            if self.use_policy_dhcp:
+                lock = 'nsxp_network_' + network_id
+                with locking.LockManager.get_lock(lock):
+                    network = self._get_network(context, network_id)
+                    if not self._has_active_port(context, network_id):
+                        self._disable_network_dhcp(context, network)
+            elif cfg.CONF.nsx_p.allow_passthrough:
+                self._delete_network_disable_dhcp(context, network_id)
+
+        is_nsx_net = self._network_is_nsx_net(context, network_id)
+
+        # Call DB operation for delete network as it will perform
         # checks on active ports
         self._retry_delete_network(context, network_id)
 
@@ -904,6 +921,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
             try:
                 self.nsxpolicy.segment.update(network_id, **kwargs)
+
             except nsx_lib_exc.ManagerError:
                 LOG.exception("Unable to update NSX backend, rolling "
                               "back changes on neutron")
@@ -956,16 +974,374 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.nsxpolicy.tier1.update(router_id,
                                         ipv6_ndra_profile_id=profile_id)
 
+    def _validate_net_dhcp_edge_cluster(self, context, network, az):
+        """Validate that the dhcp server edge cluster match the one of
+           the network TZ
+        """
+        if not self.nsxlib:
+            # Cannot validate the TZ because the fabric apis are available
+            # only via the nsxlib
+            return
+
+        net_tz = self._get_net_tz(context, network['id'])
+        dhcp_ec_path = self.nsxpolicy.dhcp_server_config.get(
+            az._policy_dhcp_server_config).get('edge_cluster_path')
+        ec_id = p_utils.path_to_id(dhcp_ec_path)
+        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
+        ec_tzs = []
+        for tn_uuid in ec_nodes:
+            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
+                tn_uuid))
+        if net_tz not in ec_tzs:
+            msg = (_('Network TZ %(tz)s does not match DHCP server '
+                     'edge cluster %(ec)s') %
+                   {'tz': net_tz, 'ec': ec_id})
+            LOG.error(msg)
+            raise n_exc.InvalidInput(error_message=msg)
+
+    def _create_subnet_dhcp_port(self, context, az, network, subnet):
+        port_data = {
+            "name": "",
+            "admin_state_up": True,
+            "device_id": network['id'],
+            "device_owner": const.DEVICE_OWNER_DHCP,
+            "network_id": network['id'],
+            "tenant_id": network["tenant_id"],
+            "mac_address": const.ATTR_NOT_SPECIFIED,
+            "fixed_ips": [{"subnet_id": subnet['id']}],
+            psec.PORTSECURITY: False
+        }
+        # Create the DHCP port (on neutron only) and update its port security
+        port = {'port': port_data}
+        neutron_port = super(NsxPolicyPlugin, self).create_port(context, port)
+        is_ens_tz_port = self._is_ens_tz_port(context, port_data)
+        self._create_port_preprocess_security(context, port, port_data,
+                                              neutron_port, is_ens_tz_port)
+        self._process_portbindings_create_and_update(
+            context, port_data, neutron_port)
+
+    def _delete_subnet_dhcp_port(self, context, net_id):
+        dhcp_port = self._get_sunbet_dhcp_port(context, net_id)
+        if dhcp_port:
+            self.delete_port(context, dhcp_port['id'],
+                             force_delete_dhcp=True)
+
+    def _get_sunbet_dhcp_port(self, context, net_id):
+        filters = {
+            'network_id': [net_id],
+            'device_owner': [const.DEVICE_OWNER_DHCP]
+        }
+        dhcp_ports = self.get_ports(context, filters=filters)
+        return dhcp_ports[0] if dhcp_ports else None
+
+    def _get_sunbet_dhcp_server_ip(self, context, net_id, dhcp_subnet_id):
+        dhcp_port = self._get_sunbet_dhcp_port(context, net_id)
+        if dhcp_port:
+            dhcp_server_ips = [fip['ip_address']
+                               for fip in dhcp_port['fixed_ips']
+                               if fip['subnet_id'] == dhcp_subnet_id]
+            if dhcp_server_ips:
+                return dhcp_server_ips[0]
+
+    def _is_dhcp_network(self, context, net_id):
+        dhcp_port = self._get_sunbet_dhcp_port(context, net_id)
+        return True if dhcp_port else False
+
+    def _get_segment_subnets(self, context, net_id, net_az=None, **kwargs):
+        """Get list of segmentSubnet objects to put on the segment
+        Including router interface subnets (for overlay networks) &
+        DHCP subnet (if using policy DHCP)
+        """
+        dhcp_subnet = None
+        if 'dhcp_subnet' in kwargs:
+            dhcp_subnet = kwargs['dhcp_subnet']
+        else:
+            # Get it from the network
+            if self.use_policy_dhcp:
+                # TODO(asarfaty): Add ipv6 support
+                network = self._get_network(context, net_id)
+                for subnet in network.subnets:
+                    if subnet.enable_dhcp and subnet.ip_version == 4:
+                        dhcp_subnet = self.get_subnet(context, subnet.id)
+                        break
+
+        router_subnets = None
+        if 'router_subnets' in kwargs:
+            router_subnets = kwargs['router_subnets']
+        else:
+            # Get it from the network, only if overlay
+            if self._is_overlay_network(context, net_id):
+                router_ids = self._get_network_router_ids(
+                    context.elevated(), net_id)
+                if router_ids:
+                    router_id = router_ids[0]
+                    router_subnets = self._load_router_subnet_cidrs_from_db(
+                        context.elevated(), router_id)
+
+        seg_subnets = []
+
+        dhcp_subnet_id = None
+        if dhcp_subnet:
+            dhcp_subnet_id = dhcp_subnet['id']
+            gw_addr = self._get_gateway_addr_from_subnet(dhcp_subnet)
+            cidr_prefix = int(dhcp_subnet['cidr'].split('/')[1])
+            dhcp_server_ip = self._get_sunbet_dhcp_server_ip(
+                context, net_id, dhcp_subnet_id)
+            dns_nameservers = dhcp_subnet['dns_nameservers']
+            if (not dns_nameservers or
+                not validators.is_attr_set(dns_nameservers)):
+                # Use preconfigured dns server
+                if not net_az:
+                    net_az = self.get_network_az_by_net_id(context, net_id)
+                dns_nameservers = net_az.nameservers
+            dhcp_config = policy_defs.SegmentDhcpConfig(
+                server_address="%s/%s" % (dhcp_server_ip, cidr_prefix),
+                dns_servers=dns_nameservers,
+                is_ipv6=False)  # TODO(asarfaty): add ipv6 support
+
+            seg_subnet = policy_defs.Subnet(gateway_address=gw_addr,
+                                            dhcp_ranges=[],
+                                            dhcp_config=dhcp_config)
+            seg_subnets.append(seg_subnet)
+
+        if router_subnets:
+            for rtr_subnet in router_subnets:
+                if rtr_subnet['id'] == dhcp_subnet_id:
+                    # Do not add the same subnet twice
+                    continue
+                if rtr_subnet['network_id'] == net_id:
+                    gw_addr = self._get_gateway_addr_from_subnet(rtr_subnet)
+                    seg_subnets.append(
+                        policy_defs.Subnet(gateway_address=gw_addr,
+                                           dhcp_ranges=[],
+                                           dhcp_config=None))
+
+        return seg_subnets
+
+    def _enable_subnet_dhcp(self, context, network, subnet, az):
+        # Allocate a neutron port for the DHCP server
+        self._create_subnet_dhcp_port(context, az, network, subnet)
+
+        # Update the DHCP server on the segment
+        net_id = network['id']
+        segment_id = self._get_network_nsx_segment_id(context, net_id)
+
+        seg_subnets = self._get_segment_subnets(
+            context, net_id, net_az=az, dhcp_subnet=subnet)
+        net_name = self._net_nsx_name(network)
+
+        # Update dhcp server config on the segment
+        self.nsxpolicy.segment.create_or_overwrite(
+            net_name,
+            segment_id=segment_id,
+            dhcp_server_config_id=az._policy_dhcp_server_config,
+            subnets=seg_subnets)
+
+    def _disable_network_dhcp(self, context, network):
+        net_id = network['id']
+
+        # Remove dhcp server config from the segment
+        segment_id = self._get_network_nsx_segment_id(
+            context, net_id)
+        seg_subnets = self._get_segment_subnets(
+            context, net_id, dhcp_subnet=None)
+        self.nsxpolicy.segment.update(
+            segment_id,
+            subnets=seg_subnets,
+            dhcp_server_config_id=None)
+
+        # Delete the neutron DHCP port (and its bindings)
+        self._delete_subnet_dhcp_port(context, net_id)
+
+    def _update_subnet_dhcp(self, context, network, subnet, az):
+        net_id = network['id']
+        segment_id = self._get_network_nsx_segment_id(context, net_id)
+        seg_subnets = self._get_segment_subnets(
+            context, net_id, net_az=az, dhcp_subnet=subnet)
+        net_name = self._net_nsx_name(network)
+
+        filters = {'network_id': [net_id]}
+        ports = self.get_ports(context, filters=filters)
+
+        self.nsxpolicy.segment.create_or_overwrite(
+            net_name, segment_id=segment_id,
+            dhcp_server_config_id=az._policy_dhcp_server_config,
+            subnets=seg_subnets)
+
+        # Update DHCP bindings for all the ports.
+        for port in ports:
+            self._add_or_overwrite_port_policy_dhcp_binding(
+                context, port, segment_id, subnet)
+
+    def _validate_net_type_with_dhcp(self, context, network):
+        ddi_support, ddi_type = self._is_ddi_supported_on_net_with_type(
+            context, network['id'], network=network)
+        if not ddi_support:
+            msg = _("Native DHCP is not supported for %(type)s "
+                    "network %(id)s") % {'id': network['id'],
+                                         'type': ddi_type}
+            LOG.error(msg)
+            raise n_exc.InvalidInput(error_message=msg)
+
     @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
-        return self._create_subnet(context, subnet)
+        if not self.use_policy_dhcp:
+            # Subnet with MP DHCP
+            return self._create_subnet_with_mp_dhcp(context, subnet)
+
+        self._validate_number_of_subnet_static_routes(subnet)
+        self._validate_host_routes_input(subnet)
+        self._validate_subnet_ip_version(subnet['subnet'])
+        net_id = subnet['subnet']['network_id']
+        network = self._get_network(context, net_id)
+        self._validate_single_ipv6_subnet(context, network, subnet['subnet'])
+        net_az = self.get_network_az_by_net_id(context, net_id)
+
+        # Allow manipulation of only 1 subnet of the same network at once
+        lock = 'nsxp_network_' + net_id
+        with locking.LockManager.get_lock(lock):
+            # DHCP validations (before creating the neutron subnet)
+            with_dhcp = False
+            if self._subnet_with_native_dhcp(subnet['subnet']):
+                with_dhcp = True
+                self._validate_external_subnet(context, net_id)
+                self._validate_net_dhcp_edge_cluster(context, network, net_az)
+                self._validate_net_type_with_dhcp(context, network)
+
+                if self._has_dhcp_enabled_subnet(context, network):
+                    msg = (_("Can not create more than one DHCP-enabled "
+                            "subnet in network %s") % net_id)
+                    LOG.error(msg)
+                    raise n_exc.InvalidInput(error_message=msg)
+
+            # Create the neutron subnet.
+            # Any failure from here and on will require rollback.
+            created_subnet = super(NsxPolicyPlugin, self).create_subnet(
+                context, subnet)
+            try:
+                # This can be called only after the super create
+                # since we need the subnet pool to be translated
+                # to allocation pools
+                self._validate_address_space(context, created_subnet)
+            except n_exc.InvalidInput:
+                # revert the subnet creation
+                with excutils.save_and_reraise_exception():
+                    super(NsxPolicyPlugin, self).delete_subnet(
+                        context, created_subnet['id'])
+
+            self._extension_manager.process_create_subnet(context,
+                subnet['subnet'], created_subnet)
+
+            if with_dhcp:
+                try:
+                    # Enable the network DHCP on the NSX
+                    self._enable_subnet_dhcp(
+                        context, network, created_subnet, net_az)
+                except (nsx_lib_exc.ManagerError, nsx_exc.NsxPluginException):
+                    # revert the subnet creation
+                    with excutils.save_and_reraise_exception():
+                        # Try to delete the DHCP port, and the neutron subnet
+                        self._delete_subnet_dhcp_port(context, net_id)
+                        super(NsxPolicyPlugin, self).delete_subnet(
+                            context, created_subnet['id'])
+
+        return created_subnet
 
     def delete_subnet(self, context, subnet_id):
-        # Call common V3 code to delete the subnet
+        if not self.use_policy_dhcp:
+            # Subnet with MP DHCP
+            return self.delete_subnet_with_mp_dhcp(context, subnet_id)
+
+        if self._has_native_dhcp_metadata():
+            # Ensure that subnet is not deleted if attached to router.
+            self._subnet_check_ip_allocations_internal_router_ports(
+                context, subnet_id)
+            subnet = self.get_subnet(context, subnet_id)
+            if self._subnet_with_native_dhcp(subnet):
+                lock = 'nsxp_network_' + subnet['network_id']
+                with locking.LockManager.get_lock(lock):
+                    # Check if it is the last DHCP-enabled subnet to delete.
+                    network = self._get_network(context, subnet['network_id'])
+                    if self._has_single_dhcp_enabled_subnet(context, network):
+                        try:
+                            self._disable_network_dhcp(context, network)
+                        except Exception as e:
+                            LOG.error("Failed to disable DHCP for "
+                                      "network %(id)s. Exception: %(e)s",
+                                      {'id': network['id'], 'e': e})
+                            # Continue for the neutron subnet deletion
+        # Delete neutron subnet
         super(NsxPolicyPlugin, self).delete_subnet(context, subnet_id)
 
     def update_subnet(self, context, subnet_id, subnet):
-        return self._update_subnet(context, subnet_id, subnet)
+        if not self.use_policy_dhcp:
+            # Subnet with MP DHCP
+            return self.update_subnet_with_mp_dhcp(context, subnet_id, subnet)
+        subnet_data = subnet['subnet']
+        updated_subnet = None
+        orig_subnet = self.get_subnet(context, subnet_id)
+        self._validate_number_of_subnet_static_routes(subnet)
+        self._validate_host_routes_input(
+            subnet,
+            orig_enable_dhcp=orig_subnet['enable_dhcp'],
+            orig_host_routes=orig_subnet['host_routes'])
+
+        net_id = orig_subnet['network_id']
+        network = self._get_network(context, net_id)
+        net_az = self.get_network_az_by_net_id(context, net_id)
+
+        enable_dhcp = self._subnet_with_native_dhcp(
+            subnet_data, orig_subnet=orig_subnet)
+        orig_enable_dhcp = self._subnet_with_native_dhcp(orig_subnet)
+
+        if enable_dhcp != orig_enable_dhcp:
+            # Update subnet with DHCP status change
+            self._validate_external_subnet(context, net_id)
+            lock = 'nsxp_network_' + net_id
+            with locking.LockManager.get_lock(lock):
+                if enable_dhcp:
+                    self._validate_net_type_with_dhcp(context, network)
+
+                    if self._has_dhcp_enabled_subnet(context, network):
+                        msg = (_("Can not create more than one DHCP-enabled "
+                                "subnet in network %s") % net_id)
+                        LOG.error(msg)
+                        raise n_exc.InvalidInput(error_message=msg)
+
+                updated_subnet = super(NsxPolicyPlugin, self).update_subnet(
+                    context, subnet_id, subnet)
+                self._extension_manager.process_update_subnet(
+                    context, subnet_data, updated_subnet)
+
+                try:
+                    if enable_dhcp:
+                        self._enable_subnet_dhcp(context, network,
+                                                 updated_subnet, net_az)
+                    else:
+                        self._disable_network_dhcp(context, network)
+                except (nsx_lib_exc.ManagerError, nsx_exc.NsxPluginException):
+                    # revert the subnet update
+                    with excutils.save_and_reraise_exception():
+                        super(NsxPolicyPlugin, self).update_subnet(
+                            context, subnet_id, {'subnet': orig_subnet})
+
+        else:
+            # No dhcp changes - just call super update
+            updated_subnet = super(NsxPolicyPlugin, self).update_subnet(
+                context, subnet_id, subnet)
+            self._extension_manager.process_update_subnet(
+                context, subnet_data, updated_subnet)
+
+        # Check if needs to update DHCP related NSX resources
+        # (only if the subnet changed, but dhcp was already enabled)
+        if (enable_dhcp and orig_enable_dhcp and
+            ('dns_nameservers' in subnet_data or
+             'gateway_ip' in subnet_data or
+             'host_routes' in subnet_data)):
+            self._update_subnet_dhcp(context, network,
+                                     updated_subnet, net_az)
+
+        return updated_subnet
 
     def _build_port_address_bindings(self, context, port_data):
         psec_on, has_ip = self._determine_port_security_and_has_ip(context,
@@ -1066,9 +1442,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             vif_id = port_data['id']
 
         tags = self._build_port_tags(port_data)
-        if device_owner == const.DEVICE_OWNER_DHCP:
-            tag_resource_type = 'os-neutron-dport-id'
-        elif device_owner == l3_db.DEVICE_OWNER_ROUTER_INTF:
+        if device_owner == l3_db.DEVICE_OWNER_ROUTER_INTF:
             tag_resource_type = 'os-neutron-rport-id'
         else:
             tag_resource_type = NSX_P_PORT_RESOURCE_TYPE
@@ -1179,7 +1553,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         is_octavia_port = (device_owner == oct_const.DEVICE_OWNER_OCTAVIA)
 
         if is_external_net or is_router_interface or is_dhcp_port:
-            # DHCP is handled on MP level so far
+            # DHCP is handled on NSX level
             # Router is connected automatically in policy
             return False
 
@@ -1190,6 +1564,136 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             return False
 
         return True
+
+    def _add_or_overwrite_port_policy_dhcp_binding(
+        self, context, port, segment_id, dhcp_subnet=None):
+        if not utils.is_port_dhcp_configurable(port):
+            return
+        net_id = port['network_id']
+
+        for fixed_ip in self._filter_ipv4_dhcp_fixed_ips(
+            context, port['fixed_ips']):
+            # There will be only one ipv4 ip here
+            binding_id = port['id'] + '-ipv4'
+            name = 'IPv4 binding for port %s' % port['id']
+            ip = fixed_ip['ip_address']
+            hostname = 'host-%s' % ip.replace('.', '-')
+            if dhcp_subnet:
+                if fixed_ip['subnet_id'] != dhcp_subnet['id']:
+                    continue
+                subnet = dhcp_subnet
+            else:
+                subnet = self.get_subnet(context, fixed_ip['subnet_id'])
+            gateway_ip = subnet.get('gateway_ip')
+            options = self._get_dhcp_options(
+                context, ip, port.get(ext_edo.EXTRADHCPOPTS),
+                net_id, subnet)
+            self.nsxpolicy.segment_dhcp_static_bindings.create_or_overwrite_v4(
+                name, segment_id, binding_id=binding_id,
+                gateway_address=gateway_ip,
+                host_name=hostname,
+                ip_address=ip,
+                lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
+                mac_address=port['mac_address'],
+                options=options)
+
+        # TODO(asarfaty): add ipv6 bindings (without options)
+
+    def _add_port_policy_dhcp_binding(self, context, port):
+        net_id = port['network_id']
+        if not self._is_dhcp_network(context, net_id):
+            return
+
+        segment_id = self._get_network_nsx_segment_id(context, net_id)
+        self._add_or_overwrite_port_policy_dhcp_binding(
+            context, port, segment_id)
+
+    def _delete_port_policy_dhcp_binding(self, context, port):
+        # Do not check device_owner here because Nova may have already
+        # deleted that before Neutron's port deletion.
+        net_id = port['network_id']
+        if not self._is_dhcp_network(context, net_id):
+            return
+        segment_id = self._get_network_nsx_segment_id(context, net_id)
+
+        v4_dhcp = v6_dhcp = False
+        for fixed_ip in port['fixed_ips']:
+            ip_addr = fixed_ip['ip_address']
+            if netaddr.IPAddress(ip_addr).version == 6:
+                v6_dhcp = True
+            else:
+                v4_dhcp = True
+        if v4_dhcp:
+            try:
+                bindingv4_id = port['id'] + '-ipv4'
+                self.nsxpolicy.segment_dhcp_static_bindings.delete(
+                    segment_id, bindingv4_id)
+            except nsx_lib_exc.ResourceNotFound:
+                pass
+
+        if v6_dhcp:
+            try:
+                bindingv6_id = port['id'] + '-ipv6'
+                self.nsxpolicy.segment_dhcp_static_bindings.delete(
+                    segment_id, bindingv6_id)
+            except nsx_lib_exc.ResourceNotFound:
+                pass
+
+    def _update_port_policy_dhcp_binding(self, context, old_port, new_port):
+        # First check if any IPv4 address in fixed_ips is changed.
+        # Then update DHCP server setting or DHCP static binding
+        # depending on the port type.
+        # Note that Neutron allows a port with multiple IPs in the
+        # same subnet. But backend DHCP server may not support that.
+        if (utils.is_port_dhcp_configurable(old_port) !=
+            utils.is_port_dhcp_configurable(new_port)):
+            # Note that the device_owner could be changed,
+            # but still needs DHCP binding.
+            if utils.is_port_dhcp_configurable(old_port):
+                self._delete_port_policy_dhcp_binding(context, old_port)
+            else:
+                self._add_port_policy_dhcp_binding(context, new_port)
+            return
+
+        # Collect IPv4 DHCP addresses from original and updated fixed_ips
+        # in the form of [(subnet_id, ip_address)].
+        old_fixed_ips = set([(fixed_ip['subnet_id'], fixed_ip['ip_address'])
+                             for fixed_ip in self._filter_ipv4_dhcp_fixed_ips(
+                                 context, old_port['fixed_ips'])])
+        new_fixed_ips = set([(fixed_ip['subnet_id'], fixed_ip['ip_address'])
+                             for fixed_ip in self._filter_ipv4_dhcp_fixed_ips(
+                                 context, new_port['fixed_ips'])])
+        # Find out the subnet/IP differences before and after the update.
+        ips_to_add = list(new_fixed_ips - old_fixed_ips)
+        ips_to_delete = list(old_fixed_ips - new_fixed_ips)
+        ip_change = (ips_to_add or ips_to_delete)
+
+        if (old_port["device_owner"] == const.DEVICE_OWNER_DHCP and
+            ip_change):
+            # Update backend DHCP server address if the IP address of a DHCP
+            # port is changed.
+            if len(new_fixed_ips) != 1:
+                msg = _("Can only configure one IP address on a DHCP server")
+                LOG.error(msg)
+                raise n_exc.InvalidInput(error_message=msg)
+            fixed_ip = list(new_fixed_ips)[0]
+            subnet_id = fixed_ip[0]
+            net_id = old_port['network_id']
+            network = self.get_network(context, net_id)
+            subnet = self.get_subnet(context, subnet_id)
+            net_az = self.get_network_az_by_net_id(context, net_id)
+            self._update_subnet_dhcp(context, network, subnet, net_az)
+
+        elif utils.is_port_dhcp_configurable(new_port):
+            dhcp_opts_changed = (old_port[ext_edo.EXTRADHCPOPTS] !=
+                                 new_port[ext_edo.EXTRADHCPOPTS])
+            if (ip_change or dhcp_opts_changed or
+                old_port['mac_address'] != new_port['mac_address']):
+                if new_fixed_ips:
+                    # Recreate the bindings of this port
+                    self._add_port_policy_dhcp_binding(context, new_port)
+                else:
+                    self._delete_port_policy_dhcp_binding(context, old_port)
 
     def create_port(self, context, port, l2gw_port_check=False):
         port_data = port['port']
@@ -1257,7 +1761,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     super(NsxPolicyPlugin, self).delete_port(
                         context, neutron_db['id'])
 
-        # Attach the policy to the port in the neutron DB
+        # Attach the QoS policy to the port in the neutron DB
         if qos_policy_id:
             qos_com_utils.update_port_policy_binding(context,
                                                      neutron_db['id'],
@@ -1270,16 +1774,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self._remove_provider_security_groups_from_list(port_data)
 
         # Add Mac/IP binding to native DHCP server and neutron DB.
-        if cfg.CONF.nsx_p.allow_passthrough:
-            try:
-                self._add_dhcp_binding(context, port_data)
-            except nsx_lib_exc.ManagerError:
-                # Rollback create port
-                self.delete_port(context, port_data['id'],
-                                 force_delete_dhcp=True)
-                msg = _('Unable to create port. Please contact admin')
-                LOG.exception(msg)
-                raise nsx_exc.NsxPluginException(err_msg=msg)
+        try:
+            if self.use_policy_dhcp:
+                self._add_port_policy_dhcp_binding(context, port_data)
+            elif cfg.CONF.nsx_p.allow_passthrough:
+                self._add_port_mp_dhcp_binding(context, port_data)
+        except nsx_lib_exc.ManagerError:
+            # Rollback create port
+            self.delete_port(context, port_data['id'],
+                             force_delete_dhcp=True)
+            msg = _('Unable to create port. Please contact admin')
+            LOG.exception(msg)
+            raise nsx_exc.NsxPluginException(err_msg=msg)
 
         kwargs = {'context': context, 'port': neutron_db}
         registry.notify(resources.PORT, events.AFTER_CREATE, self, **kwargs)
@@ -1331,8 +1837,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self.disassociate_floatingips(context, port_id)
 
         # Remove Mac/IP binding from native DHCP server and neutron DB.
-        if cfg.CONF.nsx_p.allow_passthrough:
-            self._delete_dhcp_binding(context, port_data)
+        if self.use_policy_dhcp:
+            self._delete_port_policy_dhcp_binding(context, port_data)
+        elif cfg.CONF.nsx_p.allow_passthrough:
+            self._delete_port_mp_dhcp_binding(context, port_data)
 
         super(NsxPolicyPlugin, self).delete_port(context, port_id)
 
@@ -1469,8 +1977,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                              port_id)
 
         # Update DHCP bindings.
-        if cfg.CONF.nsx_p.allow_passthrough:
-            self._update_dhcp_binding(context, original_port, updated_port)
+        if self.use_policy_dhcp:
+            self._update_port_policy_dhcp_binding(
+                context, original_port, updated_port)
+        elif cfg.CONF.nsx_p.allow_passthrough:
+            self._update_port_mp_dhcp_binding(
+                context, original_port, updated_port)
 
         # Make sure the port revision is updated
         if 'revision_number' in updated_port:
@@ -1564,7 +2076,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             router_id,
             nat_rule_id=self._get_snat_rule_id(subnet))
 
-    def _get_edge_cluster_path(self, tier0_uuid, router):
+    def _get_router_edge_cluster_path(self, tier0_uuid, router):
         # Take the AZ edge cluster if configured
         az = self._get_router_az_obj(router)
         if az and az._edge_cluster_uuid:
@@ -1662,7 +2174,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             err_msg = (_("Cannot create service router for %s without a "
                          "gateway") % router_id)
             raise n_exc.InvalidInput(error_message=err_msg)
-        edge_cluster_path = self._get_edge_cluster_path(
+        edge_cluster_path = self._get_router_edge_cluster_path(
             tier0_uuid, router)
         if edge_cluster_path:
             self.nsxpolicy.tier1.set_edge_cluster_path(
@@ -2004,8 +2516,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return updated_router
 
     def _get_gateway_addr_from_subnet(self, subnet):
-        cidr_prefix = int(subnet['cidr'].split('/')[1])
-        return "%s/%s" % (subnet['gateway_ip'], cidr_prefix)
+        if subnet['gateway_ip'] and subnet['cidr']:
+            cidr_prefix = int(subnet['cidr'].split('/')[1])
+            return "%s/%s" % (subnet['gateway_ip'], cidr_prefix)
 
     @nsx_plugin_common.api_replay_mode_wrapper
     def add_router_interface(self, context, router_id, interface_info):
@@ -2064,15 +2577,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 context.elevated(), router_id)
             if overlay_net:
                 # overlay interface
-                pol_subnets = []
-                for rtr_subnet in rtr_subnets:
-                    # For dual stack, we allow one v4 and one v6
-                    # subnet per network
-                    if rtr_subnet['network_id'] == network_id:
-                        gw_addr = self._get_gateway_addr_from_subnet(
-                            rtr_subnet)
-                        pol_subnets.append(
-                            policy_defs.Subnet(gateway_address=gw_addr))
+                pol_subnets = self._get_segment_subnets(
+                    context, network_id, interface_subnets=rtr_subnets)
 
                 self.nsxpolicy.segment.update(segment_id,
                                               tier1_id=router_id,

@@ -111,14 +111,6 @@ class NsxPAvailabilityZonesTestCase(base.BaseTestCase):
             nsx_az.NsxPAvailabilityZone,
             self.az_name)
 
-    def test_availability_zone_missing_dhcp_profile(self):
-        # Mandatory parameter
-        self._config_az(dhcp_profile=None)
-        self.assertRaises(
-            nsx_exc.NsxInvalidConfiguration,
-            nsx_az.NsxPAvailabilityZone,
-            self.az_name)
-
     def test_availability_zone_missing_md_route(self):
         self._config_az(native_metadata_route=None)
         az = nsx_az.NsxPAvailabilityZone(self.az_name)

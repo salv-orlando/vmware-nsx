@@ -159,9 +159,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 self._native_dhcp_enabled = False
 
     def _init_native_metadata(self):
-        if not self.nsxlib:
-            return
-
         for az in self.get_azs_list():
             if not az._native_md_proxy_uuid:
                 LOG.error("Unable to retrieve Metadata Proxy %s for "
@@ -1635,7 +1632,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         # Configure existing ports to work with the new DHCP server
         try:
             for port_data in existing_ports:
-                self._add_dhcp_binding(context, port_data)
+                self._add_port_mp_dhcp_binding(context, port_data)
         except Exception:
             LOG.error('Unable to create DHCP bindings for existing ports '
                       'on subnet %s', subnet['id'])
@@ -1701,7 +1698,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 ips.append(fixed_ip)
         return ips
 
-    def _add_dhcp_binding(self, context, port):
+    def _add_port_mp_dhcp_binding(self, context, port):
         if not utils.is_port_dhcp_configurable(port):
             return
         dhcp_service = nsx_db.get_nsx_service_binding(
@@ -1760,7 +1757,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                            'port': port['id'],
                            'server': dhcp_service_id})
 
-    def _delete_dhcp_binding(self, context, port):
+    def _delete_port_mp_dhcp_binding(self, context, port):
         # Do not check device_owner here because Nova may have already
         # deleted that before Neutron's port deletion.
         bindings = nsx_db.get_nsx_dhcp_bindings(context.session, port['id'])
@@ -1797,7 +1794,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 ip_address == binding['ip_address']):
                 return binding
 
-    def _update_dhcp_binding(self, context, old_port, new_port):
+    def _update_port_mp_dhcp_binding(self, context, old_port, new_port):
         # First check if any IPv4 address in fixed_ips is changed.
         # Then update DHCP server setting or DHCP static binding
         # depending on the port type.
@@ -1808,9 +1805,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             # Note that the device_owner could be changed,
             # but still needs DHCP binding.
             if utils.is_port_dhcp_configurable(old_port):
-                self._delete_dhcp_binding(context, old_port)
+                self._delete_port_mp_dhcp_binding(context, old_port)
             else:
-                self._add_dhcp_binding(context, new_port)
+                self._add_port_mp_dhcp_binding(context, new_port)
             return
 
         # Collect IPv4 DHCP addresses from original and updated fixed_ips
@@ -2054,6 +2051,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         is_slaac = (subnet.get('ipv6_address_mode') == 'slaac')
         if enable_dhcp and not is_slaac:
             # No DHCPv6 support yet
+            # TODO(asarfaty): add ipv6 support for policy plugin
             msg = _("DHCPv6 is not supported")
             LOG.error(msg)
             raise n_exc.InvalidInput(error_message=msg)
@@ -2084,7 +2082,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.error(msg)
             raise n_exc.InvalidInput(error_message=msg)
 
-    def _create_subnet(self, context, subnet):
+    def _create_subnet_with_mp_dhcp(self, context, subnet):
         self._validate_number_of_subnet_static_routes(subnet)
         self._validate_host_routes_input(subnet)
         self._validate_subnet_ip_version(subnet['subnet'])
@@ -2304,7 +2302,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         return super(NsxPluginV3Base, self).get_subnets(
             context, filters, fields, sorts, limit, marker, page_reverse)
 
-    def delete_subnet(self, context, subnet_id):
+    def delete_subnet_with_mp_dhcp(self, context, subnet_id):
         # TODO(berlin): cancel public external subnet announcement
         if self._has_native_dhcp_metadata():
             # Ensure that subnet is not deleted if attached to router.
@@ -2328,7 +2326,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         return
         super(NsxPluginV3Base, self).delete_subnet(context, subnet_id)
 
-    def _update_subnet(self, context, subnet_id, subnet):
+    def update_subnet_with_mp_dhcp(self, context, subnet_id, subnet):
         updated_subnet = None
         orig_subnet = self.get_subnet(context, subnet_id)
         self._validate_number_of_subnet_static_routes(subnet)
@@ -2336,12 +2334,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             subnet,
             orig_enable_dhcp=orig_subnet['enable_dhcp'],
             orig_host_routes=orig_subnet['host_routes'])
-
         network = self._get_network(context, orig_subnet['network_id'])
-        if (subnet['subnet'].get('ip_version') !=
-            orig_subnet.get('ip_version')):
-            self._validate_single_ipv6_subnet(
-                context, network, subnet['subnet'])
 
         if self._has_native_dhcp_metadata():
             enable_dhcp = self._subnet_with_native_dhcp(
@@ -2413,7 +2406,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         if key != 'dns_nameservers':
                             kwargs['options'] = None
             if 'options' in kwargs:
-                sr, gw_ip = self.nsxlib.native_dhcp.build_static_routes(
+                sr, gw_ip = self._build_static_routes(
                     updated_subnet.get('gateway_ip'),
                     updated_subnet.get('cidr'),
                     updated_subnet.get('host_routes', []))
@@ -2509,6 +2502,28 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     # we have nothing else to do but raise the exception.
                     raise
 
+    def _build_static_routes(self, gateway_ip, cidr, host_routes):
+        # The following code is based on _generate_opts_per_subnet() in
+        # neutron/agent/linux/dhcp.py. It prepares DHCP options for a subnet.
+
+        # Add route for directly connected network.
+        static_routes = [{'network': cidr, 'next_hop': '0.0.0.0'}]
+        # Copy routes from subnet host_routes attribute.
+        if host_routes:
+            for hr in host_routes:
+                if hr['destination'] == constants.IPv4_ANY:
+                    if not gateway_ip:
+                        gateway_ip = hr['nexthop']
+                else:
+                    static_routes.append({'network': hr['destination'],
+                                          'next_hop': hr['nexthop']})
+
+        # If gateway_ip is defined, add default route via this gateway.
+        if gateway_ip:
+            static_routes.append({'network': constants.IPv4_ANY,
+                                  'next_hop': gateway_ip})
+        return static_routes, gateway_ip
+
     def _get_dhcp_options(self, context, ip, extra_dhcp_opts, net_id,
                           subnet):
         # Always add option121.
@@ -2519,7 +2534,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             {'network': '%s' % net_az.native_metadata_route,
              'next_hop': ip}]}}
         if subnet:
-            sr, gateway_ip = self.nsxlib.native_dhcp.build_static_routes(
+            sr, gateway_ip = self._build_static_routes(
                 subnet.get('gateway_ip'), subnet.get('cidr'),
                 subnet.get('host_routes', []))
             options['option121']['static_routes'].extend(sr)
@@ -2641,6 +2656,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if subnet.enable_dhcp and subnet.ipv6_address_mode != 'slaac':
                 return False
         return True
+
+    def _has_dhcp_enabled_subnet(self, context, network):
+        return not self._has_no_dhcp_enabled_subnet(context, network)
 
     def _has_single_dhcp_enabled_subnet(self, context, network):
         # Check if there is only one DHCP-enabled subnet in the network.

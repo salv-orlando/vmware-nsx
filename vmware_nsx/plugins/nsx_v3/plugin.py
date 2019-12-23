@@ -1222,16 +1222,15 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
     @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
-        return self._create_subnet(context, subnet)
+        return self._create_subnet_with_mp_dhcp(context, subnet)
 
     def delete_subnet(self, context, subnet_id):
         # Call common V3 code to delete the subnet
-        super(NsxV3Plugin, self).delete_subnet(context, subnet_id)
+        self.delete_subnet_with_mp_dhcp(context, subnet_id)
 
     def update_subnet(self, context, subnet_id, subnet):
-        updated_subnet = self._update_subnet(context,
-                                             subnet_id,
-                                             subnet)
+        updated_subnet = self.update_subnet_with_mp_dhcp(
+            context, subnet_id, subnet)
         if (cfg.CONF.nsx_v3.metadata_on_demand and
             not self._has_native_dhcp_metadata()):
             # If enable_dhcp is changed on a subnet attached to a router,
@@ -1659,7 +1658,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         # Add Mac/IP binding to native DHCP server and neutron DB.
         if cfg.CONF.nsx_v3.native_dhcp_metadata:
             try:
-                self._add_dhcp_binding(context, port_data)
+                self._add_port_mp_dhcp_binding(context, port_data)
             except nsx_lib_exc.ManagerError:
                 # Rollback create port
                 self.delete_port(context, port_data['id'],
@@ -1732,7 +1731,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         # Remove Mac/IP binding from native DHCP server and neutron DB.
         if cfg.CONF.nsx_v3.native_dhcp_metadata:
-            self._delete_dhcp_binding(context, port)
+            self._delete_port_mp_dhcp_binding(context, port)
         else:
             nsx_rpc.handle_port_metadata_access(self, context, port,
                                                 is_delete=True)
@@ -2016,7 +2015,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         # Update DHCP bindings.
         if cfg.CONF.nsx_v3.native_dhcp_metadata:
-            self._update_dhcp_binding(context, original_port, updated_port)
+            self._update_port_mp_dhcp_binding(
+                context, original_port, updated_port)
 
         # Make sure the port revision is updated
         if 'revision_number' in updated_port:
