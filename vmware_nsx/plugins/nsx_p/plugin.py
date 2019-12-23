@@ -1149,17 +1149,24 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             context, port['port'], neutron_db)
         return neutron_db
 
-    def _is_backend_port(self, context, port_data):
+    def _is_backend_port(self, context, port_data, delete=False):
         is_external_net = self._network_is_external(
             context, port_data['network_id'])
 
         device_owner = port_data.get('device_owner')
         is_router_interface = (device_owner == l3_db.DEVICE_OWNER_ROUTER_INTF)
         is_dhcp_port = (device_owner == const.DEVICE_OWNER_DHCP)
+        is_octavia_port = (device_owner == oct_const.DEVICE_OWNER_OCTAVIA)
 
         if is_external_net or is_router_interface or is_dhcp_port:
             # DHCP is handled on MP level so far
             # Router is connected automatically in policy
+            return False
+
+        if not delete and is_octavia_port:
+            # Octavia vip port should not be created on the NSX.
+            # Since octavia backend ports from older deployments may exist,
+            # need to try and delete those.
             return False
 
         return True
@@ -1310,7 +1317,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         super(NsxPolicyPlugin, self).delete_port(context, port_id)
 
         # Delete the backend port last to prevent recreation by another process
-        if self._is_backend_port(context, port_data):
+        if self._is_backend_port(context, port_data, delete=True):
             try:
                 self._delete_port_on_backend(context, net_id, port_id)
             except nsx_lib_exc.ResourceNotFound:
