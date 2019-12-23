@@ -361,11 +361,6 @@ nsx_v3_and_p = [
                       "that will be used to enable native metadata service. "
                       "It needs to be created in NSX before starting Neutron "
                       "with the NSX plugin.")),
-    cfg.StrOpt('dhcp_profile',
-               help=_("This is the name or UUID of the NSX DHCP Profile "
-                      "that will be used to enable native DHCP service. It "
-                      "needs to be created in NSX before starting Neutron "
-                      "with the NSX plugin")),
     cfg.StrOpt('native_metadata_route',
                default="169.254.169.254/31",
                help=_("The metadata route used for native metadata proxy "
@@ -410,6 +405,11 @@ nsx_v3_and_p = [
 ]
 
 nsx_v3_opts = nsx_v3_and_p + [
+    cfg.StrOpt('dhcp_profile',
+               help=_("This is the name or UUID of the NSX DHCP Profile "
+                      "that will be used to enable native DHCP service. It "
+                      "needs to be created in NSX before starting Neutron "
+                      "with the NSX plugin")),
     cfg.StrOpt('default_overlay_tz',
                help=_("This is the name or UUID of the default NSX overlay "
                       "transport zone that will be used for creating "
@@ -505,6 +505,12 @@ nsx_v3_opts = nsx_v3_and_p + [
 ]
 
 nsx_p_opts = nsx_v3_and_p + [
+    cfg.StrOpt('dhcp_profile',
+               help=_("This is the name or UUID of the NSX DHCP Profile, "
+                      "or the name or ID of the Policy DHCP server config "
+                      "that will be used to enable native DHCP service. It "
+                      "needs to be created in NSX before starting Neutron "
+                      "with the NSX plugin")),
     cfg.StrOpt('default_tier0_router',
                help=_("Name or UUID of the default tier0 router that will be "
                       "used for connecting to tier1 logical routers and "

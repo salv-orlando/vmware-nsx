@@ -34,10 +34,6 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
     def get_az_opts(self):
         return config.get_nsxp_az_opts(self.name)
 
-    def init_from_config_section(self, az_name):
-        super(NsxPAvailabilityZone, self).init_from_config_section(az_name)
-        #TODO(asarfaty): Add nsx-p specific configs here
-
     def init_defaults(self):
         # use the default configuration
         self.metadata_proxy = cfg.CONF.nsx_p.metadata_proxy
@@ -141,6 +137,24 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
             auto_config=False, is_mandatory=False,
             search_scope=search_scope)
 
+        # Init dhcp config from policy or MP
+        self.use_policy_dhcp = False
+        if (nsxpolicy.feature_supported(
+                nsx_constants.FEATURE_NSX_POLICY_DHCP)):
+            try:
+                self._policy_dhcp_server_config = self._init_default_resource(
+                    nsxpolicy, nsxpolicy.dhcp_server_config, 'dhcp_profile',
+                    auto_config=False, is_mandatory=False,
+                    search_scope=search_scope)
+                if self._policy_dhcp_server_config:
+                    self.use_policy_dhcp = True
+            except Exception:
+                # Not found. try as MP profile
+                pass
+        self._native_dhcp_profile_uuid = None
+        if not self.use_policy_dhcp and nsxlib:
+            self._translate_dhcp_profile(nsxlib, search_scope=search_scope)
+
         self.use_policy_md = False
         if (nsxpolicy.feature_supported(
                 nsx_constants.FEATURE_NSX_POLICY_MDPROXY)):
@@ -166,12 +180,6 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
                     self._native_md_proxy_uuid)
             else:
                 self._native_md_proxy_uuid = None
-
-        # If passthrough api is supported, also initialize those NSX objects
-        if nsxlib:
-            self._translate_dhcp_profile(nsxlib, search_scope=search_scope)
-        else:
-            self._native_dhcp_profile_uuid = None
 
     def _get_edge_cluster_tzs(self, nsxpolicy, nsxlib, ec_uuid):
         ec_nodes = nsxpolicy.edge_cluster.get_edge_node_ids(ec_uuid)
@@ -228,7 +236,15 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
                           self._default_tier0_router,
                           tier0_ec_uuid)
 
-        if self._native_dhcp_profile_uuid:
+        if self.use_policy_dhcp:
+            dhcp_ec_path = nsxpolicy.dhcp_server_config.get(
+                self._policy_dhcp_server_config).get('edge_cluster_path')
+            dhcp_ec = p_utils.path_to_id(dhcp_ec_path)
+            if dhcp_ec != tier0_ec_uuid:
+                self._validate_tz(nsxpolicy, nsxlib, 'DHCP server config',
+                                  self._policy_dhcp_server_config,
+                                  dhcp_ec)
+        elif self._native_dhcp_profile_uuid:
             dhcp_ec = nsxlib.native_dhcp_profile.get(
                 self._native_dhcp_profile_uuid).get('edge_cluster_id')
             if dhcp_ec != tier0_ec_uuid:

@@ -77,6 +77,7 @@ class NSXClient(object):
         self.host = host
         self.username = username
         self.password = password
+        self.allow_passthrough = allow_passthrough
         self.neutron_db = (NeutronNsxDB(db_connection)
                            if db_connection else None)
 
@@ -84,6 +85,7 @@ class NSXClient(object):
             username=self.username,
             password=self.password,
             nsx_api_managers=[self.host],
+            allow_passthrough=allow_passthrough,
             # allow admin user to delete entities created
             # under openstack principal identity
             allow_overwrite_header=True)
@@ -184,6 +186,7 @@ class NSXClient(object):
         return segments
 
     def delete_network_nsx_dhcp_port(self, network_id):
+        # Delete dhcp port when using MP dhcp
         if not self.nsxlib:
             # no passthrough api
             return

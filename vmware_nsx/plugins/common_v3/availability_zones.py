@@ -35,9 +35,8 @@ class NsxV3AvailabilityZone(common_az.ConfiguredAvailabilityZone):
         # Should be implemented by children
         pass
 
-    def init_from_config_section(self, az_name):
+    def init_from_config_section(self, az_name, mandatory_dhcp=True):
         az_info = self.get_az_opts()
-
         if self._has_native_dhcp_metadata():
             # The optional parameters will get the global values if not
             # defined for this AZ
@@ -49,8 +48,9 @@ class NsxV3AvailabilityZone(common_az.ConfiguredAvailabilityZone):
                     reason=(_("metadata_proxy for availability zone %s "
                               "must be defined") % az_name))
 
+            # This is mandatory only if using MP dhcp
             self.dhcp_profile = az_info.get('dhcp_profile')
-            if not self.dhcp_profile:
+            if not self.dhcp_profile and mandatory_dhcp:
                 raise nsx_exc.NsxInvalidConfiguration(
                     opt_name="dhcp_profile",
                     opt_value='None',
