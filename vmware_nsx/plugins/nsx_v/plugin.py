@@ -4277,7 +4277,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             self.fwaas_callbacks.should_apply_firewall_to_router(
                 context, router_db, router_id)):
             fwaas_rules = self.fwaas_callbacks.get_fwaas_rules_for_router(
-                context, router_db['id'], edge_id)
+                context, router_db['id'], router_db, edge_id)
             if fwaas_rules:
                 fw_rules += fwaas_rules
 
