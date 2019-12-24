@@ -528,6 +528,7 @@ nsx_p_opts = nsx_v3_and_p + [
                       "on backend, it will be assumed as default unless this "
                       "value is provided")),
     cfg.StrOpt('waf_profile',
+               deprecated_for_removal=True,
                help=_("(Optional) Name or UUID of the default WAF profile to "
                       "be attached to L7 loadbalancer listeners")),
     cfg.BoolOpt('allow_passthrough',
