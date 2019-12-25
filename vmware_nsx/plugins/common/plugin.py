@@ -101,6 +101,15 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
                         'network_id': [network_id]}
         return self.get_ports(context, filters=port_filters)
 
+    def _get_network_interface_ports(self, context, net_id):
+        port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
+                        'network_id': [net_id]}
+        return self.get_ports(context, filters=port_filters)
+
+    def _get_network_router_ids(self, context, net_id):
+        intf_ports = self._get_network_interface_ports(context, net_id)
+        return [port['device_id'] for port in intf_ports if port['device_id']]
+
     def get_router_for_floatingip(self, context, internal_port,
                                   internal_subnet, external_network_id):
         router_id = super(NsxPluginBase, self).get_router_for_floatingip(

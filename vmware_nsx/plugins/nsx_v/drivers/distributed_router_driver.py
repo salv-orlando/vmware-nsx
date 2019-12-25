@@ -15,8 +15,6 @@
 import netaddr
 from oslo_log import log as logging
 
-from neutron.db import l3_db
-
 from neutron_lib.api import validators
 from neutron_lib import constants
 from neutron_lib.db import api as db_api
@@ -225,12 +223,8 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
         _nsxv_plugin = self.plugin
         net_id, subnet_id = _nsxv_plugin._get_interface_info(context,
                                                              interface_info)
-
-        port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
-                        'network_id': [net_id]}
-        intf_ports = _nsxv_plugin.get_ports(context.elevated(),
-                                            filters=port_filters)
-        router_ids = [port['device_id'] for port in intf_ports]
+        router_ids = _nsxv_plugin._get_network_router_ids(
+            context.elevated(), net_id)
         all_routers = _nsxv_plugin.get_routers(context,
                                                filters={'id': router_ids})
         dist_routers = [router['id'] for router in all_routers

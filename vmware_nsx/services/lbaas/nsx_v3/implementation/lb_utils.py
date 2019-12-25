@@ -15,7 +15,6 @@
 
 import functools
 
-from neutron.db import l3_db
 from neutron.services.flavors import flavors_plugin
 from neutron_lib import exceptions as n_exc
 from oslo_log import helpers as log_helpers
@@ -54,9 +53,8 @@ def get_network_from_subnet(context, plugin, subnet_id):
 def get_router_from_network(context, plugin, subnet_id):
     subnet = plugin.get_subnet(context, subnet_id)
     network_id = subnet['network_id']
-    port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
-                    'network_id': [network_id]}
-    ports = plugin.get_ports(context.elevated(), filters=port_filters)
+    ports = plugin._get_router_interface_ports_by_network(
+        context.elevated(), network_id)
     if ports:
         router = plugin.get_router(context.elevated(), ports[0]['device_id'])
         if router.get('external_gateway_info'):
