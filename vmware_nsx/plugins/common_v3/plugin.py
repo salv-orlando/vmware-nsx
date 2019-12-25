@@ -2793,11 +2793,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                              "a logical router."))
                 LOG.error(err_msg)
                 raise n_exc.InvalidInput(error_message=err_msg)
-        port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
-                        'network_id': [net_id]}
-        intf_ports = self.get_ports(context.elevated(), filters=port_filters)
-        router_ids = [port['device_id']
-                      for port in intf_ports if port['device_id']]
+        intf_ports = self._get_network_interface_ports(
+            context.elevated(), net_id)
+        router_ids = [port['device_id'] for port in intf_ports
+                      if port['device_id']]
         if len(router_ids) > 0:
             err_msg = _("Only one subnet of each IP version in a network "
                         "%(net_id)s can be attached to router, one subnet "

@@ -15,7 +15,6 @@
 import netaddr
 from oslo_log import log as logging
 
-from neutron.db import l3_db
 from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
@@ -127,9 +126,8 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                                   subnet['id'], transit_networks)
 
             # Network attached to multiple routers
-            port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
-                            'network_id': [net['id']]}
-            intf_ports = plugin.get_ports(admin_context, filters=port_filters)
+            intf_ports = plugin._get_network_interface_ports(
+                admin_context, net['id'])
             if len(intf_ports) > 1:
                 n_errors = n_errors + 1
                 LOG.error("Network %s has interfaces on multiple routers. "

@@ -1491,9 +1491,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         subnet_ids = (subnet['id'] for subnet in subnets)
 
         # check if the subnet is attached to a router
-        port_filters = {'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF],
-                        'network_id': [original_port['network_id']]}
-        interfaces = self.get_ports(context.elevated(), filters=port_filters)
+        interfaces = self._get_network_interface_ports(
+            context.elevated(), original_port['network_id'])
         for interface in interfaces:
             for fixed_ip in interface['fixed_ips']:
                 if fixed_ip['subnet_id'] in subnet_ids:
