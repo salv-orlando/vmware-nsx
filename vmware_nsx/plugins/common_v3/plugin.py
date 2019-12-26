@@ -2332,7 +2332,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         updated_subnet = None
         orig_subnet = self.get_subnet(context, subnet_id)
         self._validate_number_of_subnet_static_routes(subnet)
-        self._validate_external_subnet(context, orig_subnet['network_id'])
         self._validate_host_routes_input(
             subnet,
             orig_enable_dhcp=orig_subnet['enable_dhcp'],
@@ -2350,6 +2349,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             orig_enable_dhcp = self._subnet_with_native_dhcp(orig_subnet)
             if enable_dhcp != orig_enable_dhcp:
                 self._ensure_native_dhcp()
+                self._validate_external_subnet(
+                    context, orig_subnet['network_id'])
                 lock = 'nsxv3_network_' + orig_subnet['network_id']
                 with locking.LockManager.get_lock(lock):
                     if enable_dhcp:
