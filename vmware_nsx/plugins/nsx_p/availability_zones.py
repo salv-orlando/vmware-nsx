@@ -34,6 +34,10 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
     def get_az_opts(self):
         return config.get_nsxp_az_opts(self.name)
 
+    def init_from_config_section(self, az_name):
+        super(NsxPAvailabilityZone, self).init_from_config_section(az_name)
+        #TODO(asarfaty): Add nsx-p specific configs here
+
     def init_defaults(self):
         # use the default configuration
         self.metadata_proxy = cfg.CONF.nsx_p.metadata_proxy
@@ -134,7 +138,7 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
 
         self._edge_cluster_uuid = self._init_default_resource(
             nsxpolicy, nsxpolicy.edge_cluster, 'edge_cluster',
-            auto_config=True, is_mandatory=False,
+            auto_config=False, is_mandatory=False,
             search_scope=search_scope)
 
         self.use_policy_md = False

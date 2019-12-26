@@ -29,7 +29,7 @@ class NsxPAvailabilityZonesTestCase(base.BaseTestCase):
         super(NsxPAvailabilityZonesTestCase, self).setUp()
         self.az_name = "zone1"
         self.group_name = "az:%s" % self.az_name
-        config.register_nsxv3_azs(cfg.CONF, [self.az_name])
+        config.register_nsxp_azs(cfg.CONF, [self.az_name])
         self.global_md_proxy = uuidutils.generate_uuid()
         cfg.CONF.set_override(
             "metadata_proxy", self.global_md_proxy, group="nsx_p")
@@ -42,6 +42,7 @@ class NsxPAvailabilityZonesTestCase(base.BaseTestCase):
         cfg.CONF.set_override("nameservers", ["10.1.1.1"], group="nsx_p")
         cfg.CONF.set_override(
             "default_tier0_router", "uuidrtr1", group="nsx_p")
+        cfg.CONF.set_override("edge_cluster", "ec1", group="nsx_p")
 
     def _config_az(self,
                    metadata_proxy="metadata_proxy1",
@@ -51,7 +52,8 @@ class NsxPAvailabilityZonesTestCase(base.BaseTestCase):
                    nameservers=["20.1.1.1"],
                    default_overlay_tz='otz',
                    default_vlan_tz='vtz',
-                   default_tier0_router="uuidrtr2"):
+                   default_tier0_router="uuidrtr2",
+                   edge_cluster="ec2"):
         if metadata_proxy is not None:
             cfg.CONF.set_override("metadata_proxy", metadata_proxy,
                                   group=self.group_name)
@@ -77,6 +79,9 @@ class NsxPAvailabilityZonesTestCase(base.BaseTestCase):
         if default_tier0_router is not None:
             cfg.CONF.set_override("default_tier0_router", default_tier0_router,
                                   group=self.group_name)
+        if edge_cluster is not None:
+            cfg.CONF.set_override("edge_cluster", edge_cluster,
+                                  group=self.group_name)
 
     def test_simple_availability_zone(self):
         self._config_az()
@@ -90,6 +95,7 @@ class NsxPAvailabilityZonesTestCase(base.BaseTestCase):
         self.assertEqual("otz", az.default_overlay_tz)
         self.assertEqual("vtz", az.default_vlan_tz)
         self.assertEqual("uuidrtr2", az.default_tier0_router)
+        self.assertEqual("ec2", az.edge_cluster)
 
     def test_missing_group_section(self):
         self.assertRaises(
