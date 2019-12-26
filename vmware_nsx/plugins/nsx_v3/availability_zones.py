@@ -41,10 +41,6 @@ class NsxV3AvailabilityZone(v3_az.NsxV3AvailabilityZone):
         if switching_profiles:
             self.switching_profiles = switching_profiles
 
-        edge_cluster = az_info.get('edge_cluster')
-        if edge_cluster:
-            self.edge_cluster = edge_cluster
-
         dhcp_relay_service = az_info.get('dhcp_relay_service')
         if dhcp_relay_service:
             self.dhcp_relay_service = dhcp_relay_service
