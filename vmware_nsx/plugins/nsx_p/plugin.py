@@ -945,6 +945,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self.nsxpolicy.tier1.update(router_id,
                                         ipv6_ndra_profile_id=profile_id)
 
+    @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
         return self._create_subnet(context, subnet)
 
