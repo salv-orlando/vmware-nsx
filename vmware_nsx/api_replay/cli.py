@@ -37,8 +37,15 @@ class ApiReplayCli(object):
             dest_os_auth_url=args.dest_os_auth_url,
             dest_plugin=args.dest_plugin,
             use_old_keystone=args.use_old_keystone,
-            max_retry=args.max_retry,
-            logfile=args.logfile)
+            octavia_os_tenant_name=args.octavia_os_project_name,
+            octavia_os_tenant_domain_id=args.octavia_os_project_domain_id,
+            octavia_os_username=args.octavia_os_username,
+            octavia_os_user_domain_id=args.octavia_os_user_domain_id,
+            octavia_os_password=args.octavia_os_password,
+            octavia_os_auth_url=args.octavia_os_auth_url,
+            neutron_conf=args.neutron_conf,
+            logfile=args.logfile,
+            max_retry=args.max_retry)
 
     def _setup_argparse(self):
         parser = argparse.ArgumentParser()
@@ -115,10 +122,41 @@ class ApiReplayCli(object):
             action='store_true',
             help="Use old keystone client for source authentication.")
 
+        # Arguments required to connect to the octavia client (read only)
+        parser.add_argument(
+            "--octavia-os-username",
+            help="The octavia os-username to use to "
+                 "gather loadbalancers resources with.")
+        parser.add_argument(
+            "--octavia-os-user-domain-id",
+            default=DEFAULT_DOMAIN_ID,
+            help="The octavia os-user-domain-id to use to "
+                 "gather loadbalancers resources with.")
+        parser.add_argument(
+            "--octavia-os-project-name",
+            help="The octavia os-project-name to use to "
+                 "gather loadbalancers resource with.")
+        parser.add_argument(
+            "--octavia-os-project-domain-id",
+            default=DEFAULT_DOMAIN_ID,
+            help="The octavia os-project-domain-id to use to "
+                 "gather loadbalancers resource with.")
+        parser.add_argument(
+            "--octavia-os-password",
+            help="The password for this octavia user.")
+        parser.add_argument(
+            "--octavia-os-auth-url",
+            help="They keystone api endpoint for this octavia user.")
+
         parser.add_argument(
             "--logfile",
             default=DEFAULT_LOGFILE,
             help="Output logfile.")
+
+        parser.add_argument(
+            "--neutron_conf",
+            default='/etc/neutron/neutron.conf',
+            help="neutron config file path.")
 
         parser.add_argument(
             "--max-retry",

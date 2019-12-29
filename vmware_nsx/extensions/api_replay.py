@@ -37,6 +37,9 @@ RESOURCE_ATTRIBUTE_MAP = {
     'networks': {
         'id': ID_WITH_POST,
     },
+    'subnets': {
+        'id': ID_WITH_POST,
+    },
     'security_groups': {
         'id': ID_WITH_POST,
         'name': {'allow_post': True, 'allow_put': True,
