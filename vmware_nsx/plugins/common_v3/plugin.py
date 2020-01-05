@@ -2201,7 +2201,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             # Note that the session.rollback() function is called here.
             # session.rollback() will invoke transaction.rollback() on
             # the transaction this session maintains. The latter will
-            # deactive the transaction and clear the session's cache.
+            # deactivate the transaction and clear the session's cache.
             #
             # But depending on where the exception occurred,
             # transaction.rollback() may have already been called

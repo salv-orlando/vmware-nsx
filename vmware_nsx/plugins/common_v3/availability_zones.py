@@ -28,7 +28,7 @@ class NsxV3AvailabilityZone(common_az.ConfiguredAvailabilityZone):
             reason=_("Expected a list of names"))
 
     def _has_native_dhcp_metadata(self):
-        # May be overriden by children
+        # May be overridden by children
         return True
 
     def get_az_opts(self):
@@ -126,10 +126,8 @@ class NsxV3AvailabilityZone(common_az.ConfiguredAvailabilityZone):
             self._native_md_proxy_uuid = None
 
     def translate_configured_names_to_uuids(self, nsxlib):
-        # May be overriden by children
+        # May be overridden by children
         # Default implementation assumes UUID is provided in config
-        # TODO(annak): refine this when we have a better picture
-        # what az config is relevant for policy
         self._default_overlay_tz_uuid = self.default_overlay_tz
         self._default_vlan_tz_uuid = self.default_vlan_tz
         self._default_tier0_router = self.default_tier0_router

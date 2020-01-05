@@ -1743,7 +1743,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if (actions['remove_router_link_port'] or
                 actions['add_router_link_port']):
                 # GW was changed. update GW and route advertisement
-                # pylint: disable=unexpected-keyword-arg
                 self.nsxpolicy.tier1.update_route_advertisement(
                     router_id,
                     static_routes=not new_enable_snat,
@@ -1837,7 +1836,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 # Also create the empty locale-service as it must always exist
                 self.nsxpolicy.tier1.create_locale_service(router['id'])
 
-        #TODO(annak): narrow down the exception
         except Exception as ex:
             with excutils.save_and_reraise_exception():
                 LOG.error('Failed to create router %(id)s '
@@ -2111,7 +2109,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):
-        # find the subnet - it is need for removing the SNAT rule
+        # First get the subnet, which is needed for removing the SNAT rule
         subnet = subnet_id = None
         if 'port_id' in interface_info:
             port_id = interface_info['port_id']

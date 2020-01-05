@@ -437,7 +437,7 @@ nsx_v3_opts = nsx_v3_and_p + [
                       "endpoint profile that will be used to perform L2 "
                       "bridging between networks in the NSX fabric and "
                       "VLANs external to NSX. If not specified, operators "
-                      "will need to explictly create a layer-2 gateway in "
+                      "will need to explicitly create a layer-2 gateway in "
                       "Neutron using the L2 gateway APIs.")),
     cfg.StrOpt('default_tier0_router',
                help=_("Name or UUID of the default tier0 router that will be "

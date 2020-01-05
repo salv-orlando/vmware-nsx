@@ -283,7 +283,7 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
 
                 self._update_routes(context, router_id,
                                     nexthop)
-        # In case of failure, rollbak will be done in teh plugin level
+        # In case of failure, rollback will be done in the plugin level
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):

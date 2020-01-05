@@ -661,7 +661,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _init_mac_learning_profiles(self):
         with locking.LockManager.get_lock('nsxv3_mac_learning_profile_init'):
             if not self._get_mac_learning_profile():
-                # pylint: disable=unexpected-keyword-arg
                 self.nsxlib.switching_profile.create_mac_learning_profile(
                     NSX_V3_MAC_LEARNING_PROFILE_NAME,
                     'Neutron MAC Learning Profile',
@@ -669,7 +668,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                     tags=self.nsxlib.build_v3_api_version_tag())
             self._get_mac_learning_profile()
             if not self._get_mac_learning_disabled_profile():
-                # pylint: disable=unexpected-keyword-arg
                 self.nsxlib.switching_profile.create_mac_learning_profile(
                     NSX_V3_MAC_DISABLED_PROFILE_NAME,
                     'Neutron MAC Learning Disabled Profile',
@@ -2792,7 +2790,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         network_id = None
         if 'port_id' in interface_info:
             port_id = interface_info['port_id']
-            # find subnet_id - it is need for removing the SNAT rule
+            # Find subnet_id which is needed for removing the SNAT rule
             port = self._get_port(context, port_id)
             network_id = port['network_id']
             if port.get('fixed_ips'):
