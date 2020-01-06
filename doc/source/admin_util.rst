@@ -282,7 +282,7 @@ Security Groups, Firewall and Spoofguard
     nsxadmin -r spoofguard-policy -o clean --property policy-id=spoofguardpolicy-10
     nsxadmin -r spoofguard-policy -o list --property reverse (entries defined on NSXv and not in Neutron)
     nsxadmin -r spoofguard-policy -o list-mismatches (--property network=<neutron net id>) - List spoofguard policies with mismatching ips or mac, globally or for a specific network
-    nsxadmin -r spoofguard-policy -o fix-mismatch --property port=<neutron port id> - Fix the spoofgurad ips of a neutron port
+    nsxadmin -r spoofguard-policy -o fix-mismatch --property port=<neutron port id> - Fix the spoofguard ips of a neutron port
 
 - Orphaned rules in NSX section::
 
@@ -316,7 +316,7 @@ Metadata
 V2T migration
 ~~~~~~~~~~~~~
 
-- Validate the configuration of the NSX-V plugin befor migrating to NSX-T::
+- Validate the configuration of the NSX-V plugin before migrating to NSX-T::
 
     nsxadmin -r nsx-migrate-v2t -o validate [--property transit-network=<cidr>]
 
@@ -465,7 +465,7 @@ Metadata Proxy
 
     nsxadmin -r metadata-proxy -o list
 
-- Resync metadata proxies for NSX-T version 1.1.0 and above (enable md proxy, or update the uuid). This is only for migrating to native metadata support::
+- Resync metadata proxies for NSX-T version 1.1.0 and above (enable MD proxy, or update the uuid). This is only for migrating to native metadata support::
 
     nsxadmin -r metadata-proxy -o nsx-update --property metadata_proxy_uuid=<metadata_proxy_uuid>
 
