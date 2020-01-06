@@ -300,7 +300,7 @@ Add those parameters in ``local.conf``::
     NSX_USER=<username>
     NSX_PASSWORD=<password>
     DHCP_PROFILE_UUID=<MP name or UUID of the DHCP profile>
-    METADATA_PROXY_UUID=<MP name or UUID of the metadata proxy>
+    METADATA_PROXY_UUID=<MP or Policy name or UUID of the metadata proxy>
     DEFAULT_TIER0_ROUTER_UUID=<Policy name or ID of Tier0>
     DEFAULT_OVERLAY_TZ_UUID=<Policy name or ID of of the overlay transport zone>
 
