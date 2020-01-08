@@ -1270,7 +1270,9 @@ class TestPortsV2(NsxVPluginV2TestCase,
                                  data['port']['fixed_ips'])
 
     def _update_port_index(self, port_id, device_id, index):
-        data = {'port': {'device_id': device_id, 'vnic_index': index}}
+        data = {'port': {'device_owner': 'compute:None',
+                         'device_id': device_id,
+                         'vnic_index': index}}
         req = self.new_update_request('ports',
                                       data, port_id)
         res = self.deserialize('json', req.get_response(self.api))
@@ -1291,9 +1293,11 @@ class TestPortsV2(NsxVPluginV2TestCase,
             with self.port(subnet=subnet,
                            device_id=device_id,
                            mac_address=port_mac,
-                           fixed_ips=fixed_ip_data,
-                           device_owner='compute:None') as port:
-                self.assertIsNone(port['port']['vnic_index'])
+                           fixed_ips=fixed_ip_data) as port:
+                # set port as compute first
+                res = self._update_port_index(
+                    port['port']['id'], device_id, None)
+                self.assertIsNone(res['port']['vnic_index'])
 
                 self.fc2.approve_assigned_addresses = (
                     mock.Mock().approve_assigned_addresses)
