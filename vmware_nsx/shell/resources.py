@@ -52,6 +52,7 @@ class Operations(enum.Enum):
     NSX_UPDATE_SECRET = 'nsx-update-secret'
     NSX_UPDATE_RULES = 'nsx-update-rules'
     NSX_UPDATE_DHCP_RELAY = 'nsx-update-dhcp-relay'
+    NSX_UPDATE_STATE = 'nsx-update-state'
     NSX_ENABLE_STANDBY_RELOCATION = 'nsx-enable-standby-relocation'
     NSX_UPDATE_IP = 'nsx-update-ip'
     NSX_RECREATE = 'nsx-recreate'
@@ -260,7 +261,8 @@ nsxp_resources = {
     constants.SECURITY_GROUPS: Resource(constants.SECURITY_GROUPS,
                                         [Operations.LIST.value]),
     constants.NETWORKS: Resource(constants.NETWORKS,
-                                 [Operations.LIST.value]),
+                                 [Operations.LIST.value,
+                                  Operations.NSX_UPDATE_STATE.value]),
     constants.ROUTERS: Resource(constants.ROUTERS,
                                 [Operations.LIST.value,
                                  Operations.UPDATE_TIER0.value,
