@@ -628,13 +628,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             'transport_zone_id': provider_data['physical_net'],
             'tags': tags}
 
+        if (not admin_state and
+            self.nsxpolicy.feature_supported(
+                nsxlib_consts.FEATURE_NSX_POLICY_ADMIN_STATE)):
+            kwargs['admin_state'] = admin_state
+
         if az.use_policy_md:
             kwargs['metadata_proxy_id'] = az._native_md_proxy_uuid
 
         self.nsxpolicy.segment.create_or_overwrite(
             net_name, **kwargs)
 
-        if not admin_state and cfg.CONF.nsx_p.allow_passthrough:
+        if (not admin_state and cfg.CONF.nsx_p.allow_passthrough and
+            not self.nsxpolicy.feature_supported(
+                nsxlib_consts.FEATURE_NSX_POLICY_ADMIN_STATE)):
             # This api uses the passthrough api
             self.nsxpolicy.segment.set_admin_state(
                 net_data['id'], admin_state)
@@ -878,14 +885,25 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         # Update the backend segment
         if (not extern_net and not is_nsx_net and
-            ('name' in net_data or 'description' in net_data)):
+            ('name' in net_data or 'description' in net_data or
+             'admin_state_up' in net_data)):
             net_name = utils.get_name_and_uuid(
                 updated_net['name'] or 'network', network_id)
+
+            kwargs = {'name': net_name,
+                      'description': updated_net.get('description', '')}
+
+            if 'admin_state_up' in net_data:
+                if (self.nsxpolicy.feature_supported(
+                        nsxlib_consts.FEATURE_NSX_POLICY_ADMIN_STATE)):
+                    kwargs['admin_state'] = net_data['admin_state_up']
+                elif cfg.CONF.nsx_p.allow_passthrough:
+                    # Update admin state using the passthrough api
+                    self.nsxpolicy.segment.set_admin_state(
+                        network_id, net_data['admin_state_up'])
+
             try:
-                self.nsxpolicy.segment.update(
-                    network_id,
-                    name=net_name,
-                    description=updated_net.get('description', ''))
+                self.nsxpolicy.segment.update(network_id, **kwargs)
             except nsx_lib_exc.ManagerError:
                 LOG.exception("Unable to update NSX backend, rolling "
                               "back changes on neutron")
@@ -896,13 +914,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                         del original_net['availability_zone_hints']
                     super(NsxPolicyPlugin, self).update_network(
                         context, network_id, {'network': original_net})
-
-        if (not extern_net and not is_nsx_net and
-            'admin_state_up' in net_data and
-            cfg.CONF.nsx_p.allow_passthrough):
-            # Update admin state using the passthrough api
-            self.nsxpolicy.segment.set_admin_state(
-                network_id, net_data['admin_state_up'])
 
         return updated_net
 
@@ -1111,6 +1122,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if vif_id:
             kwargs['vif_id'] = vif_id
 
+        if (self.nsxpolicy.feature_supported(
+                nsxlib_consts.FEATURE_NSX_POLICY_ADMIN_STATE) and
+            'admin_state_up' in port_data):
+            kwargs['admin_state'] = port_data['admin_state_up']
+
         # Create/ update the backend port in a single transaction
         with policy_trans.NsxPolicyTransaction():
             self.nsxpolicy.segment_port.create_or_overwrite(
@@ -1135,7 +1151,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         # Update port admin status using passthrough api, only if it changed
         # or new port with disabled admin state
-        if cfg.CONF.nsx_p.allow_passthrough and 'admin_state_up' in port_data:
+        if (not self.nsxpolicy.feature_supported(
+                nsxlib_consts.FEATURE_NSX_POLICY_ADMIN_STATE) and
+            cfg.CONF.nsx_p.allow_passthrough and
+            'admin_state_up' in port_data):
             new_state = port_data['admin_state_up']
             if ((is_create and new_state is False) or
                 (is_update and
