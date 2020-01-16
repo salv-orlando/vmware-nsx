@@ -193,6 +193,23 @@ class NSXClient(object):
         if port_id:
             self.nsxlib.logical_port.delete(port_id)
 
+    def cleanup_segments_interfaces(self):
+        segments = self.get_os_nsx_segments()
+        routers = self.get_os_nsx_tier1_routers()
+        print("Cleaning interfaces of %s segments and %s tier-1s" % (
+              len(segments), len(routers)))
+        for s in segments:
+            # Disassociate overlay interfaces from tier1 routers
+            self.nsxpolicy.segment.remove_connectivity_and_subnets(s['id'])
+
+        for rtr in routers:
+            # Disassociate VLAN interfaces from tier1 routers
+            interfaces = self.nsxpolicy.tier1.list_segment_interface(
+                rtr['id'])
+            for intf in interfaces:
+                self.nsxpolicy.tier1.remove_segment_interface(
+                    rtr['id'], intf['id'])
+
     def cleanup_segments(self):
         """Delete all OS created NSX Policy segments & ports"""
         segments = self.get_os_nsx_segments()
@@ -203,8 +220,6 @@ class NSXClient(object):
             # Delete the nsx mdproxy port
             self.delete_network_nsx_dhcp_port(s['id'])
             try:
-                # Disassociate from a tier1 router
-                self.nsxpolicy.segment.remove_connectivity_and_subnets(s['id'])
                 # Delete the segment
                 self.nsxpolicy.segment.delete(s['id'])
             except exceptions.ManagerError as e:
@@ -425,6 +440,7 @@ class NSXClient(object):
         """
         print("Cleaning up openstack resources")
         self.cleanup_security_groups(policy_constants.DEFAULT_DOMAIN)
+        self.cleanup_segments_interfaces()
         self.cleanup_segments()
         self.cleanup_load_balancers()
         self.cleanup_nsx_logical_dhcp_servers()
