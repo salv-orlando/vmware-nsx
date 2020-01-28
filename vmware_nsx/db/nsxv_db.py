@@ -212,11 +212,18 @@ def clean_edge_vnic_binding(session, edge_id):
 def allocate_edge_vnic(session, edge_id, network_id):
     """Allocate an available edge vnic to network."""
 
+    # get vnic count of specific edge
+    bindings = (session.query(nsxv_models.NsxvEdgeVnicBinding).
+                filter_by(edge_id=edge_id,
+                          vnic_index=1).all())
+
+    vnic_tunnels_per_index = len(bindings)
+
     with session.begin(subtransactions=True):
         bindings = (session.query(nsxv_models.NsxvEdgeVnicBinding).
                     filter_by(edge_id=edge_id, network_id=None).all())
         for binding in bindings:
-            if binding['tunnel_index'] % constants.MAX_TUNNEL_NUM == 1:
+            if binding['tunnel_index'] % vnic_tunnels_per_index == 1:
                 binding['network_id'] = network_id
                 session.add(binding)
                 return binding
