@@ -1,7 +1,7 @@
 amqp==2.1.1
 bandit==1.1.0
 coverage==4.0
-decorator==4.3.0
+decorator==4.4.1
 eventlet==0.24.1
 fixtures==3.0.0
 flake8-import-order==0.12
