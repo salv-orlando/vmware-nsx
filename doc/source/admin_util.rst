@@ -626,6 +626,10 @@ NSX Policy Plugin
 
     nsxadmin -r networks -o list
 
+- Sync admin state of networks and ports (Once upgraded to NSX 3.0 which supports policy admin state)::
+
+    nsxadmin -r networks -o nsx-update-state
+
 - List all the neutron routers together with their NSX Policy objects and realization state::
 
     nsxadmin -r routers -o list
