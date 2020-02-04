@@ -53,7 +53,7 @@ def get_network_from_subnet(context, plugin, subnet_id):
 def get_router_from_network(context, plugin, subnet_id):
     subnet = plugin.get_subnet(context, subnet_id)
     network_id = subnet['network_id']
-    ports = plugin._get_router_interface_ports_by_network(
+    ports = plugin._get_network_interface_ports(
         context.elevated(), network_id)
     if ports:
         router = plugin.get_router(context.elevated(), ports[0]['device_id'])
