@@ -284,38 +284,26 @@ class NsxV3TestSubnets(NsxV3SubnetMixin,
     def test_list_subnets_with_parameter(self):
         super(NsxV3TestSubnets, self).test_list_subnets_with_parameter()
 
-    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_gw_is_nw_end_addr(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_first_ip_owned_by_router(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_first_ip_owned_by_non_router(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_with_v6_pd_allocation_pool(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_with_v6_allocation_pool(self):
-        self.skipTest('No DHCP v6 Support yet')
-
     def test_create_subnet_ipv6_pd_gw_values(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_slaac_with_dhcp_port_on_network(self):
-        self.skipTest('No DHCP v6 Support yet')
+        self.skipTest('Test not suited to the plugin DHCP code')
 
     def test_create_subnet_ipv6_slaac_with_port_not_found(self):
-        self.skipTest('No DHCP v6 Support yet')
+        self.skipTest('Test not suited to the plugin DHCP code')
 
     def test_bulk_create_subnet_ipv6_auto_addr_with_port_on_network(self):
-        self.skipTest('No DHCP v6 Support yet')
+        self.skipTest('No Multiple v6 subnets support yet')
+
+    def test_create_subnet_dhcpv6_stateless_with_ip_already_allocated(self):
+        self.skipTest('Test not suited to the plugin DHCP code')
+
+    def test_create_subnet_ipv6_slaac_with_dhcp_port_on_network(self):
+        self.skipTest('Test not suited to the plugin DHCP code')
+
+    def test_create_subnet_dhcpv6_stateless_with_port_on_network(self):
+        self.skipTest('Test not suited to the plugin DHCP code')
+
+    def test_delete_subnet_port_exists_owned_by_network(self):
+        self.skipTest('Test not suited to the plugin DHCP code')
 
     def test_create_subnets_bulk_native_ipv6(self):
         self.skipTest('Multiple IPv6 subnets on one network is not supported')
@@ -379,24 +367,6 @@ class NsxV3TestSubnets(NsxV3SubnetMixin,
     def test_update_subnet_inconsistent_ipv6_hostroute_np_v4(self):
         super(NsxV3TestSubnets,
               self).test_update_subnet_inconsistent_ipv6_hostroute_np_v4()
-
-    def test_update_subnet_ipv6_ra_mode_fails(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_dhcpv6_stateless_with_port_on_network(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_delete_subnet_port_exists_owned_by_network(self):
-        self.skipTest('No support for multiple ips')
-
-    def test_create_subnet_dhcpv6_stateless_with_ip_already_allocated(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_slaac_with_db_reference_error(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_create_subnet_ipv6_slaac_with_ip_already_allocated(self):
-        self.skipTest('No DHCP v6 Support yet')
 
     def test_subnet_update_ipv4_and_ipv6_pd_v6stateless_subnets(self):
         self.skipTest('Multiple fixed ips on a port are not supported')
