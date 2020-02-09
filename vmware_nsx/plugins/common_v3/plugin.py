@@ -1489,15 +1489,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.warning(err_msg)
             raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _build_dhcp_server_config(self, context, network, subnet, port, az):
-
-        name = self.nsxlib.native_dhcp.build_server_name(
-            network['name'], network['id'])
-
-        net_tags = self.nsxlib.build_v3_tags_payload(
-            network, resource_type='os-neutron-net-id',
-            project_name=context.tenant_name)
-
+    def _get_network_dns_domain(self, az, network):
         dns_domain = None
         if network.get('dns_domain'):
             net_dns = network['dns_domain']
@@ -1507,6 +1499,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 dns_domain = net_dns.dns_domain
         if not dns_domain or not validators.is_attr_set(dns_domain):
             dns_domain = az.dns_domain
+        return dns_domain
+
+    def _build_dhcp_server_config(self, context, network, subnet, port, az):
+
+        name = self.nsxlib.native_dhcp.build_server_name(
+            network['name'], network['id'])
+
+        net_tags = self.nsxlib.build_v3_tags_payload(
+            network, resource_type='os-neutron-net-id',
+            project_name=context.tenant_name)
+
+        dns_domain = self._get_network_dns_domain(az, network)
 
         dns_nameservers = subnet['dns_nameservers']
         if not dns_nameservers or not validators.is_attr_set(dns_nameservers):
@@ -2032,15 +2036,15 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         native_metadata = self._has_native_dhcp_metadata()
         default_enable_dhcp = (orig_subnet.get('enable_dhcp', False)
                                if orig_subnet else False)
-        # DHCPv6 is not yet supported, but slaac is
+        # DHCPv6 is not yet supported, but slaac is.
         # When configuring slaac, neutron requires the user
         # to enable dhcp, however plugin code does not consider
         # slaac as dhcp.
         return (native_metadata and
                 subnet.get('enable_dhcp', default_enable_dhcp) and
-                subnet.get('ipv6_address_mode') != 'slaac')
+                subnet.get('ipv6_address_mode') != constants.IPV6_SLAAC)
 
-    def _validate_subnet_ip_version(self, subnet):
+    def _validate_mp_subnet_ip_version(self, subnet):
         # This validation only needs to be called at create,
         # since ip version and ipv6 mode attributes are read only
         if subnet.get('ip_version') == 4:
@@ -2048,10 +2052,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             return
 
         enable_dhcp = subnet.get('enable_dhcp', False)
-        is_slaac = (subnet.get('ipv6_address_mode') == 'slaac')
+        is_slaac = (subnet.get('ipv6_address_mode') == constants.IPV6_SLAAC)
         if enable_dhcp and not is_slaac:
-            # No DHCPv6 support yet
-            # TODO(asarfaty): add ipv6 support for policy plugin
+            # No DHCPv6 support with the MP DHCP
             msg = _("DHCPv6 is not supported")
             LOG.error(msg)
             raise n_exc.InvalidInput(error_message=msg)
@@ -2085,7 +2088,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _create_subnet_with_mp_dhcp(self, context, subnet):
         self._validate_number_of_subnet_static_routes(subnet)
         self._validate_host_routes_input(subnet)
-        self._validate_subnet_ip_version(subnet['subnet'])
+        self._validate_mp_subnet_ip_version(subnet['subnet'])
 
         net_id = subnet['subnet']['network_id']
         network = self._get_network(context, net_id)
@@ -2505,6 +2508,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _build_static_routes(self, gateway_ip, cidr, host_routes):
         # The following code is based on _generate_opts_per_subnet() in
         # neutron/agent/linux/dhcp.py. It prepares DHCP options for a subnet.
+        # This code is for IPv4 only (IPv6 dhcp does not support options)
 
         # Add route for directly connected network.
         static_routes = [{'network': cidr, 'next_hop': '0.0.0.0'}]
@@ -2653,12 +2657,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _has_no_dhcp_enabled_subnet(self, context, network):
         # Check if there is no DHCP-enabled subnet in the network.
         for subnet in network.subnets:
-            if subnet.enable_dhcp and subnet.ipv6_address_mode != 'slaac':
+            if (subnet.enable_dhcp and
+                subnet.ipv6_address_mode != constants.IPV6_SLAAC):
                 return False
         return True
-
-    def _has_dhcp_enabled_subnet(self, context, network):
-        return not self._has_no_dhcp_enabled_subnet(context, network)
 
     def _has_single_dhcp_enabled_subnet(self, context, network):
         # Check if there is only one DHCP-enabled subnet in the network.

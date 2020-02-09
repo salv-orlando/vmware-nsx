@@ -29,6 +29,7 @@ from neutron.tests.unit.extensions import test_l3 as test_l3_plugin
 from neutron.tests.unit.extensions import test_securitygroup
 
 from neutron_lib.api.definitions import external_net as extnet_apidef
+from neutron_lib.api.definitions import extra_dhcp_opt as edo_ext
 from neutron_lib.api.definitions import extraroute as xroute_apidef
 from neutron_lib.api.definitions import l3_ext_gw_mode as l3_egm_apidef
 from neutron_lib.api.definitions import port_security as psec
@@ -575,10 +576,6 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
         super(NsxPTestPorts, self).setUp(**kwargs)
 
     @common_v3.with_disable_dhcp
-    def test_requested_subnet_id_v4_and_v6(self):
-        return super(NsxPTestPorts, self).test_requested_subnet_id_v4_and_v6()
-
-    @common_v3.with_disable_dhcp
     def test_requested_ips_only(self):
         return super(NsxPTestPorts, self).test_requested_ips_only()
 
@@ -1004,12 +1001,46 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
                                     **kwargs)
             self.assertEqual(res.status_int, exc.HTTPBadRequest.code)
 
+    def test_create_ipv6_port(self):
+        with self.network(name='net') as network:
+            self._make_v6_subnet(network, constants.DHCPV6_STATEFUL)
+            res = self._create_port(self.fmt, net_id=network['network']['id'])
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('id', port['port'])
+
+    def test_create_ipv6_port_with_extra_dhcp(self):
+        with self.network(name='net') as network:
+            self._make_v6_subnet(network, constants.DHCPV6_STATEFUL)
+            opt_list = [{'opt_name': 'bootfile-name',
+                         'opt_value': 'pxelinux.0'},
+                        {'opt_name': 'tftp-server-address',
+                         'opt_value': '123.123.123.123'}]
+            params = {edo_ext.EXTRADHCPOPTS: opt_list,
+                      'arg_list': (edo_ext.EXTRADHCPOPTS,)}
+            self._create_port(self.fmt, network['network']['id'],
+                              exc.HTTPBadRequest.code, **params)
+
+    def test_update_ipv6_port_with_extra_dhcp(self):
+        with self.network(name='net') as network:
+            self._make_v6_subnet(network, constants.DHCPV6_STATEFUL)
+            res = self._create_port(self.fmt, net_id=network['network']['id'])
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('id', port['port'])
+
+            opt_list = [{'opt_name': 'bootfile-name',
+                         'opt_value': 'pxelinux.0'},
+                        {'opt_name': 'tftp-server-address',
+                         'opt_value': '123.123.123.123'}]
+            data = {'port': {edo_ext.EXTRADHCPOPTS: opt_list}}
+            req = self.new_update_request('ports', data, port['port']['id'])
+            res = self.deserialize(self.fmt, req.get_response(self.api))
+            self.assertIn('NeutronError', res)
+
 
 class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                       NsxPPluginTestCaseMixin):
     def setUp(self, plugin=PLUGIN_NAME, ext_mgr=None):
         super(NsxPTestSubnets, self).setUp(plugin=plugin, ext_mgr=ext_mgr)
-        self.force_slaac = False
 
     def _create_subnet_bulk(self, fmt, number, net_id, name,
                             ip_version=4, **kwargs):
@@ -1032,17 +1063,6 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                                             for num in range(number)]))
         kwargs.update({'override': overrides})
         return self._create_bulk(fmt, number, 'subnet', base_data, **kwargs)
-
-    def _test_create_subnet(self, network=None, expected=None, **kwargs):
-        # Until DHCPv6 is supported, switch all test to slaac-only
-        #TODO(asarfaty): remove when DHCPv6 is supported
-        if (self.force_slaac and
-            'ipv6_ra_mode' in kwargs and 'ipv6_address_mode' in kwargs):
-            kwargs['ipv6_ra_mode'] = constants.IPV6_SLAAC
-            kwargs['ipv6_address_mode'] = constants.IPV6_SLAAC
-
-        return super(NsxPTestSubnets,
-                     self)._test_create_subnet(network, expected, **kwargs)
 
     def test_create_external_subnet_with_conflicting_t0_address(self):
         with self._create_l3_ext_network() as network:
@@ -1083,6 +1103,119 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
     def test_create_subnet_ipv6_slaac_with_port_on_network(self):
         super(NsxPTestSubnets,
               self).test_create_subnet_ipv6_slaac_with_port_on_network()
+
+    def test_create_subnet_ipv6_gw_values(self):
+        self.skipTest("IPv6 gateway IP is assigned by the plugin")
+
+    def test_create_ipv6_subnet_with_host_routes(self):
+        # IPv6 host routes are not allowed
+        with self.network() as network:
+            data = {'subnet': {'network_id': network['network']['id'],
+                    'cidr': '100::/64',
+                    'ip_version': 6,
+                    'tenant_id': network['network']['tenant_id'],
+                    'host_routes': [{'destination': '200::/64',
+                                     'nexthop': '100::16'}]}}
+            subnet_req = self.new_create_request('subnets', data)
+            res = subnet_req.get_response(self.api)
+            self.assertEqual(exc.HTTPClientError.code, res.status_int)
+
+    def test_update_ipv6_subnet_with_host_routes(self):
+        # IPv6 host routes are not allowed
+        with self.network() as network:
+            data = {'subnet': {'network_id': network['network']['id'],
+                    'cidr': '100::/64',
+                    'ip_version': 6,
+                    'tenant_id': network['network']['tenant_id']}}
+            subnet_req = self.new_create_request('subnets', data)
+            subnet = self.deserialize(self.fmt,
+                                      subnet_req.get_response(self.api))
+            sub_id = subnet['subnet']['id']
+            # update host routes should fail
+            data = {'subnet': {'host_routes': [{'destination': '200::/64',
+                                                'nexthop': '100::16'}]}}
+            update_req = self.new_update_request('subnets', data, sub_id)
+            res = update_req.get_response(self.api)
+            self.assertEqual(exc.HTTPClientError.code, res.status_int)
+
+    def _verify_dhcp_service(self, network_id, tenant_id, enabled):
+        # Verify if DHCP service is enabled on a network.
+        port_res = self._list_ports('json', 200, network_id,
+                                    tenant_id=tenant_id,
+                                    device_owner=constants.DEVICE_OWNER_DHCP)
+        port_list = self.deserialize('json', port_res)
+        self.assertEqual(len(port_list['ports']) == 1, enabled)
+
+    def test_create_dhcpv6_subnet(self):
+        with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                        "NsxPolicySegmentApi.update") as seg_update,\
+            self.subnet(ip_version=constants.IP_VERSION_6, cidr='fe80::/64',
+                        enable_dhcp=True) as subnet:
+            self.assertEqual(True, subnet['subnet']['enable_dhcp'])
+            # verify that the dhcp port was created
+            self._verify_dhcp_service(subnet['subnet']['network_id'],
+                                      subnet['subnet']['tenant_id'], True)
+            # verify backend calls
+            seg_update.assert_called_once_with(
+                dhcp_server_config_id=NSX_DHCP_PROFILE_ID,
+                segment_id=subnet['subnet']['network_id'],
+                subnets=[mock.ANY])
+
+    def test_subnet_enable_dhcpv6(self):
+        with self.subnet(ip_version=constants.IP_VERSION_6, cidr='fe80::/64',
+                         enable_dhcp=False) as subnet:
+            data = {'subnet': {'enable_dhcp': True}}
+            with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                            "NsxPolicySegmentApi.update") as seg_update:
+                req = self.new_update_request('subnets', data,
+                                              subnet['subnet']['id'])
+                res = self.deserialize('json', req.get_response(self.api))
+                self.assertEqual(True, res['subnet']['enable_dhcp'])
+                # verify that the dhcp port was created
+                self._verify_dhcp_service(subnet['subnet']['network_id'],
+                                          subnet['subnet']['tenant_id'], True)
+                # verify backend calls
+                seg_update.assert_called_once_with(
+                    dhcp_server_config_id=NSX_DHCP_PROFILE_ID,
+                    segment_id=subnet['subnet']['network_id'],
+                    subnets=[mock.ANY])
+
+    def test_subnet_disable_dhcpv6(self):
+        with self.subnet(ip_version=constants.IP_VERSION_6, cidr='fe80::/64',
+                         enable_dhcp=True) as subnet:
+            data = {'subnet': {'enable_dhcp': False}}
+            with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                            "NsxPolicySegmentApi.update") as seg_update:
+                req = self.new_update_request('subnets', data,
+                                              subnet['subnet']['id'])
+                res = self.deserialize('json', req.get_response(self.api))
+                self.assertEqual(False, res['subnet']['enable_dhcp'])
+                # verify that the dhcp port was deleted
+                self._verify_dhcp_service(subnet['subnet']['network_id'],
+                                          subnet['subnet']['tenant_id'], False)
+                # verify backend calls
+                seg_update.assert_called_once_with(
+                    dhcp_server_config_id=None,
+                    segment_id=subnet['subnet']['network_id'],
+                    subnets=[])
+
+    def test_delete_ipv6_dhcp_subnet(self):
+        with self.subnet(ip_version=constants.IP_VERSION_6, cidr='fe80::/64',
+                         enable_dhcp=True) as subnet:
+            with mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                            "NsxPolicySegmentApi.update") as seg_update:
+                req = self.new_delete_request(
+                    'subnets', subnet['subnet']['id'])
+                res = req.get_response(self.api)
+                self.assertEqual(exc.HTTPNoContent.code, res.status_int)
+                # verify that the dhcp port was deleted
+                self._verify_dhcp_service(subnet['subnet']['network_id'],
+                                          subnet['subnet']['tenant_id'], False)
+                # verify backend calls
+                seg_update.assert_called_once_with(
+                    dhcp_server_config_id=None,
+                    segment_id=subnet['subnet']['network_id'],
+                    subnets=[])
 
 
 class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
@@ -1470,9 +1603,6 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
 
     def test_router_add_gateway_multiple_subnets_ipv6(self):
         self.skipTest('not supported')
-
-    def test_router_add_interface_ipv6_subnet(self):
-        self.skipTest('DHCPv6 not supported')
 
     def test_slaac_profile_single_subnet(self):
         with mock.patch("vmware_nsxlib.v3.policy.core_resources."
@@ -2268,6 +2398,8 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
             False, pol_const.NAT_FIREWALL_MATCH_EXTERNAL)
 
     def test_router_interface_with_dhcp_subnet(self):
+        # Policy DHCP does not allow 1 dhcp subnet and another router
+        # interface subnet on the same overlay network
         with self.router() as r,\
             self.network() as net,\
             self.subnet(cidr='20.0.0.0/24', network=net),\
@@ -2277,3 +2409,252 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                 'add', r['router']['id'],
                 if_subnet['subnet']['id'], None,
                 expected_code=exc.HTTPBadRequest.code)
+
+    def test_router_interface_ndprofile_ipv4(self):
+        with self.router() as r,\
+            self.network() as net,\
+            self.subnet(cidr='20.0.0.0/24', network=net) as if_subnet,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.update") as t1_update:
+            # Adding ipv4 interface
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            t1_update.assert_not_called()
+
+            # Removing ipv4 interface
+            self._router_interface_action(
+                'remove', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            t1_update.assert_not_called()
+
+    def _test_router_interface_ndprofile(self, profile_with,
+                                         enable_dhcp=True, mode='slaac'):
+        with self.router() as r,\
+            self.network() as net,\
+            self.subnet(cidr='2001::/64', network=net,
+                        ip_version=6, enable_dhcp=enable_dhcp,
+                        ipv6_address_mode=mode,
+                        ipv6_ra_mode=mode) as if_subnet,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.update") as t1_update:
+            # Adding subnet interface
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            t1_update.assert_called_with(
+                r['router']['id'],
+                ipv6_ndra_profile_id=profile_with)
+            t1_update.reset_mock()
+
+            # Removing subnet interface
+            self._router_interface_action(
+                'remove', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            t1_update.assert_called_with(
+                r['router']['id'],
+                ipv6_ndra_profile_id=nsx_plugin.NO_SLAAC_NDRA_PROFILE_ID)
+
+    def test_router_interface_ndprofile_no_dhcp(self):
+        self._test_router_interface_ndprofile(
+            nsx_plugin.NO_SLAAC_NDRA_PROFILE_ID,
+            enable_dhcp=False, mode=None)
+
+    def test_router_interface_ndprofile_slaac(self):
+        self._test_router_interface_ndprofile(
+            nsx_plugin.SLAAC_NDRA_PROFILE_ID,
+            enable_dhcp=True, mode=constants.IPV6_SLAAC)
+
+    def test_router_interface_ndprofile_stateful(self):
+        self._test_router_interface_ndprofile(
+            nsx_plugin.STATEFUL_DHCP_NDRA_PROFILE_ID,
+            enable_dhcp=True, mode=constants.DHCPV6_STATEFUL)
+
+    def test_router_interface_ndprofile_stateless(self):
+        self._test_router_interface_ndprofile(
+            nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID,
+            enable_dhcp=True, mode=constants.DHCPV6_STATELESS)
+
+    def _test_router_interfaces_ndprofile(self, sub1_enable_dhcp, sub1_mode,
+                                          sub2_enable_dhcp, sub2_mode,
+                                          sub1_profile, mixed_profile=None,
+                                          successful=True,
+                                          sub1_ipversion=6, sub2_ipversion=6):
+        cidr1 = '2001::/64' if sub1_ipversion == 6 else '201.0.0.0/24'
+        cidr2 = '2002::/64' if sub2_ipversion == 6 else '202.0.0.0/24'
+        with self.router() as r,\
+            self.network() as net1, self.network() as net2,\
+            self.subnet(cidr=cidr1, network=net1,
+                        ip_version=sub1_ipversion,
+                        enable_dhcp=sub1_enable_dhcp,
+                        ipv6_address_mode=sub1_mode,
+                        ipv6_ra_mode=sub1_mode) as sub1,\
+            self.subnet(cidr=cidr2, network=net2,
+                        ip_version=sub2_ipversion,
+                        enable_dhcp=sub2_enable_dhcp,
+                        ipv6_address_mode=sub2_mode,
+                        ipv6_ra_mode=sub2_mode) as sub2,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.update") as t1_update:
+
+            # Adding first interface
+            self._router_interface_action(
+                'add', r['router']['id'],
+                sub1['subnet']['id'], None)
+            if sub1_ipversion == 6:
+                t1_update.assert_called_with(
+                    r['router']['id'],
+                    ipv6_ndra_profile_id=sub1_profile)
+                t1_update.reset_mock()
+            else:
+                t1_update.assert_not_called()
+
+            # Adding the 2nd interface
+            expected_code = (exc.HTTPBadRequest.code if not successful
+                             else exc.HTTPOk.code)
+            self._router_interface_action(
+                'add', r['router']['id'],
+                sub2['subnet']['id'], None,
+                expected_code=expected_code)
+            if not successful:
+                return
+            if sub2_ipversion == 6:
+                t1_update.assert_called_with(
+                    r['router']['id'],
+                    ipv6_ndra_profile_id=mixed_profile)
+                t1_update.reset_mock()
+            else:
+                t1_update.assert_not_called()
+
+            # Removing the 2nd interface
+            self._router_interface_action(
+                'remove', r['router']['id'],
+                sub2['subnet']['id'], None)
+            if sub2_ipversion == 6:
+                t1_update.assert_called_with(
+                    r['router']['id'],
+                    ipv6_ndra_profile_id=sub1_profile)
+            else:
+                t1_update.assert_not_called()
+
+    def test_router_interfaces_ndprofile_slaac_slaac(self):
+        self._test_router_interfaces_ndprofile(
+            True, constants.IPV6_SLAAC,
+            True, constants.IPV6_SLAAC,
+            nsx_plugin.SLAAC_NDRA_PROFILE_ID,
+            nsx_plugin.SLAAC_NDRA_PROFILE_ID)
+
+    def test_router_interfaces_ndprofile_slaac_stateful(self):
+        self._test_router_interfaces_ndprofile(
+            True, constants.IPV6_SLAAC,
+            True, constants.DHCPV6_STATEFUL,
+            nsx_plugin.SLAAC_NDRA_PROFILE_ID,
+            None, successful=False)
+
+    def test_router_interfaces_ndprofile_slaac_stateless(self):
+        self._test_router_interfaces_ndprofile(
+            True, constants.IPV6_SLAAC,
+            True, constants.DHCPV6_STATELESS,
+            nsx_plugin.SLAAC_NDRA_PROFILE_ID,
+            None, successful=False)
+
+    def test_router_interfaces_ndprofile_disabled_stateful(self):
+        self._test_router_interfaces_ndprofile(
+            False, None,
+            True, constants.DHCPV6_STATEFUL,
+            nsx_plugin.NO_SLAAC_NDRA_PROFILE_ID,
+            nsx_plugin.STATEFUL_DHCP_NDRA_PROFILE_ID)
+
+    def test_router_interfaces_ndprofile_disabled_stateless(self):
+        self._test_router_interfaces_ndprofile(
+            False, None,
+            True, constants.DHCPV6_STATELESS,
+            nsx_plugin.NO_SLAAC_NDRA_PROFILE_ID,
+            nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID)
+
+    def test_router_interfaces_ndprofile_stateful_stateless(self):
+        self._test_router_interfaces_ndprofile(
+            True, constants.DHCPV6_STATEFUL,
+            True, constants.DHCPV6_STATELESS,
+            nsx_plugin.STATEFUL_DHCP_NDRA_PROFILE_ID,
+            None, successful=False)
+
+    def test_router_interfaces_ndprofile_v4_stateless(self):
+        self._test_router_interfaces_ndprofile(
+            True, None,
+            True, constants.DHCPV6_STATELESS,
+            nsx_plugin.NO_SLAAC_NDRA_PROFILE_ID,
+            nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID,
+            sub1_ipversion=4)
+
+    def test_router_interfaces_ndprofile_stateless_v4(self):
+        self._test_router_interfaces_ndprofile(
+            True, constants.DHCPV6_STATELESS,
+            True, None,
+            nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID,
+            nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID,
+            sub2_ipversion=4)
+
+    def _test_router_vlan_interface_ndprofile(self, profile_with,
+                                              enable_dhcp=True, mode='slaac'):
+        providernet_args = {pnet.NETWORK_TYPE: 'vlan',
+                            pnet.SEGMENTATION_ID: 11}
+
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'NsxPolicyTransportZoneApi.get_transport_type',
+                        return_value=nsx_constants.TRANSPORT_TYPE_VLAN), \
+            self.network(name='vlan_net',
+                         providernet_args=providernet_args,
+                         arg_list=(pnet.NETWORK_TYPE,
+                                   pnet.SEGMENTATION_ID)) as net,\
+            self.router() as r,\
+            self.subnet(cidr='2001::/64', network=net,
+                        ip_version=6, enable_dhcp=enable_dhcp,
+                        ipv6_address_mode=mode,
+                        ipv6_ra_mode=mode) as if_subnet,\
+            self._create_l3_ext_network() as ext_net,\
+            self.subnet(network=ext_net, cidr='10.0.0.0/16',
+                        enable_dhcp=False) as ext_sub,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.add_segment_interface") as t1_add,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.remove_segment_interface") as t1_del:
+
+            # Add router GW
+            self._add_external_gateway_to_router(
+                r['router']['id'],
+                ext_sub['subnet']['network_id'])
+
+            # Adding subnet interface
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            t1_add.assert_called_once_with(
+                r['router']['id'], mock.ANY, mock.ANY, [mock.ANY],
+                profile_with)
+
+            # Removing subnet interface
+            self._router_interface_action(
+                'remove', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            t1_del.assert_called_once_with(r['router']['id'], mock.ANY)
+
+    def test_router_vlan_interface_ndprofile_no_dhcp(self):
+        self._test_router_vlan_interface_ndprofile(
+            nsx_plugin.NO_SLAAC_NDRA_PROFILE_ID,
+            enable_dhcp=False, mode=None)
+
+    def test_router_vlan_interface_ndprofile_slaac(self):
+        self._test_router_vlan_interface_ndprofile(
+            nsx_plugin.SLAAC_NDRA_PROFILE_ID,
+            enable_dhcp=True, mode=constants.IPV6_SLAAC)
+
+    def test_router_vlan_interface_ndprofile_stateful(self):
+        self._test_router_vlan_interface_ndprofile(
+            nsx_plugin.STATEFUL_DHCP_NDRA_PROFILE_ID,
+            enable_dhcp=True, mode=constants.DHCPV6_STATEFUL)
+
+    def test_router_vlan_interface_ndprofile_stateless(self):
+        self._test_router_vlan_interface_ndprofile(
+            nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID,
+            enable_dhcp=True, mode=constants.DHCPV6_STATELESS)

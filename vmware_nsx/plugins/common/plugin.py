@@ -231,6 +231,7 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
                     'ip_version': subnet.ip_version,
                     'network_id': subnet.network_id,
                     'gateway_ip': subnet.gateway_ip,
+                    'enable_dhcp': subnet.enable_dhcp,
                     'ipv6_address_mode': subnet.ipv6_address_mode}
                    for subnet in db_subnets]
         return subnets

@@ -104,8 +104,8 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
             'host_routes': host_routes,
             'shared': shared}}
 
-    def _bind_name(self, port):
-        return 'IPv4 binding for port %s' % port['port']['id']
+    def _bind_name(self, port, ip_version=4):
+        return 'IPv%s binding for port %s' % (ip_version, port['port']['id'])
 
     def _verify_dhcp_service(self, network_id, tenant_id, enabled):
         # Verify if DHCP service is enabled on a network.
@@ -172,6 +172,39 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                 update_dhcp_binding.assert_called_once_with(
                     binding_name, subnet['subnet']['network_id'],
                     binding_id=port['port']['id'] + '-ipv4',
+                    **binding_data)
+
+    def _verify_dhcp_binding_v6(self, subnet, port_data, update_data,
+                                assert_data):
+        # Verify if DHCP-v6 binding is updated.
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'SegmentDhcpStaticBindingConfigApi.'
+                        'create_or_overwrite_v6') as update_dhcp_binding:
+            device_owner = constants.DEVICE_OWNER_COMPUTE_PREFIX + 'None'
+            device_id = uuidutils.generate_uuid()
+            with self.port(subnet=subnet, device_owner=device_owner,
+                           device_id=device_id, **port_data) as port:
+                binding_name = self._bind_name(port, 6)
+                ip_address = port['port']['fixed_ips'][0]['ip_address']
+                binding_data = {'mac_address': port['port']['mac_address'],
+                                'ip_addresses': [ip_address],
+                                'lease_time': 86400}
+                # Verify the initial bindings call.
+                update_dhcp_binding.assert_called_once_with(
+                    binding_name, subnet['subnet']['network_id'],
+                    binding_id=port['port']['id'] + '-ipv6',
+                    **binding_data)
+                update_dhcp_binding.reset_mock()
+                # Update the port with provided data.
+                self.plugin.update_port(
+                    context.get_admin_context(), port['port']['id'],
+                    update_data)
+                # Extend basic binding data with to-be-asserted data.
+                binding_data.update(assert_data)
+                # Verify the update call.
+                update_dhcp_binding.assert_called_once_with(
+                    binding_name, subnet['subnet']['network_id'],
+                    binding_id=port['port']['id'] + '-ipv6',
                     **binding_data)
 
     def test_dhcp_service_with_create_network(self):
@@ -569,6 +602,20 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
             self._verify_dhcp_binding(subnet, port_data, update_data,
                                       assert_data)
 
+    def test_dhcp_binding_v6_with_update_port_ip(self):
+        # Test if DHCP binding is updated when the IP of the associated
+        # compute port is changed.
+        with self.subnet(ip_version=6, cidr='101::/64',
+                         enable_dhcp=True) as subnet:
+            port_data = {'fixed_ips': [{'subnet_id': subnet['subnet']['id'],
+                                        'ip_address': '101::3'}]}
+            new_ip = '101::4'
+            update_data = {'port': {'fixed_ips': [
+                {'subnet_id': subnet['subnet']['id'], 'ip_address': new_ip}]}}
+            assert_data = {'ip_addresses': [new_ip]}
+            self._verify_dhcp_binding_v6(subnet, port_data, update_data,
+                                         assert_data)
+
     def test_dhcp_binding_with_update_port_mac(self):
         # Test if DHCP binding is updated when the Mac of the associated
         # compute port is changed.
@@ -873,6 +920,18 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                 n_exc.InvalidInput, self.plugin.update_subnet,
                 context.get_admin_context(), neutron_subnet['id'],
                 {'subnet': {'enable_dhcp': True}})
+
+    def test_create_subnet_with_dhcp_v6_port(self):
+        with self.subnet(enable_dhcp=True, ip_version=6,
+                         cidr="2002::/64") as subnet:
+            # find the dhcp port and verify it has port security disabled
+            ports = self.plugin.get_ports(
+                context.get_admin_context())
+            self.assertEqual(1, len(ports))
+            self.assertEqual('network:dhcp', ports[0]['device_owner'])
+            self.assertEqual(subnet['subnet']['network_id'],
+                             ports[0]['network_id'])
+            self.assertEqual(False, ports[0]['port_security_enabled'])
 
 
 class NsxPolicyMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
