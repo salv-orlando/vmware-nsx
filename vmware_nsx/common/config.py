@@ -969,10 +969,6 @@ nsxv3_az_opts = nsx_v3_and_p_az_opts + [
                help=_("(Optional) This is the name or UUID of the NSX dhcp "
                       "relay service that will be used to enable DHCP relay "
                       "on router ports.")),
-    cfg.StrOpt('default_tier0_router',
-               help=_("Name or UUID of the default tier0 router that will be "
-                      "used for connecting to tier1 logical routers and "
-                      "configuring external networks")),
 ]
 
 nsxp_az_opts = nsx_v3_and_p_az_opts
