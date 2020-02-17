@@ -89,7 +89,6 @@ class NsxPPluginTestCaseMixin(
               service_plugins=None, **kwargs):
 
         self._mock_nsx_policy_backend_calls()
-        self._mock_nsxlib_backend_calls()
         self.setup_conf_overrides()
         super(NsxPPluginTestCaseMixin, self).setUp(plugin=plugin,
                                                    ext_mgr=ext_mgr)
@@ -151,45 +150,6 @@ class NsxPPluginTestCaseMixin(
                                  NSX_VLAN_TZ_NAME, mock.ANY]).start()
         mock.patch("vmware_nsxlib.v3.core_resources.NsxLibEdgeCluster."
                    "get_transport_nodes", return_value=["dummy"]).start()
-
-    def _mock_nsxlib_backend_calls(self):
-        """Mock nsxlib backend calls used as passthrough
-        until implemented by policy
-        """
-        mock.patch(
-            "vmware_nsxlib.v3.core_resources.NsxLibDhcpProfile."
-            "get_id_by_name_or_id",
-            return_value=NSX_DHCP_PROFILE_ID).start()
-
-        mock.patch(
-            "vmware_nsxlib.v3.resources.LogicalDhcpServer."
-            "get_id_by_name_or_id",
-            return_value=_return_same).start()
-
-        mock.patch(
-            "vmware_nsxlib.v3.core_resources.NsxLibMetadataProxy."
-            "get_id_by_name_or_id",
-            side_effect=_return_same).start()
-
-        mock.patch(
-            "vmware_nsxlib.v3.resources.LogicalPort.create",
-            side_effect=_return_id_key).start()
-
-        mock.patch(
-            "vmware_nsxlib.v3.resources.LogicalDhcpServer.create",
-            side_effect=_return_id_key).start()
-
-        mock.patch(
-            "vmware_nsxlib.v3.resources.LogicalDhcpServer.update",
-            side_effect=_return_id_key).start()
-
-        mock.patch(
-            "vmware_nsxlib.v3.resources.LogicalDhcpServer.create_binding",
-            side_effect=_return_id_key).start()
-
-        mock.patch("vmware_nsxlib.v3.resources.LogicalDhcpServer."
-                   "update_binding").start()
-
         mock.patch("vmware_nsxlib.v3.NsxLib."
                    "get_id_by_resource_and_tag").start()
 
@@ -613,21 +573,6 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
                     NsxPPluginTestCaseMixin):
     def setUp(self, **kwargs):
         super(NsxPTestPorts, self).setUp(**kwargs)
-
-    @common_v3.with_disable_dhcp
-    def test_create_port_with_multiple_ipv4_and_ipv6_subnets(self):
-        return super(
-            NsxPTestPorts,
-            self).test_create_port_with_multiple_ipv4_and_ipv6_subnets
-
-    def test_ip_allocation_for_ipv6_2_subnet_slaac_mode(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_update_port_with_ipv6_slaac_subnet_in_fixed_ips(self):
-        self.skipTest('No DHCP v6 Support yet')
-
-    def test_update_port_excluding_ipv6_slaac_subnet_from_fixed_ips(self):
-        self.skipTest('No DHCP v6 Support yet')
 
     @common_v3.with_disable_dhcp
     def test_requested_subnet_id_v4_and_v6(self):
@@ -1090,6 +1035,7 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
 
     def _test_create_subnet(self, network=None, expected=None, **kwargs):
         # Until DHCPv6 is supported, switch all test to slaac-only
+        #TODO(asarfaty): remove when DHCPv6 is supported
         if (self.force_slaac and
             'ipv6_ra_mode' in kwargs and 'ipv6_address_mode' in kwargs):
             kwargs['ipv6_ra_mode'] = constants.IPV6_SLAAC
