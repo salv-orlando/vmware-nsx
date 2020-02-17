@@ -59,11 +59,49 @@ def set_az_in_config(name, metadata_proxy="metadata_proxy1",
                           group=group_name)
 
 
+def mock_nsxlib_backend_calls():
+    """Mock nsxlib calls used as passthrough for MP metadata & mdproxy"""
+    mock.patch(
+        "vmware_nsxlib.v3.core_resources.NsxLibDhcpProfile."
+        "get_id_by_name_or_id",
+        return_value=test_plugin.NSX_DHCP_PROFILE_ID).start()
+
+    mock.patch(
+        "vmware_nsxlib.v3.resources.LogicalDhcpServer."
+        "get_id_by_name_or_id",
+        return_value=test_plugin._return_same).start()
+
+    mock.patch(
+        "vmware_nsxlib.v3.core_resources.NsxLibMetadataProxy."
+        "get_id_by_name_or_id",
+        side_effect=test_plugin._return_same).start()
+
+    mock.patch(
+        "vmware_nsxlib.v3.resources.LogicalPort.create",
+        side_effect=test_plugin._return_id_key).start()
+
+    mock.patch(
+        "vmware_nsxlib.v3.resources.LogicalDhcpServer.create",
+        side_effect=test_plugin._return_id_key).start()
+
+    mock.patch(
+        "vmware_nsxlib.v3.resources.LogicalDhcpServer.update",
+        side_effect=test_plugin._return_id_key).start()
+
+    mock.patch(
+        "vmware_nsxlib.v3.resources.LogicalDhcpServer.create_binding",
+        side_effect=test_plugin._return_id_key).start()
+
+    mock.patch("vmware_nsxlib.v3.resources.LogicalDhcpServer."
+               "update_binding").start()
+
+
 class NsxNativeDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
     """Test native dhcp config when using MP DHCP"""
     def setUp(self):
         self._orig_dhcp_agent_notification = cfg.CONF.dhcp_agent_notification
         cfg.CONF.set_override('dhcp_agent_notification', False)
+        mock_nsxlib_backend_calls()
         super(NsxNativeDhcpTestCase, self).setUp()
         self._az_name = 'zone1'
         self.az_metadata_route = '3.3.3.3'
@@ -894,6 +932,7 @@ class NsxNativeMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
     def setUp(self):
         self._orig_dhcp_agent_notification = cfg.CONF.dhcp_agent_notification
         cfg.CONF.set_override('dhcp_agent_notification', False)
+        mock_nsxlib_backend_calls()
         super(NsxNativeMetadataTestCase, self).setUp()
         self._az_name = 'zone1'
         self._az_metadata_proxy = 'dummy'
