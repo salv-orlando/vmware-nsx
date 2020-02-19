@@ -1100,7 +1100,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 is_ipv6=False)  # TODO(asarfaty): add ipv6 support
 
             seg_subnet = policy_defs.Subnet(gateway_address=gw_addr,
-                                            dhcp_ranges=[],
                                             dhcp_config=dhcp_config)
             seg_subnets.append(seg_subnet)
 
@@ -1113,7 +1112,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     gw_addr = self._get_gateway_addr_from_subnet(rtr_subnet)
                     seg_subnets.append(
                         policy_defs.Subnet(gateway_address=gw_addr,
-                                           dhcp_ranges=[],
                                            dhcp_config=None))
 
         return seg_subnets
@@ -1128,11 +1126,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         seg_subnets = self._get_segment_subnets(
             context, net_id, net_az=az, dhcp_subnet=subnet)
-        net_name = self._net_nsx_name(network)
-
         # Update dhcp server config on the segment
-        self.nsxpolicy.segment.create_or_overwrite(
-            net_name,
+        self.nsxpolicy.segment.update(
             segment_id=segment_id,
             dhcp_server_config_id=az._policy_dhcp_server_config,
             subnets=seg_subnets)
@@ -1158,13 +1153,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         segment_id = self._get_network_nsx_segment_id(context, net_id)
         seg_subnets = self._get_segment_subnets(
             context, net_id, net_az=az, dhcp_subnet=subnet)
-        net_name = self._net_nsx_name(network)
 
         filters = {'network_id': [net_id]}
         ports = self.get_ports(context, filters=filters)
 
-        self.nsxpolicy.segment.create_or_overwrite(
-            net_name, segment_id=segment_id,
+        self.nsxpolicy.segment.update(
+            segment_id=segment_id,
             dhcp_server_config_id=az._policy_dhcp_server_config,
             subnets=seg_subnets)
 
@@ -2655,26 +2649,26 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         rtr_subnets = self._load_router_subnet_cidrs_from_db(
             context.elevated(), router_id)
+        net_rtr_subnets = [sub for sub in rtr_subnets
+                           if sub['network_id'] == network_id]
         try:
             if overlay_net:
-                # Remove the tier1 router from this segment on the NSX
-                pol_subnets = []
-                for rtr_subnet in rtr_subnets:
-                    # For dual stack, we allow one v4 and one v6
-                    # subnet per network
-                    if rtr_subnet['network_id'] == network_id:
-                        gw_addr = self._get_gateway_addr_from_subnet(
-                            rtr_subnet)
-                        pol_subnets.append(
-                            policy_defs.Subnet(gateway_address=gw_addr))
+                # Update the segment subnets, and Remove the tier1 router from
+                # this segment it its the last subnet of this network
+                # (it is possible to have both IPv4 & 6 subnets)
+                seg_subnets = self._get_segment_subnets(
+                    context, network_id, interface_subnets=net_rtr_subnets)
 
-                if pol_subnets:
-                    self.nsxpolicy.segment.update(segment_id,
-                                                  tier1_id=router_id,
-                                                  subnets=pol_subnets)
-                else:
+                if not net_rtr_subnets:
+                    # Remove the tier1 connectivity of this segment
+                    # This must be done is a separate call as it uses PUT
                     self.nsxpolicy.segment.remove_connectivity_and_subnets(
                         segment_id)
+
+                # update remaining (DHCP/ipv4/6) subnets
+                if seg_subnets:
+                    self.nsxpolicy.segment.update(segment_id,
+                                                  subnets=seg_subnets)
 
                 # will update the router only if needed
                 self._update_slaac_on_router(context, router_id,
@@ -2683,12 +2677,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             else:
                 # VLAN interface
                 pol_subnets = []
-                for rtr_subnet in rtr_subnets:
-                    if rtr_subnet['network_id'] == network_id:
-                        prefix_len = int(rtr_subnet['cidr'].split('/')[1])
-                        pol_subnets.append(policy_defs.InterfaceSubnet(
-                            ip_addresses=[rtr_subnet['gateway_ip']],
-                            prefix_len=prefix_len))
+                for rtr_subnet in net_rtr_subnets:
+                    prefix_len = int(rtr_subnet['cidr'].split('/')[1])
+                    pol_subnets.append(policy_defs.InterfaceSubnet(
+                        ip_addresses=[rtr_subnet['gateway_ip']],
+                        prefix_len=prefix_len))
 
                 if pol_subnets:
                     # This will update segment interface
