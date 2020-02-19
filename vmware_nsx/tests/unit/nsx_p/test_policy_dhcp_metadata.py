@@ -340,7 +340,7 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         # IP is changed.
         with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
                         'NsxPolicySegmentApi.'
-                        'create_or_overwrite') as update_segment_dhcp:
+                        'update') as update_segment_dhcp:
             with self.subnet(cidr='10.0.0.0/24', enable_dhcp=True) as subnet:
                 filters = {
                     'network_id': [subnet['subnet']['network_id']],
