@@ -142,11 +142,13 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             vs_client = self.core_plugin.nsxpolicy.load_balancer.virtual_server
             vs_list = vs_client.list()
             for vs in vs_list:
+                if vs.get('id') == listener['id']:
+                    continue
                 pool_id = p_utils.path_to_id(vs.get('pool_path', ''))
                 if pool_id == def_pool_id:
                     completor(success=False)
                     msg = (_('Default pool %s is already used by another '
-                             'listener') % listener['default_pool_id'])
+                             'listener %s') % (def_pool_id, vs.get('id')))
                     raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
 
             lb_common.validate_session_persistence(
