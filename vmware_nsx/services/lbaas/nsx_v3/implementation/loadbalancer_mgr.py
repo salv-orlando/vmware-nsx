@@ -222,13 +222,22 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                     self.core_plugin.delete_service_router(context,
                                                            router_id)
         # Make sure the vip port is not marked with a vmware device owner
-        port = self.core_plugin.get_port(
-            context.elevated(), lb['vip_port_id'])
-        if port.get('device_owner') == lb_const.VMWARE_LB_VIP_OWNER:
-            self.core_plugin.update_port(
-                context.elevated(), lb['vip_port_id'],
-                {'port': {'device_id': '',
-                          'device_owner': ''}})
+        try:
+            port = self.core_plugin.get_port(
+                context.elevated(), lb['vip_port_id'])
+            if port.get('device_owner') == lb_const.VMWARE_LB_VIP_OWNER:
+                self.core_plugin.update_port(
+                    context.elevated(), lb['vip_port_id'],
+                    {'port': {'device_id': '',
+                              'device_owner': ''}})
+        except n_exc.PortNotFound:
+            # Only log the error and continue anyway
+            LOG.warning("VIP port %s not found while deleting loadbalancer %s",
+                        lb['vip_port_id'], lb['id'])
+        except Exception as e:
+            # Just log the error as all other resources were deleted
+            LOG.error("Failed to update neutron port %s devices upon "
+                      "loadbalancer deletion: %s", lb['vip_port_id'], e)
 
         completor(success=True)
 
