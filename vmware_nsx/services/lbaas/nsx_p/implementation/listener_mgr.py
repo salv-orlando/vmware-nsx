@@ -328,7 +328,7 @@ def stats_getter(context, core_plugin, ignore_list=None):
     stat_list = []
     lb_service_client = core_plugin.nsxpolicy.load_balancer.lb_service
 
-    lb_services = lb_service_client.list()
+    lb_services = lb_service_client.list(silent_if_empty=True)
     # Go over all the loadbalancers & services
     for lb_service in lb_services:
         if ignore_list and lb_service['id'] in ignore_list:
