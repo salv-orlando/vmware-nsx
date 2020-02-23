@@ -113,8 +113,14 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         completor(success=True)
 
     def delete(self, context, lb, completor):
-        router_id = lb_utils.get_router_from_network(
-            context, self.core_plugin, lb['vip_subnet_id'])
+        router_id = None
+        try:
+            router_id = lb_utils.get_router_from_network(
+                context, self.core_plugin, lb['vip_subnet_id'])
+        except n_exc.SubnetNotFound:
+            LOG.warning("VIP subnet %s not found while deleting "
+                        "loadbalancer %s", lb['vip_subnet_id'], lb['id'])
+
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
 
         if not router_id:
@@ -149,18 +155,22 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                               {'lb': lb['id'], 'err': e})
 
         # Make sure the vip port is not marked with a vmware device owner
-        port = self.core_plugin.get_port(
-            context.elevated(), lb['vip_port_id'])
-        if port.get('device_owner') == lb_const.VMWARE_LB_VIP_OWNER:
-            try:
+        try:
+            port = self.core_plugin.get_port(
+                context.elevated(), lb['vip_port_id'])
+            if port.get('device_owner') == lb_const.VMWARE_LB_VIP_OWNER:
                 self.core_plugin.update_port(
                     context.elevated(), lb['vip_port_id'],
                     {'port': {'device_id': '',
                               'device_owner': ''}})
-            except Exception as e:
-                # Just log the error as all other resources were deleted
-                LOG.error("Failed to update neutron port %s devices upon "
-                          "loadbalancer deletion: %s", lb['vip_port_id'], e)
+        except n_exc.PortNotFound:
+            # Only log the error and continue anyway
+            LOG.warning("VIP port %s not found while deleting loadbalancer %s",
+                        lb['vip_port_id'], lb['id'])
+        except Exception as e:
+            # Just log the error as all other resources were deleted
+            LOG.error("Failed to update neutron port %s devices upon "
+                      "loadbalancer deletion: %s", lb['vip_port_id'], e)
 
         completor(success=True)
 
