@@ -16,9 +16,9 @@
 """Security group action implementations with nsx extensions"""
 
 from osc_lib import utils as osc_utils
+from osc_lib.utils import tags as _tag
 
 from openstackclient.identity import common as identity_common
-from openstackclient.network.v2 import _tag
 from openstackclient.network.v2 import security_group
 
 from vmware_nsx._i18n import _
