@@ -253,8 +253,15 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
                                   dhcp_ec)
 
         if self._native_md_proxy_uuid:
-            md_ec = nsxlib.native_md_proxy.get(
-                self._native_md_proxy_uuid).get('edge_cluster_id')
+            # Validate that the edge cluster of the MD proxy (MP or policy one)
+            # match the configured TZs
+            if self.use_policy_md:
+                md_ec_path = nsxpolicy.md_proxy.get(
+                    self._native_md_proxy_uuid).get('edge_cluster_path')
+                md_ec = p_utils.path_to_id(md_ec_path)
+            else:
+                md_ec = nsxlib.native_md_proxy.get(
+                    self._native_md_proxy_uuid).get('edge_cluster_id')
             if md_ec != tier0_ec_uuid:
                 self._validate_tz(nsxpolicy, nsxlib, 'MD Proxy',
                                   self._native_md_proxy_uuid,
