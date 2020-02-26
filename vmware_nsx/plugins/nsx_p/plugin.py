@@ -1047,7 +1047,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         dhcp_port = self._get_sunbet_dhcp_port(context, net_id)
         return True if dhcp_port else False
 
-    def _get_segment_subnets(self, context, net_id, net_az=None, **kwargs):
+    def _get_segment_subnets(self, context, net_id, net_az=None,
+                             interface_subnets=None, **kwargs):
         """Get list of segmentSubnet objects to put on the segment
         Including router interface subnets (for overlay networks) &
         DHCP subnet (if using policy DHCP)
@@ -1065,9 +1066,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                         dhcp_subnet = self.get_subnet(context, subnet.id)
                         break
 
-        router_subnets = None
-        if 'router_subnets' in kwargs:
-            router_subnets = kwargs['router_subnets']
+        router_subnets = []
+        if interface_subnets:
+            router_subnets = interface_subnets
         else:
             # Get it from the network, only if overlay
             if self._is_overlay_network(context, net_id):
@@ -1090,7 +1091,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             dns_nameservers = dhcp_subnet['dns_nameservers']
             if (not dns_nameservers or
                 not validators.is_attr_set(dns_nameservers)):
-                # Use preconfigured dns server
+                # Use pre-configured dns server
                 if not net_az:
                     net_az = self.get_network_az_by_net_id(context, net_id)
                 dns_nameservers = net_az.nameservers
@@ -1103,16 +1104,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                             dhcp_config=dhcp_config)
             seg_subnets.append(seg_subnet)
 
-        if router_subnets:
-            for rtr_subnet in router_subnets:
-                if rtr_subnet['id'] == dhcp_subnet_id:
-                    # Do not add the same subnet twice
-                    continue
-                if rtr_subnet['network_id'] == net_id:
-                    gw_addr = self._get_gateway_addr_from_subnet(rtr_subnet)
-                    seg_subnets.append(
-                        policy_defs.Subnet(gateway_address=gw_addr,
-                                           dhcp_config=None))
+        for rtr_subnet in router_subnets:
+            if rtr_subnet['id'] == dhcp_subnet_id:
+                # Do not add the same subnet twice
+                continue
+            if rtr_subnet['network_id'] == net_id:
+                gw_addr = self._get_gateway_addr_from_subnet(rtr_subnet)
+                seg_subnets.append(
+                    policy_defs.Subnet(gateway_address=gw_addr,
+                                       dhcp_config=None))
 
         return seg_subnets
 
