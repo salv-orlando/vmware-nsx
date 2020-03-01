@@ -2266,3 +2266,14 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
     def test_nat_rules_firewall_match_external(self):
         self._test_nat_rules_firewall_match(
             False, pol_const.NAT_FIREWALL_MATCH_EXTERNAL)
+
+    def test_router_interface_with_dhcp_subnet(self):
+        with self.router() as r,\
+            self.network() as net,\
+            self.subnet(cidr='20.0.0.0/24', network=net),\
+            self.subnet(cidr='30.0.0.0/24', network=net,
+                        enable_dhcp=False) as if_subnet:
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None,
+                expected_code=exc.HTTPBadRequest.code)

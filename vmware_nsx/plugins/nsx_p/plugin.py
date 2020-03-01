@@ -1177,6 +1177,42 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             LOG.error(msg)
             raise n_exc.InvalidInput(error_message=msg)
 
+    def _validate_segment_subnets_num(self, context, net_id, subnet_data):
+        """Validate no multiple segment subnets on the NSX
+        The NSX cannot support more than 1 segment subnet of the same ip
+        version. This include dhcp subnets and overlay router interfaces
+        """
+        if ('enable_dhcp' not in subnet_data or
+            not subnet_data.get('enable_dhcp')):
+            # NO DHCP so no new segment subnet
+            return
+
+        ip_ver = subnet_data.get('ip_version', 4)
+        if ip_ver == 6:
+            # Since the plugin does not allow multiple ipv6 subnets,
+            # this can be ignored.
+            return
+
+        overlay_net = self._is_overlay_network(context, net_id)
+        if not overlay_net:
+            # Since the plugin allows only 1 DHCP subnet, if this is not an
+            # overlay network, no problem.
+            return
+
+        interface_ports = self._get_network_interface_ports(
+            context, net_id)
+        if interface_ports:
+            # Should have max 1 router interface per network
+            if_port = interface_ports[0]
+            if if_port['fixed_ips']:
+                if_subnet = interface_ports[0]['fixed_ips'][0]['subnet_id']
+                if subnet_data.get('id') != if_subnet:
+                    msg = (_("Can not create a DHCP subnet on network %(net)s "
+                             "as another %(ver)s subnet is attached to a "
+                             "router") % {'net': net_id, 'ver': ip_ver})
+                    LOG.error(msg)
+                    raise n_exc.InvalidInput(error_message=msg)
+
     @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
         if not self.use_policy_dhcp:
@@ -1207,6 +1243,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                             "subnet in network %s") % net_id)
                     LOG.error(msg)
                     raise n_exc.InvalidInput(error_message=msg)
+                self._validate_segment_subnets_num(
+                    context, net_id, subnet['subnet'])
 
             # Create the neutron subnet.
             # Any failure from here and on will require rollback.
@@ -1301,6 +1339,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                 "subnet in network %s") % net_id)
                         LOG.error(msg)
                         raise n_exc.InvalidInput(error_message=msg)
+
+                    self._validate_segment_subnets_num(
+                        context, net_id, subnet_data)
 
                 updated_subnet = super(NsxPolicyPlugin, self).update_subnet(
                     context, subnet_id, subnet)
@@ -2512,6 +2553,38 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             cidr_prefix = int(subnet['cidr'].split('/')[1])
             return "%s/%s" % (subnet['gateway_ip'], cidr_prefix)
 
+    def _validate_router_segment_subnets(self, context, network_id,
+                                         overlay_net, subnet):
+        """Validate that adding an interface to a router will not cause
+        multiple segments subnets which is not allowed
+        """
+        if not overlay_net:
+            # Only interfaces for overlay networks create segment subnets
+            return
+
+        if subnet.get('ip_version', 4) != 4:
+            # IPv6 is not relevant here since plugin allow only 1 ipv6 subnet
+            # per network
+            return
+
+        if subnet['enable_dhcp']:
+            # This subnet is with dhcp, so there cannot be any other with dhcp
+            return
+
+        if not self.use_policy_dhcp:
+            # Only policy DHCP creates segment subnets
+            return
+
+        # Look for another subnet with DHCP
+        network = self._get_network(context.elevated(), network_id)
+        for subnet in network.subnets:
+            if subnet.enable_dhcp and subnet.ip_version == 4:
+                msg = (_("Can not add router interface on network %(net)s "
+                         "as another %(ver)s subnet has enabled DHCP") %
+                       {'net': network_id, 'ver': subnet.ip_version})
+                LOG.error(msg)
+                raise n_exc.InvalidInput(error_message=msg)
+
     @nsx_plugin_common.api_replay_mode_wrapper
     def add_router_interface(self, context, router_id, interface_info):
         # NOTE: In dual stack case, neutron would create a separate interface
@@ -2548,6 +2621,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Interface subnets cannot overlap with the GW external subnet
             self._validate_gw_overlap_interfaces(context, gw_network_id,
                                                  [network_id])
+
+            if subnet:
+                self._validate_router_segment_subnets(context, network_id,
+                                                      overlay_net, subnet)
 
             # Update the interface of the neutron router
             info = super(NsxPolicyPlugin, self).add_router_interface(
