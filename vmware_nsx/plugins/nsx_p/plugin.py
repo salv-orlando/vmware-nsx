@@ -794,10 +794,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self._create_net_mp_mdproxy_port(
                     context, created_net, az, nsx_net_id)
             except Exception as e:
-                LOG.exception("Failed to create mdproxy port for network %s: "
-                              "%s", net_id, e)
-                with excutils.save_and_reraise_exception():
-                    self.delete_network(context, net_id)
+                msg = ("Failed to complete network creation. error: %s" % e)
+                LOG.exception(msg)
+                self.delete_network(context, net_id)
+                raise nsx_exc.NsxPluginException(err_msg=msg)
 
         # Update the QoS policy (will affect only future compute ports)
         qos_com_utils.set_qos_policy_on_new_net(
