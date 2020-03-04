@@ -844,6 +844,36 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                              ports[0]['network_id'])
             self.assertEqual(False, ports[0]['port_security_enabled'])
 
+    def test_create_dhcp_subnet_with_rtr_if(self):
+        # Test that cannot create a DHCP subnet if a router interface exists
+        dummy_port = {'fixed_ips': [{'subnet_id': 'dummy'}]}
+        with mock.patch.object(self.plugin, 'get_ports',
+                               return_value=[dummy_port]),\
+            self.network() as net:
+            subnet = self._make_subnet_data(
+                network_id=net['network']['id'], cidr='10.0.0.0/24',
+                tenant_id=net['network']['tenant_id'])
+            self.assertRaises(
+                n_exc.InvalidInput, self.plugin.create_subnet,
+                context.get_admin_context(), subnet)
+
+    def test_update_dhcp_subnet_with_rtr_if(self):
+        # Test that cannot enable a DHCP on a subnet if a router interface
+        # exists
+        dummy_port = {'fixed_ips': [{'subnet_id': 'dummy'}]}
+        with mock.patch.object(self.plugin, 'get_ports',
+                               return_value=[dummy_port]),\
+            self.network() as net:
+            subnet = self._make_subnet_data(
+                network_id=net['network']['id'], cidr='10.0.0.0/24',
+                tenant_id=net['network']['tenant_id'], enable_dhcp=False)
+            neutron_subnet = self.plugin.create_subnet(
+                context.get_admin_context(), subnet)
+            self.assertRaises(
+                n_exc.InvalidInput, self.plugin.update_subnet,
+                context.get_admin_context(), neutron_subnet['id'],
+                {'subnet': {'enable_dhcp': True}})
+
 
 class NsxPolicyMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
     """Test native metadata config when using MP MDProxy"""
