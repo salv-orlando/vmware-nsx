@@ -1422,6 +1422,29 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         return tags
 
+    def _do_port_backend_calls(self, name, segment_id,
+                               spoofguard_profile, seg_sec_profile,
+                               mac_discovery_profile, qos_policy_id, **kwargs):
+        self.nsxpolicy.segment_port.create_or_overwrite(
+            name, segment_id, **kwargs)
+
+        # add the security profiles to the port
+        self.nsxpolicy.segment_port_security_profiles.create_or_overwrite(
+            name, segment_id, port_id=kwargs['port_id'],
+            spoofguard_profile_id=spoofguard_profile,
+            segment_security_profile_id=seg_sec_profile)
+
+        # add the mac discovery profile to the port
+        self.nsxpolicy.segment_port_discovery_profiles.create_or_overwrite(
+            name, segment_id, kwargs['port_id'],
+            mac_discovery_profile_id=mac_discovery_profile)
+
+        # Add QoS segment profile (only if QoS is enabled)
+        if directory.get_plugin(plugin_const.QOS):
+            self.nsxpolicy.segment_port_qos_profiles.create_or_overwrite(
+                name, segment_id, kwargs['port_id'],
+                qos_profile_id=qos_policy_id)
+
     def _create_or_update_port_on_backend(self, context, port_data, is_psec_on,
                                           qos_policy_id, original_port=None):
         is_create = original_port is None
@@ -1495,27 +1518,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             'admin_state_up' in port_data):
             kwargs['admin_state'] = port_data['admin_state_up']
 
-        # Create/ update the backend port in a single transaction
-        with policy_trans.NsxPolicyTransaction():
-            self.nsxpolicy.segment_port.create_or_overwrite(
-                name, segment_id, **kwargs)
-
-            # add the security profiles to the port
-            self.nsxpolicy.segment_port_security_profiles.create_or_overwrite(
-                name, segment_id, port_data['id'],
-                spoofguard_profile_id=spoofguard_profile,
-                segment_security_profile_id=seg_sec_profile)
-
-            # add the mac discovery profile to the port
-            self.nsxpolicy.segment_port_discovery_profiles.create_or_overwrite(
-                name, segment_id, port_data['id'],
-                mac_discovery_profile_id=mac_discovery_profile)
-
-            # Add QoS segment profile (only if QoS is enabled)
-            if directory.get_plugin(plugin_const.QOS):
-                self.nsxpolicy.segment_port_qos_profiles.create_or_overwrite(
-                    name, segment_id, port_data['id'],
-                    qos_profile_id=qos_policy_id)
+        if not self.nsxpolicy.feature_supported(
+            nsxlib_consts.FEATURE_PARTIAL_UPDATES):
+            # If partial updates are not supported, using transactions will
+            # reset the backend segment name
+            self._do_port_backend_calls(
+                name, segment_id, spoofguard_profile, seg_sec_profile,
+                mac_discovery_profile, qos_policy_id, **kwargs)
+        else:
+            # Create/ update the backend port in a single transaction
+            with policy_trans.NsxPolicyTransaction():
+                self._do_port_backend_calls(
+                    name, segment_id, spoofguard_profile, seg_sec_profile,
+                    mac_discovery_profile, qos_policy_id, **kwargs)
 
         # Update port admin status using passthrough api, only if it changed
         # or new port with disabled admin state
