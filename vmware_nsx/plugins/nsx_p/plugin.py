@@ -2266,6 +2266,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # remove the edge cluster from the tier1 router
         self.nsxpolicy.tier1.remove_edge_cluster(router_id)
 
+    def _run_under_transaction(self, method):
+        if self.nsxpolicy.feature_supported(
+            nsxlib_consts.FEATURE_PARTIAL_UPDATES):
+            with policy_trans.NsxPolicyTransaction():
+                method()
+        else:
+            method()
+
     def _update_router_gw_info(self, context, router_id, info,
                                called_from=None):
         # Get the original data of the router GW
@@ -2313,13 +2321,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if actions['add_service_router']:
                 self.create_service_router(context, router_id, router=router)
 
-            with policy_trans.NsxPolicyTransaction():
+            def _do_remove_nat():
                 if actions['remove_snat_rules']:
                     for subnet in router_subnets:
                         self._del_subnet_snat_rule(router_id, subnet)
                 if actions['remove_no_dnat_rules']:
                     for subnet in router_subnets:
                         self._del_subnet_no_dnat_rule(router_id, subnet)
+
+            self._run_under_transaction(_do_remove_nat)
 
             if (actions['remove_router_link_port'] or
                 actions['add_router_link_port']):
@@ -2339,7 +2349,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     nat=actions['advertise_route_nat_flag'],
                     subnets=actions['advertise_route_connected_flag'])
 
-            with policy_trans.NsxPolicyTransaction():
+            def _do_add_nat():
                 if actions['add_snat_rules']:
                     # Add SNAT rules for all the subnets which are in different
                     # scope than the GW
@@ -2349,11 +2359,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                         self._add_subnet_snat_rule(context, router_id,
                                                    subnet, gw_address_scope,
                                                    newaddr)
-
                 if actions['add_no_dnat_rules']:
                     for subnet in router_subnets:
                         self._add_subnet_no_dnat_rule(
                             context, router_id, subnet)
+
+            self._run_under_transaction(_do_add_nat)
 
             # always advertise ipv6 subnets if gateway is set
             advertise_ipv6_subnets = True if info else False
@@ -2409,7 +2420,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             r, resource_type='os-neutron-router-id',
             project_name=context.tenant_name)
         try:
-            with policy_trans.NsxPolicyTransaction():
+            def _do_create_router():
                 self.nsxpolicy.tier1.create_or_overwrite(
                     router_name, router['id'],
                     tier0=None,
@@ -2417,6 +2428,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     tags=tags)
                 # Also create the empty locale-service as it must always exist
                 self.nsxpolicy.tier1.create_locale_service(router['id'])
+
+            self._run_under_transaction(_do_create_router)
 
         #TODO(annak): narrow down the exception
         except Exception as ex:
@@ -2482,7 +2495,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                           route['nexthop'])
 
     def _add_static_routes(self, router_id, routes):
-        with policy_trans.NsxPolicyTransaction():
+        def _do_add_routes():
             for route in routes:
                 dest = route['destination']
                 self.nsxpolicy.tier1_static_route.create_or_overwrite(
@@ -2491,6 +2504,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     static_route_id=self._get_static_route_id(route),
                     network=dest,
                     next_hop=route['nexthop'])
+
+        self._run_under_transaction(_do_add_routes)
 
     def _delete_static_routes(self, router_id, routes):
         for route in routes:
@@ -2827,8 +2842,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return policy_constants.NAT_FIREWALL_MATCH_EXTERNAL
 
     def _add_fip_nat_rules(self, tier1_id, fip_id, ext_ip, int_ip):
-        firewall_match = self._get_nat_firewall_match()
-        with policy_trans.NsxPolicyTransaction():
+        def _do_add_fip_nat():
+            firewall_match = self._get_nat_firewall_match()
             self.nsxpolicy.tier1_nat_rule.create_or_overwrite(
                 'snat for fip %s' % fip_id,
                 tier1_id,
@@ -2848,14 +2863,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 sequence_number=NAT_RULE_PRIORITY_FIP,
                 firewall_match=firewall_match)
 
+        self._run_under_transaction(_do_add_fip_nat)
+
     def _delete_fip_nat_rules(self, tier1_id, fip_id):
-        with policy_trans.NsxPolicyTransaction():
+        def _do_delete_fip_nat():
             self.nsxpolicy.tier1_nat_rule.delete(
                 tier1_id,
                 nat_rule_id=self._get_fip_snat_rule_id(fip_id))
             self.nsxpolicy.tier1_nat_rule.delete(
                 tier1_id,
                 nat_rule_id=self._get_fip_dnat_rule_id(fip_id))
+
+        self._run_under_transaction(_do_delete_fip_nat)
 
     def _update_lb_vip(self, port, vip_address):
         # update the load balancer virtual server's VIP with
@@ -3207,7 +3226,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             category = NSX_P_PROVIDER_SECTION_CATEGORY
 
         try:
-            with policy_trans.NsxPolicyTransaction():
+            def _do_create_sg():
                 # Create the group
                 self.nsxpolicy.group.create_or_overwrite_with_conditions(
                     nsx_name, NSX_P_GLOBAL_DOMAIN_ID, group_id=sg_id,
@@ -3221,6 +3240,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     tags=tags, category=category)
                 for entry in entries:
                     self.nsxpolicy.comm_map.create_entry_from_def(entry)
+
+            self._run_under_transaction(_do_create_sg)
         except Exception as e:
             msg = (_("Failed to create NSX resources for SG %(sg)s: "
                      "%(e)s") % {'sg': sg_id, 'e': e})
@@ -3291,7 +3312,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def _create_security_group_backend_rule(self, context, map_id,
                                             sg_rule, secgroup_logging,
-                                            is_provider_sg=False):
+                                            is_provider_sg=False,
+                                            create_related_resource=True):
         """Create backend resources for a DFW rule
 
         All rule resources (service, groups) will be created
@@ -3320,32 +3342,42 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Create a group for the remote IPs
             remote_ip = sg_rule['remote_ip_prefix']
             remote_group_id = self._get_sg_rule_remote_ip_group_id(sg_rule)
-            expr = self.nsxpolicy.group.build_ip_address_expression(
-                [remote_ip])
-            self.nsxpolicy.group.create_or_overwrite_with_conditions(
-                remote_group_id, NSX_P_GLOBAL_DOMAIN_ID,
-                group_id=remote_group_id,
-                description='%s for OS rule %s' % (remote_ip, sg_rule['id']),
-                conditions=[expr], tags=tags)
+            if create_related_resource:
+                expr = self.nsxpolicy.group.build_ip_address_expression(
+                    [remote_ip])
+                self.nsxpolicy.group.create_or_overwrite_with_conditions(
+                    remote_group_id, NSX_P_GLOBAL_DOMAIN_ID,
+                    group_id=remote_group_id,
+                    description='%s for OS rule %s' % (remote_ip,
+                                                       sg_rule['id']),
+                    conditions=[expr], tags=tags)
             source = remote_group_id
         if sg_rule.get(sg_prefix.LOCAL_IP_PREFIX):
             # Create a group for the local ips
             local_ip = sg_rule[sg_prefix.LOCAL_IP_PREFIX]
             local_group_id = self._get_sg_rule_local_ip_group_id(sg_rule)
-            expr = self.nsxpolicy.group.build_ip_address_expression(
-                [local_ip])
-            self.nsxpolicy.group.create_or_overwrite_with_conditions(
-                local_group_id, NSX_P_GLOBAL_DOMAIN_ID,
-                group_id=local_group_id,
-                description='%s for OS rule %s' % (local_ip, sg_rule['id']),
-                conditions=[expr], tags=tags)
+            if create_related_resource:
+                expr = self.nsxpolicy.group.build_ip_address_expression(
+                    [local_ip])
+                self.nsxpolicy.group.create_or_overwrite_with_conditions(
+                    local_group_id, NSX_P_GLOBAL_DOMAIN_ID,
+                    group_id=local_group_id,
+                    description='%s for OS rule %s' % (local_ip,
+                                                       sg_rule['id']),
+                    conditions=[expr], tags=tags)
             destination = local_group_id
 
         if direction == nsxlib_consts.OUT:
             # Swap source and destination
             source, destination = destination, source
 
-        service = self._get_rule_service_id(context, sg_rule, tags)
+        if create_related_resource:
+            service = self._get_rule_service_id(context, sg_rule, tags)
+        else:
+            if nsxlib_utils.get_l4_protocol_name(sg_rule['protocol']):
+                service = sg_rule['id']
+            else:
+                service = None
         ip_protocol = self._get_rule_ip_protocol(sg_rule)
         logging = (cfg.CONF.nsx_p.log_security_groups_allowed_traffic or
                    secgroup_logging)
@@ -3401,13 +3433,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             sg_rules = secgroup_db['security_group_rules']
             secgroup_logging = secgroup.get(sg_logging.LOGGING, False)
             backend_rules = []
-            with policy_trans.NsxPolicyTransaction():
-                # Create all the rules resources in a single transaction
-                for sg_rule in sg_rules:
-                    rule_entry = self._create_security_group_backend_rule(
-                        context, secgroup_db['id'], sg_rule,
-                        secgroup_logging)
-                    backend_rules.append(rule_entry)
+            # Create all the rules resources in a single transaction
+            for sg_rule in sg_rules:
+                rule_entry = self._create_security_group_backend_rule(
+                    context, secgroup_db['id'], sg_rule,
+                    secgroup_logging)
+                backend_rules.append(rule_entry)
             # Create Group & communication map on the NSX
             self._create_security_group_backend_resources(
                 context, secgroup, backend_rules)
@@ -3523,26 +3554,29 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         category = (NSX_P_PROVIDER_SECTION_CATEGORY if is_provider_sg
                     else NSX_P_REGULAR_SECTION_CATEGORY)
         # Create the NSX backend rules in a single transaction
-        with policy_trans.NsxPolicyTransaction():
+
+        def _do_update_rules():
             # Build new rules and relevant objects
             backend_rules = []
             for rule_data in rules_db:
                 rule_entry = self._create_security_group_backend_rule(
                     context, sg_id, rule_data, secgroup_logging,
                     is_provider_sg=is_provider_sg)
-
                 backend_rules.append(rule_entry)
-
             # Add the old rules
             for rule in sg['security_group_rules']:
-                rule_entry = self.nsxpolicy.comm_map.build_entry(
-                    NSX_P_GLOBAL_DOMAIN_ID, sg_id, rule['id'])
+                rule_entry = self._create_security_group_backend_rule(
+                    context, sg_id, rule, secgroup_logging,
+                    is_provider_sg=is_provider_sg,
+                    create_related_resource=False)
                 backend_rules.append(rule_entry)
 
             # Update the policy with all the rules.
             self.nsxpolicy.comm_map.update_with_entries(
                 NSX_P_GLOBAL_DOMAIN_ID, sg_id, entries=backend_rules,
                 category=category)
+
+        self._run_under_transaction(_do_update_rules)
 
         return rules_db
 

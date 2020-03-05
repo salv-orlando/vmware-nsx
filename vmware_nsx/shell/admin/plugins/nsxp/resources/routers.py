@@ -24,6 +24,7 @@ from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as p_utils
 from vmware_nsx.shell import resources as shell
 
+from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import transaction as policy_trans
 
@@ -146,11 +147,18 @@ def update_nat_firewall_match(resource, event, trigger, **kwargs):
     for router in neutron_routers:
         rules = nsxpolicy.tier1_nat_rule.list(router['id'])
         for rule in rules:
-            with policy_trans.NsxPolicyTransaction():
+            if not nsxpolicy.feature_supported(
+                nsx_constants.FEATURE_PARTIAL_UPDATES):
                 if rule['firewall_match'] == old_firewall_match:
                     nsxpolicy.tier1_nat_rule.update(
                         router['id'], rule['id'],
                         firewall_match=new_firewall_match)
+            else:
+                with policy_trans.NsxPolicyTransaction():
+                    if rule['firewall_match'] == old_firewall_match:
+                        nsxpolicy.tier1_nat_rule.update(
+                            router['id'], rule['id'],
+                            firewall_match=new_firewall_match)
 
     LOG.info("Done.")
 
