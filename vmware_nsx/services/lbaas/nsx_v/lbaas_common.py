@@ -317,31 +317,36 @@ def update_pool_fw_rule(vcns, pool_id, edge_id, section_id, member_ips):
         for rule in section.iter('rule'):
             if rule.find('name').text == pool_id:
                 pool_rule = rule
-                if member_ips:
-                    pool_rule.find('sources').find('source').find(
-                        'value').text = (','.join(edge_ips))
-                    pool_rule.find('destinations').find(
-                        'destination').find('value').text = ','.join(
-                        member_ips)
-                else:
-                    section.remove(pool_rule)
+                sources = pool_rule.find('sources')
+                if sources:
+                    pool_rule.remove(sources)
+
+                destinations = pool_rule.find('destinations')
+                if destinations:
+                    pool_rule.remove(destinations)
                 break
 
-        if member_ips and pool_rule is None:
+        if not pool_rule and member_ips:
             pool_rule = et.SubElement(section, 'rule')
             et.SubElement(pool_rule, 'name').text = pool_id
             et.SubElement(pool_rule, 'action').text = 'allow'
+
+        if member_ips:
             sources = et.SubElement(pool_rule, 'sources')
             sources.attrib['excluded'] = 'false'
-            source = et.SubElement(sources, 'source')
-            et.SubElement(source, 'type').text = 'Ipv4Address'
-            et.SubElement(source, 'value').text = ','.join(edge_ips)
+            for edge_ip in edge_ips:
+                source = et.SubElement(sources, 'source')
+                et.SubElement(source, 'type').text = 'Ipv4Address'
+                et.SubElement(source, 'value').text = edge_ip
 
             destinations = et.SubElement(pool_rule, 'destinations')
             destinations.attrib['excluded'] = 'false'
-            destination = et.SubElement(destinations, 'destination')
-            et.SubElement(destination, 'type').text = 'Ipv4Address'
-            et.SubElement(destination, 'value').text = ','.join(member_ips)
+            for member_ip in member_ips:
+                destination = et.SubElement(destinations, 'destination')
+                et.SubElement(destination, 'type').text = 'Ipv4Address'
+                et.SubElement(destination, 'value').text = member_ip
+        elif pool_rule:
+            section.remove(pool_rule)
 
         vcns.update_section(section_uri,
                             et.tostring(section, encoding="us-ascii"),
