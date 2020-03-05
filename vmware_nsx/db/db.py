@@ -316,19 +316,6 @@ def get_nsx_security_group_id(session, neutron_id, moref=False):
         return None
 
 
-def get_nsx_security_group_ids(session, neutron_ids):
-    """Return list of ids of a security groups in the NSX backend.
-    """
-    filters = {'neutron_id': neutron_ids}
-    like_filters = None
-    query = session.query(nsx_models.NeutronNsxSecurityGroupMapping)
-    mappings = _apply_filters_to_query(
-        query, nsx_models.NeutronNsxSecurityGroupMapping,
-        filters, like_filters).all()
-    return [mapping['nsx_id'] for mapping in mappings
-            if mapping['nsx_id'] is not None]
-
-
 def _delete_by_neutron_id(session, model, neutron_id):
     return session.query(model).filter_by(neutron_id=neutron_id).delete()
 

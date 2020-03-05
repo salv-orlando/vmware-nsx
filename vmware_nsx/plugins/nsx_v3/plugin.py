@@ -1300,8 +1300,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             else:
                 add_to_exclude_list = True
 
-        elif self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_DYNAMIC_CRITERIA):
+        else:
             # If port has no security-groups then we don't need to add any
             # security criteria tag.
             if port_data[ext_sg.SECURITYGROUPS]:
@@ -1502,16 +1501,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         LOG.warning(err_msg)
         raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _update_lport_with_security_groups(self, context, lport_id,
-                                           original, updated):
-        # translate the neutron sg ids to nsx ids, and call nsxlib
-        nsx_origial = nsx_db.get_nsx_security_group_ids(context.session,
-                                                        original)
-        nsx_updated = nsx_db.get_nsx_security_group_ids(context.session,
-                                                        updated)
-        self.nsxlib.ns_group.update_lport_nsgroups(
-            lport_id, nsx_origial, nsx_updated)
-
     def _disable_ens_portsec(self, port_data):
         if (cfg.CONF.nsx_v3.disable_port_security_for_ens and
             not self._ens_psec_supported()):
@@ -1610,29 +1599,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                               {'id': neutron_db['id'], 'e': e})
                     self._cleanup_port(context, neutron_db['id'], None)
 
-            if not self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_DYNAMIC_CRITERIA):
-                try:
-                    self._update_lport_with_security_groups(
-                        context, lport['id'], [], sgids or [])
-                except Exception as e:
-                    with excutils.save_and_reraise_exception(reraise=False):
-                        LOG.debug("Couldn't associate port %s with "
-                                  "one or more security-groups, reverting "
-                                  "logical-port creation (%s).",
-                                  port_data['id'], lport['id'])
-                        self._cleanup_port(
-                            context, neutron_db['id'], lport['id'])
-
-                    # NOTE(arosen): this is to translate between nsxlib
-                    # exceptions and the plugin exceptions. This should be
-                    # later refactored.
-                    if (e.__class__ is
-                            nsx_lib_exc.SecurityGroupMaximumCapacityReached):
-                        raise nsx_exc.SecurityGroupMaximumCapacityReached(
-                            err_msg=e.msg)
-                    else:
-                        raise e
             try:
                 net_id = self._get_network_nsx_id(
                     context, port_data['network_id'])
@@ -1709,11 +1675,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             _net_id, nsx_port_id = nsx_db.get_nsx_switch_and_port_id(
                 context.session, port_id)
             self.nsxlib.logical_port.delete(nsx_port_id)
-            if not self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_DYNAMIC_CRITERIA):
-                self._update_lport_with_security_groups(
-                    context, nsx_port_id,
-                    port.get(ext_sg.SECURITYGROUPS, []), [])
             if (not self.nsxlib.feature_supported(
                 nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG) and
                 self._is_excluded_port(port.get('device_owner'),
@@ -1809,28 +1770,19 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                     fs.remove_member_from_fw_exclude_list(
                         lport_id, nsxlib_consts.TARGET_TYPE_LOGICAL_PORT)
 
-        if self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_DYNAMIC_CRITERIA):
-            tags_update += self.nsxlib.ns_group.get_lport_tags(
-                updated_port.get(ext_sg.SECURITYGROUPS, []) +
-                updated_port.get(provider_sg.PROVIDER_SECURITYGROUPS, []))
-            # Only set the default section tag if there is no port security
-            if not updated_excluded:
-                tags_update.append({'scope': security.PORT_SG_SCOPE,
-                                    'tag': NSX_V3_DEFAULT_SECTION})
-            else:
-                # Ensure that the 'exclude' tag is set
-                if self.nsxlib.feature_supported(
-                    nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG):
-                    tags_update.append({'scope': security.PORT_SG_SCOPE,
-                                        'tag': nsxlib_consts.EXCLUDE_PORT})
+        tags_update += self.nsxlib.ns_group.get_lport_tags(
+            updated_port.get(ext_sg.SECURITYGROUPS, []) +
+            updated_port.get(provider_sg.PROVIDER_SECURITYGROUPS, []))
+        # Only set the default section tag if there is no port security
+        if not updated_excluded:
+            tags_update.append({'scope': security.PORT_SG_SCOPE,
+                                'tag': NSX_V3_DEFAULT_SECTION})
         else:
-            self._update_lport_with_security_groups(
-                context, lport_id,
-                original_port.get(ext_sg.SECURITYGROUPS, []) +
-                original_port.get(provider_sg.PROVIDER_SECURITYGROUPS, []),
-                updated_port.get(ext_sg.SECURITYGROUPS, []) +
-                updated_port.get(provider_sg.PROVIDER_SECURITYGROUPS, []))
+            # Ensure that the 'exclude' tag is set
+            if self.nsxlib.feature_supported(
+                nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG):
+                tags_update.append({'scope': security.PORT_SG_SCOPE,
+                                    'tag': nsxlib_consts.EXCLUDE_PORT})
 
         # Add availability zone profiles first (so that specific profiles will
         # override them)
@@ -3103,13 +3055,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             project_name=secgroup['tenant_id'])
         name = self.nsxlib.ns_group.get_name(secgroup)
 
-        if self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_DYNAMIC_CRITERIA):
-            tag_expression = (
-                self.nsxlib.ns_group.get_port_tag_expression(
-                    security.PORT_SG_SCOPE, secgroup['id']))
-        else:
-            tag_expression = None
+        tag_expression = (
+            self.nsxlib.ns_group.get_port_tag_expression(
+                security.PORT_SG_SCOPE, secgroup['id']))
 
         ns_group = self.nsxlib.ns_group.create(
             name, secgroup['description'], tags, tag_expression)
