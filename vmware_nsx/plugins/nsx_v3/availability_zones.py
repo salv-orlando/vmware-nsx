@@ -19,7 +19,6 @@ from vmware_nsx.common import config
 from vmware_nsx.plugins.common_v3 import availability_zones as v3_az
 
 from vmware_nsxlib.v3 import core_resources
-from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 
 DEFAULT_NAME = common_az.DEFAULT_NAME + 'v3'
 
@@ -129,8 +128,7 @@ class NsxV3AvailabilityZone(v3_az.NsxV3AvailabilityZone):
                         nsx_profile.get('id')))
         self.switching_profiles_objs = profiles
 
-        if (self.dhcp_relay_service and
-            nsxlib.feature_supported(nsxlib_consts.FEATURE_DHCP_RELAY)):
+        if self.dhcp_relay_service:
             relay_id = None
             if search_scope:
                 # Find the relay service by its tag

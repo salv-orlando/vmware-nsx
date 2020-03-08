@@ -3666,9 +3666,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # return a list of tier0 uplink ip/prefix addresses
         return self.nsxpolicy.tier0.get_uplink_cidrs(tier0_id)
 
-    def _is_vlan_router_interface_supported(self):
-        return True
-
     def _get_neutron_net_ids_by_nsx_id(self, context, lswitch_id):
         """Translate nsx ls IDs given by Nova to neutron network ids.
 
@@ -3731,9 +3728,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _get_net_dhcp_relay(self, context, net_id):
         # No dhcp relay support yet
         return None
-
-    def _support_vlan_router_interfaces(self):
-        return True
 
     def update_router_firewall(self, context, router_id, router_db=None,
                                from_fw=False):

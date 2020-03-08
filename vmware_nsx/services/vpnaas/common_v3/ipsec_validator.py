@@ -41,13 +41,6 @@ class IPsecCommonValidator(vpn_validator.VpnReferenceValidator):
             # TVD currently supports only NSX-T and not NSX-P
             self._core_plugin = self._core_plugin.get_plugin_by_type(
                 projectpluginmap.NsxPlugins.NSX_T)
-        self.check_backend_version()
-
-    def check_backend_version(self):
-        pass
-
-    def _validate_backend_version(self):
-        pass
 
     def _validate_policy_lifetime(self, policy_info, policy_type):
         """NSX supports only units=seconds"""
@@ -289,8 +282,6 @@ class IPsecCommonValidator(vpn_validator.VpnReferenceValidator):
     def validate_ipsec_site_connection(self, context, ipsec_site_conn):
         """Called upon create/update of a connection"""
 
-        self._validate_backend_version()
-
         self._validate_dpd(ipsec_site_conn)
         self._validate_psk(ipsec_site_conn)
 
@@ -339,8 +330,6 @@ class IPsecCommonValidator(vpn_validator.VpnReferenceValidator):
 
     def validate_vpnservice(self, context, vpnservice):
         """Called upon create/update of a service"""
-
-        self._validate_backend_version()
 
         # Call general validations
         super(IPsecCommonValidator, self).validate_vpnservice(

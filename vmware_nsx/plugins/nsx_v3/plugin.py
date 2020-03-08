@@ -196,12 +196,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             self._extension_manager.extension_aliases())
 
         self.nsxlib = v3_utils.get_nsxlib_wrapper()
-        if self.nsxlib.feature_supported(nsxlib_consts.FEATURE_ON_BEHALF_OF):
-            nsxlib_utils.set_inject_headers_callback(
-                v3_utils.inject_headers)
-        else:
-            nsxlib_utils.set_inject_headers_callback(
-                v3_utils.inject_requestid_header)
+        nsxlib_utils.set_inject_headers_callback(v3_utils.inject_headers)
 
         registry.subscribe(
             self.on_subnetpool_address_scope_updated,
@@ -245,11 +240,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         # supported if the global configuration flag vlan_transparent is
         # True
         if cfg.CONF.vlan_transparent:
-            if self.nsxlib.feature_supported(nsxlib_consts.FEATURE_TRUNK_VLAN):
-                self.supported_extension_aliases.append(vlan_apidef.ALIAS)
-            else:
-                LOG.warning("Current NSX version %s doesn't support "
-                            "transparent vlans", self.nsxlib.get_version())
+            self.supported_extension_aliases.append(vlan_apidef.ALIAS)
 
         # Register NSXv3 trunk driver to support trunk extensions
         self.trunk_driver = trunk_driver.NsxV3TrunkDriver.create(self)
@@ -441,10 +432,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             # The TVD plugin will take care of this
             return
 
-        if not self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_LOAD_BALANCER):
-            return
-
         octavia_objects = self._get_octavia_objects()
         self.octavia_listener = octavia_listener.NSXOctaviaListener(
             **octavia_objects)
@@ -501,18 +488,17 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         self._mac_learning_profile = None
         self._mac_learning_disabled_profile = None
-        # Only create MAC Learning profile when nsxv3 version >= 1.1.0
-        if self.nsxlib.feature_supported(nsxlib_consts.FEATURE_MAC_LEARNING):
-            LOG.debug("Initializing NSX v3 Mac Learning switching profiles")
-            try:
-                self._init_mac_learning_profiles()
-                # Only expose the extension if it is supported
-                self.supported_extension_aliases.append(mac_ext.ALIAS)
-            except Exception as e:
-                LOG.warning("Unable to initialize NSX v3 MAC Learning "
-                            "profiles: %(name)s. Reason: %(reason)s",
-                            {'name': NSX_V3_MAC_LEARNING_PROFILE_NAME,
-                             'reason': e})
+
+        # create MAC Learning profile
+        try:
+            self._init_mac_learning_profiles()
+            # Only expose the extension if it is supported
+            self.supported_extension_aliases.append(mac_ext.ALIAS)
+        except Exception as e:
+            LOG.warning("Unable to initialize NSX v3 MAC Learning "
+                        "profiles: %(name)s. Reason: %(reason)s",
+                        {'name': NSX_V3_MAC_LEARNING_PROFILE_NAME,
+                         'reason': e})
 
         no_switch_security_prof = profile_client.find_by_display_name(
                 NSX_V3_NON_VIF_PROFILE)[0]
@@ -525,15 +511,13 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         self.server_ssl_profile = None
         self.client_ssl_profile = None
-        # Only create LB profiles when nsxv3 version >= 2.1.0
-        if self.nsxlib.feature_supported(nsxlib_consts.FEATURE_LOAD_BALANCER):
-            LOG.debug("Initializing NSX v3 Load Balancer default profiles")
-            try:
-                self._init_lb_profiles()
-            except Exception as e:
-                msg = (_("Unable to initialize NSX v3 lb profiles: "
-                         "Reason: %(reason)s") % {'reason': str(e)})
-                raise nsx_exc.NsxPluginException(err_msg=msg)
+        LOG.debug("Initializing NSX v3 Load Balancer default profiles")
+        try:
+            self._init_lb_profiles()
+        except Exception as e:
+            msg = (_("Unable to initialize NSX v3 lb profiles: "
+                     "Reason: %(reason)s") % {'reason': str(e)})
+            raise nsx_exc.NsxPluginException(err_msg=msg)
 
     def _translate_configured_names_to_uuids(self):
         # If using tags to find the objects, make sure tag scope is configured
@@ -858,10 +842,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 provider_data['physical_net'],
                 provider_data['vlan_id'],
                 nsx_id)
-
-    def _is_vlan_router_interface_supported(self):
-        return self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_VLAN_ROUTER_INTERFACE)
 
     def _is_overlay_network(self, context, network_id):
         """Return True if this is an overlay network
@@ -1291,15 +1271,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if resource_type:
             tags = nsxlib_utils.add_v3_tag(tags, resource_type, device_id)
 
-        add_to_exclude_list = False
         if self._is_excluded_port(device_owner, psec_is_on):
-            if self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG):
-                tags.append({'scope': security.PORT_SG_SCOPE,
-                             'tag': nsxlib_consts.EXCLUDE_PORT})
-            else:
-                add_to_exclude_list = True
-
+            tags.append({'scope': security.PORT_SG_SCOPE,
+                         'tag': nsxlib_consts.EXCLUDE_PORT})
         else:
             # If port has no security-groups then we don't need to add any
             # security criteria tag.
@@ -1416,12 +1390,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             qos_com_utils.update_port_policy_binding(context,
                                                      port_data['id'],
                                                      qos_policy_id)
-
-        # Add the port to the exclude list if necessary - this is if
-        # the version is below 2.0.0
-        if add_to_exclude_list:
-            self.nsxlib.firewall_section.add_member_to_fw_exclude_list(
-                result['id'], nsxlib_consts.TARGET_TYPE_LOGICAL_PORT)
 
         return result
 
@@ -1675,17 +1643,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             _net_id, nsx_port_id = nsx_db.get_nsx_switch_and_port_id(
                 context.session, port_id)
             self.nsxlib.logical_port.delete(nsx_port_id)
-            if (not self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG) and
-                self._is_excluded_port(port.get('device_owner'),
-                                       port.get('port_security_enabled'))):
-                fs = self.nsxlib.firewall_section
-                try:
-                    fs.remove_member_from_fw_exclude_list(
-                        nsx_port_id, nsxlib_consts.TARGET_TYPE_LOGICAL_PORT)
-                except Exception as e:
-                    LOG.warning("Unable to remove port from exclude list. "
-                                "Reason: %s", e)
         self.disassociate_floatingips(context, port_id)
 
         # Remove Mac/IP binding from native DHCP server and neutron DB.
@@ -1753,22 +1710,12 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         original_excluded = self._is_excluded_port(original_device_owner,
                                                    original_ps)
         if updated_excluded != original_excluded:
-            if self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG):
-                if updated_excluded:
-                    tags_update.append({'scope': security.PORT_SG_SCOPE,
-                                        'tag': nsxlib_consts.EXCLUDE_PORT})
-                else:
-                    tags_update.append({'scope': security.PORT_SG_SCOPE,
-                                        'tag': None})
+            if updated_excluded:
+                tags_update.append({'scope': security.PORT_SG_SCOPE,
+                                    'tag': nsxlib_consts.EXCLUDE_PORT})
             else:
-                fs = self.nsxlib.firewall_section
-                if updated_excluded:
-                    fs.add_member_to_fw_exclude_list(
-                        lport_id, nsxlib_consts.TARGET_TYPE_LOGICAL_PORT)
-                else:
-                    fs.remove_member_from_fw_exclude_list(
-                        lport_id, nsxlib_consts.TARGET_TYPE_LOGICAL_PORT)
+                tags_update.append({'scope': security.PORT_SG_SCOPE,
+                                    'tag': None})
 
         tags_update += self.nsxlib.ns_group.get_lport_tags(
             updated_port.get(ext_sg.SECURITYGROUPS, []) +
@@ -1779,10 +1726,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                                 'tag': NSX_V3_DEFAULT_SECTION})
         else:
             # Ensure that the 'exclude' tag is set
-            if self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_EXCLUDE_PORT_BY_TAG):
-                tags_update.append({'scope': security.PORT_SG_SCOPE,
-                                    'tag': nsxlib_consts.EXCLUDE_PORT})
+            tags_update.append({'scope': security.PORT_SG_SCOPE,
+                                'tag': nsxlib_consts.EXCLUDE_PORT})
 
         # Add availability zone profiles first (so that specific profiles will
         # override them)
@@ -2152,19 +2097,15 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if actions['remove_router_link_port']:
             # remove the link port and reset the router transport zone
             self.nsxlib.router.remove_router_link_port(nsx_router_id)
-            if self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_ROUTER_TRANSPORT_ZONE):
-                self.nsxlib.router.update_router_transport_zone(
-                    nsx_router_id, None)
+            self.nsxlib.router.update_router_transport_zone(
+                nsx_router_id, None)
         if actions['add_router_link_port']:
             # Add the overlay transport zone to the router config
-            if self.nsxlib.feature_supported(
-                    nsxlib_consts.FEATURE_ROUTER_TRANSPORT_ZONE):
-                tz_uuid = self.nsxlib.router.get_tier0_router_overlay_tz(
-                    new_tier0_uuid)
-                if tz_uuid:
-                    self.nsxlib.router.update_router_transport_zone(
-                        nsx_router_id, tz_uuid)
+            tz_uuid = self.nsxlib.router.get_tier0_router_overlay_tz(
+                new_tier0_uuid)
+            if tz_uuid:
+                self.nsxlib.router.update_router_transport_zone(
+                    nsx_router_id, tz_uuid)
             tags = self.nsxlib.build_v3_tags_payload(
                     router, resource_type='os-neutron-rport',
                     project_name=context.tenant_name)
@@ -2210,21 +2151,17 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             return
         # Add NO-DNAT rule to allow internal traffic between VMs, even if
         # they have floating ips (Only for routers with snat enabled)
-        if self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_NO_DNAT_NO_SNAT):
-            self.nsxlib.logical_router.add_nat_rule(
-                nsx_router_id, "NO_DNAT", None,
-                dest_net=subnet['cidr'],
-                rule_priority=nsxlib_router.GW_NAT_PRI)
+        self.nsxlib.logical_router.add_nat_rule(
+            nsx_router_id, "NO_DNAT", None,
+            dest_net=subnet['cidr'],
+            rule_priority=nsxlib_router.GW_NAT_PRI)
 
     def _del_subnet_no_dnat_rule(self, context, nsx_router_id, subnet):
         # Delete the previously created NO-DNAT rules
-        if self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_NO_DNAT_NO_SNAT):
-            self.nsxlib.logical_router.delete_nat_rule_by_values(
-                nsx_router_id,
-                action="NO_DNAT",
-                match_destination_network=subnet['cidr'])
+        self.nsxlib.logical_router.delete_nat_rule_by_values(
+            nsx_router_id,
+            action="NO_DNAT",
+            match_destination_network=subnet['cidr'])
 
     def validate_router_dhcp_relay(self, context):
         """Fail router creation dhcp relay is configured without IPAM"""
@@ -3351,10 +3288,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _get_net_dhcp_relay(self, context, net_id):
         return self.get_network_az_by_net_id(
             context, net_id).dhcp_relay_service
-
-    def _support_vlan_router_interfaces(self):
-        return self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_VLAN_ROUTER_INTERFACE)
 
     def update_port_nsx_tags(self, context, port_id, tags, is_delete=False):
         """Update backend NSX port with tags from the tagging plugin"""

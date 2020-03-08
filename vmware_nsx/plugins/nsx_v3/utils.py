@@ -542,10 +542,3 @@ def inject_headers():
         return {'X-NSX-EUSER': user_id,
                 'X-NSX-EREQID': ctx_dict.get('request_id')}
     return {}
-
-
-def inject_requestid_header():
-    ctx = context_utils.get_current()
-    if ctx:
-        return {'X-NSX-EREQID': ctx.__dict__.get('request_id')}
-    return {}

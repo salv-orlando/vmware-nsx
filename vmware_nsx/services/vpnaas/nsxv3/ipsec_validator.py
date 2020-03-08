@@ -19,7 +19,6 @@ from vmware_nsx._i18n import _
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.services.vpnaas.common_v3 import ipsec_utils
 from vmware_nsx.services.vpnaas.common_v3 import ipsec_validator
-from vmware_nsxlib.v3 import nsx_constants as consts
 
 LOG = logging.getLogger(__name__)
 
@@ -32,22 +31,6 @@ class IPsecV3Validator(ipsec_validator.IPsecCommonValidator):
     @property
     def nsxlib(self):
         return self._core_plugin.nsxlib
-
-    def check_backend_version(self):
-        if not self.nsxlib.feature_supported(consts.FEATURE_IPSEC_VPN):
-            # ipsec vpn is not supported
-            LOG.warning("VPNaaS is not supported by the NSX backend (version "
-                        "%s)",
-                        self.nsxlib.get_version())
-            self.backend_support = False
-        else:
-            self.backend_support = True
-
-    def _validate_backend_version(self):
-        if not self.backend_support:
-            msg = (_("VPNaaS is not supported by the NSX backend "
-                     "(version %s)") % self.nsxlib.get_version())
-            raise nsx_exc.NsxVpnValidationError(details=msg)
 
     @property
     def auth_algorithm_map(self):

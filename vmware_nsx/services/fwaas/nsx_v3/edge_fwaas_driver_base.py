@@ -27,7 +27,6 @@ class CommonEdgeFwaasV3Driver(fwaas_driver_base.EdgeFwaasDriverBaseV2):
 
     def __init__(self, driver_name):
         super(CommonEdgeFwaasV3Driver, self).__init__(driver_name)
-        self.backend_support = True
         self.driver_exception = exceptions.FirewallInternalDriverError
         self._core_plugin = None
 
@@ -36,15 +35,8 @@ class CommonEdgeFwaasV3Driver(fwaas_driver_base.EdgeFwaasDriverBaseV2):
         """Get the core plugin - should be implemented by each driver"""
         pass
 
-    def validate_backend_version(self):
-        """Validate NSX backend supports FWaaS
-        Can be implemented by each driver
-        """
-        pass
-
     def _update_backend_routers(self, apply_list, fwg_id):
         """Update all the affected router on the backend"""
-        self.validate_backend_version()
         LOG.info("Updating routers firewall for firewall group %s", fwg_id)
         context = n_context.get_admin_context()
         routers = set()

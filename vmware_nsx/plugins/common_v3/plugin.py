@@ -2617,9 +2617,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 msg = (_("DHCP option %s is not supported") % opt_name)
                 raise n_exc.InvalidInput(error_message=msg)
 
-    def _is_vlan_router_interface_supported(self):
-        """Should be implemented by each plugin"""
-
     def _is_ddi_supported_on_network(self, context, network_id, network=None):
         result, _ = self._is_ddi_supported_on_net_with_type(
             context, network_id, network=network)
@@ -2647,8 +2644,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         # NSX version
         is_overlay = self._is_overlay_network(context, network_id)
         net_type = "overlay" if is_overlay else "non-overlay"
-        return (is_overlay or
-                self._is_vlan_router_interface_supported()), net_type
+        return True, net_type
 
     def _has_no_dhcp_enabled_subnet(self, context, network):
         # Check if there is no DHCP-enabled subnet in the network.
@@ -2789,22 +2785,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if port_id:
             self.nsxlib.logical_port.delete(port_id)
 
-    def _support_vlan_router_interfaces(self):
-        """Should be implemented by each plugin"""
-        pass
-
     def _validate_multiple_subnets_routers(self, context, router_id,
                                            net_id, subnet):
         network = self.get_network(context, net_id)
-        net_type = network.get(pnet.NETWORK_TYPE)
-        if (net_type and
-            not self._support_vlan_router_interfaces() and
-            not self._is_overlay_network(context, net_id)):
-            err_msg = (_("Only overlay networks can be attached to a logical "
-                         "router. Network %(net_id)s is a %(net_type)s based "
-                         "network") % {'net_id': net_id, 'net_type': net_type})
-            LOG.error(err_msg)
-            raise n_exc.InvalidInput(error_message=err_msg)
+
         # Unable to attach a trunked network to a router interface
         if cfg.CONF.vlan_transparent:
             if network.get('vlan_transparent') is True:

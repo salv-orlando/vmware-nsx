@@ -15,9 +15,6 @@
 
 import netaddr
 
-from neutron_lib.callbacks import events
-from neutron_lib.callbacks import registry
-from neutron_lib.callbacks import resources
 from neutron_lib.plugins import directory
 from oslo_log import log as logging
 
@@ -38,9 +35,6 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
 
     def __init__(self):
         super(EdgeFwaasV3DriverV2, self).__init__(FWAAS_DRIVER_NAME)
-        registry.subscribe(
-            self.check_backend_version,
-            resources.PROCESS, events.BEFORE_SPAWN)
 
     @property
     def core_plugin(self):
@@ -69,15 +63,6 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
     @property
     def nsx_router(self):
         return self.nsxlib.logical_router
-
-    def check_backend_version(self, resource, event, trigger, payload=None):
-        if (self.core_plugin and
-            not self.nsxlib.feature_supported(consts.FEATURE_ROUTER_FIREWALL)):
-            # router firewall is not supported
-            LOG.warning("FWaaS is not supported by the NSX backend (version "
-                        "%s): Router firewall is not supported",
-                        self.nsxlib.get_version())
-            self.backend_support = False
 
     def _translate_cidr(self, cidr, fwaas_rule_id):
         # Validate that this is a legal & supported ipv4 / ipv6 cidr
@@ -194,12 +179,6 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
             translated_rules.append(nsx_rule)
 
         return translated_rules
-
-    def validate_backend_version(self):
-        # prevent firewall actions if the backend does not support it
-        if not self.backend_support:
-            LOG.error("The NSX backend does not support router firewall")
-            raise self.driver_exception(driver=self.driver_name)
 
     def get_default_backend_rule(self, section_id, allow_all=True):
         # Add default allow all rule
