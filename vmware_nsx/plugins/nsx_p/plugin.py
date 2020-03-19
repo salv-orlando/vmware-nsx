@@ -3654,6 +3654,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     tz)
                 return type == nsxlib_consts.TRANSPORT_TYPE_OVERLAY
 
+        return False
+
     def _is_ens_tz(self, tz_id):
         # This call is cached on the nsxlib side
         mode = self.nsxpolicy.transport_zone.get_host_switch_mode(tz_id)
