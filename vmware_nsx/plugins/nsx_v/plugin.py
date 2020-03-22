@@ -4802,6 +4802,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
             _h, _c = self.nsx_v.vcns.get_section(section_uri)
             section = self.nsx_sg_utils.parse_section(_c)
+            self.nsx_sg_utils.fix_existing_section_rules(section)
             self.nsx_sg_utils.extend_section_with_rules(section, nsx_rules)
             try:
                 h, c = self.nsx_v.vcns.update_section(

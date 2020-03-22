@@ -148,6 +148,20 @@ class NsxSecurityGroupUtils(object):
             pairs.append(pair)
         return pairs
 
+    def fix_existing_section_rules(self, section):
+        # fix section existing rules before extending it with new rules
+        for rule in section.iter('rule'):
+            services = rule.find('services')
+            if services:
+                for service in services:
+                    subProt = service.find('subProtocolName')
+                    icmpCode = service.find('icmpCode')
+                    if (icmpCode is not None and icmpCode.text == '0' and
+                        subProt is not None and
+                        subProt.text in ('echo-request', 'echo-reply')):
+                        # ICMP code should not exist in the payload
+                        service.remove(icmpCode)
+
     def extend_section_with_rules(self, section, nsx_rules):
         section.extend(nsx_rules)
 
