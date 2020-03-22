@@ -117,8 +117,14 @@ class NsxSecurityGroupUtils(object):
                     svcPortTag = et.SubElement(svcTag, 'subProtocol')
                     svcPortTag.text = str(icmptype)
                 if icmpcode is not None:
-                    svcPortTag = et.SubElement(svcTag, 'icmpCode')
-                    svcPortTag.text = str(icmpcode)
+                    if icmptype in ('0', '8') and icmpcode == '0':
+                        # icmpcode 0 should not be sent
+                        # TODO(asarfaty): Validate if this is needed for all
+                        # NSX versions and all icmp types
+                        pass
+                    else:
+                        svcPortTag = et.SubElement(svcTag, 'icmpCode')
+                        svcPortTag.text = str(icmpcode)
 
         if application_services:
             s = et.SubElement(ruleTag, 'services')
@@ -147,6 +153,21 @@ class NsxSecurityGroupUtils(object):
                     'neutron_id': rule.find('name').text}
             pairs.append(pair)
         return pairs
+
+    def fix_existing_section_rules(self, section):
+        # fix section existing rules before extending it with new rules
+        # TODO(asarfaty): Validate if this is needed for all NSX versions
+        for rule in section.iter('rule'):
+            services = rule.find('services')
+            if services:
+                for service in services:
+                    subProt = service.find('subProtocolName')
+                    icmpCode = service.find('icmpCode')
+                    if (icmpCode is not None and icmpCode.text == '0' and
+                        subProt is not None and
+                        subProt.text in ('echo-request', 'echo-reply')):
+                        # ICMP code should not exist in the payload
+                        service.remove(icmpCode)
 
     def extend_section_with_rules(self, section, nsx_rules):
         section.extend(nsx_rules)
