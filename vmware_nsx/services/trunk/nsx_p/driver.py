@@ -22,6 +22,7 @@ from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
+from neutron_lib import constants
 from neutron_lib.services.trunk import constants as trunk_consts
 
 from vmware_nsx._i18n import _
@@ -50,13 +51,18 @@ class NsxpTrunkHandler(object):
         self.plugin_driver = plugin_driver
 
     def _get_port_tags_and_network(self, context, port_id):
+        _, tags, net = self._get_port_compute_tags_and_net(context, port_id)
+        return tags, net
+
+    def _get_port_compute_tags_and_net(self, context, port_id):
         port = self.plugin_driver.get_port(context, port_id)
         segment_id = self.plugin_driver._get_network_nsx_segment_id(
             context, port['network_id'])
         lport = self.plugin_driver.nsxpolicy.segment_port.get(
             segment_id, port_id)
-
-        return segment_id, lport.get('tags', [])
+        is_compute = port.get('device_owner', '').startswith(
+            constants.DEVICE_OWNER_COMPUTE_PREFIX)
+        return is_compute, segment_id, lport.get('tags', [])
 
     def _update_tags(self, port_id, tags, tags_update, is_delete=False):
         if is_delete:
@@ -122,16 +128,19 @@ class NsxpTrunkHandler(object):
             tags_update = [{'scope': TRUNK_ID_TAG_NAME,
                             'tag': subport.trunk_id}]
 
-            segment_id, tags = self._get_port_tags_and_network(
+            is_compute, segment_id, tags = self._get_port_compute_tags_and_net(
                 context, subport.port_id)
 
             tags = self._update_tags(
                 subport.port_id, tags, tags_update, is_delete=True)
 
             # Update logical port in the backend to set/unset parent port
+            vif_id = None
+            if is_compute:
+                vif_id = subport.port_id
             try:
                 self.plugin_driver.nsxpolicy.segment_port.detach(
-                    segment_id, subport.port_id, tags=tags)
+                    segment_id, subport.port_id, vif_id=vif_id, tags=tags)
 
             except nsxlib_exc.ManagerError as e:
                 with excutils.save_and_reraise_exception():
@@ -164,15 +173,18 @@ class NsxpTrunkHandler(object):
     def trunk_deleted(self, context, trunk):
         tags_update = [{'scope': TRUNK_ID_TAG_NAME, 'tag': trunk.id}]
 
-        segment_id, tags = self._get_port_tags_and_network(
+        is_compute, segment_id, tags = self._get_port_compute_tags_and_net(
             context, trunk.port_id)
 
         tags = self._update_tags(
             trunk.port_id, tags, tags_update, is_delete=True)
 
         try:
+            vif_id = None
+            if is_compute:
+                vif_id = trunk.port_id
             self.plugin_driver.nsxpolicy.segment_port.detach(
-                segment_id, trunk.port_id, tags=tags)
+                segment_id, trunk.port_id, vif_id=vif_id, tags=tags)
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 LOG.error("Parent port detachment for trunk %(trunk)s failed "

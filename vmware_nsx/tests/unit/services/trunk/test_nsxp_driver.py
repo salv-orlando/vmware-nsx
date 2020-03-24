@@ -30,16 +30,16 @@ PLUGIN_NAME = 'vmware_nsx.plugins.nsx_p.plugin.NsxPolicyPlugin'
 class TestNsxpTrunkHandler(test_nsx_p_plugin.NsxPPluginTestCaseMixin,
                            base.BaseTestCase):
 
-    def _get_port_tags_and_network(self, context, port_id):
-        return 'net_' + port_id[-1:], []
+    def _get_port_compute_tags_and_net(self, context, port_id):
+        return True, 'net_' + port_id[-1:], []
 
     def setUp(self):
         super(TestNsxpTrunkHandler, self).setUp()
         self.context = context.get_admin_context()
         self.core_plugin = importutils.import_object(PLUGIN_NAME)
         self.handler = trunk_driver.NsxpTrunkHandler(self.core_plugin)
-        self.handler._get_port_tags_and_network = mock.Mock(
-            side_effect=self._get_port_tags_and_network)
+        self.handler._get_port_compute_tags_and_net = mock.Mock(
+            side_effect=self._get_port_compute_tags_and_net)
         self.trunk_1 = mock.Mock()
         self.trunk_1.port_id = "parent_port_1"
         self.trunk_1.id = "trunk_1_id"
@@ -135,7 +135,8 @@ class TestNsxpTrunkHandler(test_nsx_p_plugin.NsxPPluginTestCaseMixin,
                 'detach') as m_detach:
             self.handler.trunk_deleted(self.context, self.trunk_1)
             m_detach.assert_called_with(
-                'net_1', self.trunk_1.port_id, tags=mock.ANY)
+                'net_1', self.trunk_1.port_id, vif_id=self.trunk_1.port_id,
+                tags=mock.ANY)
 
         # Delete trunk with 1 subport
         self.trunk_1.sub_ports = [self.sub_port_a]
@@ -145,9 +146,11 @@ class TestNsxpTrunkHandler(test_nsx_p_plugin.NsxPPluginTestCaseMixin,
             self.handler.trunk_deleted(self.context, self.trunk_1)
             calls = [
                 mock.call.m_detach(
-                    'net_1', self.trunk_1.port_id, tags=mock.ANY),
+                    'net_1', self.trunk_1.port_id,
+                    vif_id=self.trunk_1.port_id, tags=mock.ANY),
                 mock.call.m_detach(
-                    'net_a', self.sub_port_a.port_id, tags=mock.ANY)]
+                    'net_a', self.sub_port_a.port_id,
+                    vif_id=self.sub_port_a.port_id, tags=mock.ANY)]
             m_detach.assert_has_calls(calls, any_order=True)
 
         # Delete trunk with multiple subports
@@ -158,11 +161,14 @@ class TestNsxpTrunkHandler(test_nsx_p_plugin.NsxPPluginTestCaseMixin,
             self.handler.trunk_deleted(self.context, self.trunk_2)
             calls = [
                 mock.call.m_detach(
-                    'net_2', self.trunk_2.port_id, tags=mock.ANY),
+                    'net_2', self.trunk_2.port_id,
+                    vif_id=self.trunk_2.port_id, tags=mock.ANY),
                 mock.call.m_detach(
-                    'net_b', self.sub_port_b.port_id, tags=mock.ANY),
+                    'net_b', self.sub_port_b.port_id,
+                    vif_id=self.sub_port_b.port_id, tags=mock.ANY),
                 mock.call.m_detach(
-                    'net_c', self.sub_port_c.port_id, tags=mock.ANY)]
+                    'net_c', self.sub_port_c.port_id,
+                    vif_id=self.sub_port_c.port_id, tags=mock.ANY)]
             m_detach.assert_has_calls(calls, any_order=True)
 
     def test_subports_added(self):
@@ -229,7 +235,8 @@ class TestNsxpTrunkHandler(test_nsx_p_plugin.NsxPPluginTestCaseMixin,
             self.handler.subports_deleted(
                 self.context, self.trunk_1, sub_ports)
             m_detach.assert_called_with(
-                'net_a', self.sub_port_a.port_id, tags=mock.ANY)
+                'net_a', self.sub_port_a.port_id,
+                vif_id=self.sub_port_a.port_id, tags=mock.ANY)
 
         # Update trunk to remove multiple subports
         sub_ports = [self.sub_port_b, self.sub_port_c]
@@ -240,9 +247,11 @@ class TestNsxpTrunkHandler(test_nsx_p_plugin.NsxPPluginTestCaseMixin,
                 self.context, self.trunk_2, sub_ports)
             calls = [
                 mock.call.m_detach(
-                    'net_b', self.sub_port_b.port_id, tags=mock.ANY),
+                    'net_b', self.sub_port_b.port_id,
+                    vif_id=self.sub_port_b.port_id, tags=mock.ANY),
                 mock.call.m_detach(
-                    'net_c', self.sub_port_c.port_id, tags=mock.ANY)]
+                    'net_c', self.sub_port_c.port_id,
+                    vif_id=self.sub_port_c.port_id, tags=mock.ANY)]
             m_detach.assert_has_calls(calls, any_order=True)
 
 
