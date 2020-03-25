@@ -91,9 +91,14 @@ FWAAS_TABLES = {
     'cisco_firewall_associations',
 }
 
+VPNAAS_TABLES = {
+    'vpn_endpoint_groups',
+    'vpn_endpoints',
+}
+
 # EXTERNAL_TABLES should contain all names of tables that are not related to
 # current repo.
-EXTERNAL_TABLES = (set(external.TABLES) | LBAAS_TABLES |
+EXTERNAL_TABLES = (set(external.TABLES) | LBAAS_TABLES | VPNAAS_TABLES |
                    L2GW_TABLES | SFC_TABLES | TAAS_TABLES | FWAAS_TABLES)
 
 

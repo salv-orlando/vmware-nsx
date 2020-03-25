@@ -418,7 +418,9 @@ class NsxProjectPluginMapping(model_base.BASEV2, models.TimestampMixin):
     """Stores the mapping between the neutron plugin and the project id"""
     __tablename__ = 'nsx_project_plugin_mappings'
     project = sa.Column(sa.String(36), primary_key=True)
-    plugin = sa.Column(sa.Enum('dvs', 'nsx-v', 'nsx-t'), nullable=False)
+    plugin = sa.Column(sa.Enum('dvs', 'nsx-v', 'nsx-t',
+                               name='nsx_plugin_type'),
+                       nullable=False)
 
 
 class NsxVpnConnectionMapping(model_base.BASEV2, models.TimestampMixin):
