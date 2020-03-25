@@ -117,8 +117,14 @@ class NsxSecurityGroupUtils(object):
                     svcPortTag = et.SubElement(svcTag, 'subProtocol')
                     svcPortTag.text = str(icmptype)
                 if icmpcode is not None:
-                    svcPortTag = et.SubElement(svcTag, 'icmpCode')
-                    svcPortTag.text = str(icmpcode)
+                    if icmptype in ('0', '8') and icmpcode == '0':
+                        # icmpcode 0 should not be sent
+                        # TODO(asarfaty): Validate if this is needed for all
+                        # NSX versions and all icmp types
+                        pass
+                    else:
+                        svcPortTag = et.SubElement(svcTag, 'icmpCode')
+                        svcPortTag.text = str(icmpcode)
 
         if application_services:
             s = et.SubElement(ruleTag, 'services')
@@ -150,6 +156,7 @@ class NsxSecurityGroupUtils(object):
 
     def fix_existing_section_rules(self, section):
         # fix section existing rules before extending it with new rules
+        # TODO(asarfaty): Validate if this is needed for all NSX versions
         for rule in section.iter('rule'):
             services = rule.find('services')
             if services:
