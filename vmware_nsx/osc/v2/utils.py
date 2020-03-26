@@ -14,7 +14,6 @@
 #    under the License.
 from osc_lib import utils as osc_utils
 
-
 cached_extensions = None
 
 
@@ -24,9 +23,14 @@ def get_extensions(client_manager):
     global cached_extensions
     if cached_extensions is not None:
         return cached_extensions
+
+    extensions = []
+    if not client_manager._auth_setup_completed:
+        # cannot get the extensions from the neutron client
+        return extensions
+
     # Get supported extensions from the manager
     data = client_manager.network.extensions()
-    extensions = []
     for s in data:
         prop = osc_utils.get_item_properties(
             s, ('Alias',), formatters={})
