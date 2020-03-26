@@ -2010,15 +2010,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         edge_cluster_uuid = self._get_edge_cluster(tier0_uuid, router)
         nsx_router_id = nsx_db.get_nsx_router_id(context.session,
                                                  router_id)
-        enable_standby_relocation = False
-        if self.nsxlib.feature_supported(
-                nsxlib_consts.FEATURE_ROUTER_ALLOCATION_PROFILE):
-            enable_standby_relocation = True
-
         self.nsxlib.logical_router.update(
             nsx_router_id,
             edge_cluster_id=edge_cluster_uuid,
-            enable_standby_relocation=enable_standby_relocation)
+            enable_standby_relocation=True)
 
         LOG.info("Created service router for %s (NSX logical router %s)",
                  router_id, nsx_router_id)
