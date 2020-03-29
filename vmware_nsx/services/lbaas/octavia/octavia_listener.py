@@ -140,12 +140,17 @@ class NSXOctaviaListenerEndpoint(object):
                                     payload=None):
         """Prevent removing a router GW or deleting a router used by LB"""
         router_id = payload.resource_id
-        # get the default core plugin so we can get the router project
-        default_core_plugin = self._get_default_core_plugin(payload.context)
-        router = default_core_plugin.get_router(payload.context, router_id)
-        # get the real core plugin
-        core_plugin = self._get_core_plugin(
-            payload.context, router['project_id'])
+        core_plugin = self.loadbalancer.core_plugin
+        if core_plugin.is_tvd_plugin():
+            # TVD support
+            # get the default core plugin so we can get the router project
+            default_core_plugin = self._get_default_core_plugin(
+                payload.context)
+            router = default_core_plugin.get_router(
+                payload.context, router_id)
+            # get the real core plugin
+            core_plugin = self._get_core_plugin(
+                payload.context, router['project_id'])
         if core_plugin.service_router_has_loadbalancers(
             payload.context, router_id):
             msg = _('Cannot delete a %s as it still has lb service '
