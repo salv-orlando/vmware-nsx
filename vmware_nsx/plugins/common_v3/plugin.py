@@ -1657,8 +1657,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     context.session, dhcp_service['port_id'])
                 self._cleanup_port(context, dhcp_service['port_id'],
                                    nsx_port_id)
-            except nsx_lib_exc.ResourceNotFound:
-                # This could happen when the port has been manually deleted.
+            except (nsx_lib_exc.ResourceNotFound, n_exc.NotFound):
+                # This could happen when the port has been manually deleted
+                # from the NSX, or when the neutron port deletion previously
+                # failed
                 LOG.error("Failed to delete DHCP port %(port)s for "
                           "network %(network)s",
                           {'port': dhcp_service['port_id'],
