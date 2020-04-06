@@ -604,22 +604,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             resources.PORT,
             events.BEFORE_DELETE)
 
-    def _validate_dhcp_profile(self, dhcp_profile_uuid):
-        dhcp_profile = self.nsxlib.switching_profile.get(dhcp_profile_uuid)
-        if (dhcp_profile.get('resource_type') !=
-            nsx_resources.SwitchingProfileTypes.SWITCH_SECURITY):
-            msg = _("Invalid configuration on the backend for DHCP "
-                    "switching profile %s. Switching Profile must be of type "
-                    "'Switch Security'") % dhcp_profile_uuid
-            raise n_exc.InvalidInput(error_message=msg)
-        dhcp_filter = dhcp_profile.get('dhcp_filter')
-        if (not dhcp_filter or dhcp_filter.get('client_block_enabled') or
-            dhcp_filter.get('server_block_enabled')):
-            msg = _("Invalid configuration on the backend for DHCP "
-                    "switching profile %s. DHCP Server Block and Client Block "
-                    "must be disabled") % dhcp_profile_uuid
-            raise n_exc.InvalidInput(error_message=msg)
-
     @nsxlib_utils.retry_upon_exception(
         Exception, max_attempts=cfg.CONF.nsx_v3.retries)
     def _init_dhcp_switching_profile(self):
