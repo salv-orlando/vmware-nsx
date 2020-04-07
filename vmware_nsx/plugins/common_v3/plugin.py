@@ -2267,7 +2267,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 self._rollback_subnet(subnet, _subnet_dhcp_info[subnet['id']])
                 del _subnet_dhcp_info[subnet['id']]
 
-        if self._has_native_dhcp_metadata():
+        # callback should be called only with MP DHCP
+        if (self._has_native_dhcp_metadata() and
+            (not hasattr(self, 'use_policy_dhcp') or
+             not self.use_policy_dhcp)):
             return self._create_bulk_with_callback('subnet', context, subnets,
                                                    _post_create, _rollback)
         else:

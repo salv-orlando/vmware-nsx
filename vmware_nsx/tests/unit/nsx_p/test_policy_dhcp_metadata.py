@@ -254,62 +254,6 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
                                           network['network']['tenant_id'],
                                           True)
 
-    def test_dhcp_service_with_create_dhcp_subnet_bulk(self):
-        # Test if DHCP service is enabled on all networks after a
-        # create_subnet_bulk operation.
-        with self.network() as network1, self.network() as network2:
-            subnet1 = self._make_subnet_data(
-                network_id=network1['network']['id'], cidr='10.0.0.0/24',
-                tenant_id=network1['network']['tenant_id'])
-            subnet2 = self._make_subnet_data(
-                network_id=network2['network']['id'], cidr='20.0.0.0/24',
-                tenant_id=network2['network']['tenant_id'])
-            subnets = {'subnets': [subnet1, subnet2]}
-
-            with mock.patch.object(self.plugin, '_post_create_subnet'
-                                   ) as post_create_subnet:
-                self.plugin.create_subnet_bulk(
-                    context.get_admin_context(), subnets)
-                # Check if post_create function has been called for
-                # both subnets.
-                self.assertEqual(len(subnets['subnets']),
-                                 post_create_subnet.call_count)
-
-    def test_dhcp_service_with_create_dhcp_subnet_bulk_failure(self):
-        # Test if user-provided rollback function is invoked when
-        # exception occurred during a create_subnet_bulk operation.
-        with self.network() as network1, self.network() as network2:
-            subnet1 = self._make_subnet_data(
-                network_id=network1['network']['id'], cidr='10.0.0.0/24',
-                tenant_id=network1['network']['tenant_id'])
-            subnet2 = self._make_subnet_data(
-                network_id=network2['network']['id'], cidr='20.0.0.0/24',
-                tenant_id=network2['network']['tenant_id'])
-            subnets = {'subnets': [subnet1, subnet2]}
-
-            # Inject an exception on the second create_subnet call.
-            orig_create_subnet = self.plugin.create_subnet
-            with mock.patch.object(self.plugin,
-                                   'create_subnet') as create_subnet:
-                def side_effect(*args, **kwargs):
-                    return self._fail_second_call(
-                        create_subnet, orig_create_subnet, *args, **kwargs)
-                create_subnet.side_effect = side_effect
-
-                with mock.patch.object(self.plugin,
-                                       '_rollback_subnet') as rollback_subnet:
-                    try:
-                        self.plugin.create_subnet_bulk(
-                            context.get_admin_context(), subnets)
-                    except Exception:
-                        pass
-                    # Check if rollback function has been called for
-                    # the subnet in the first network.
-                    rollback_subnet.assert_called_once_with(mock.ANY, mock.ANY)
-                    subnet_arg = rollback_subnet.call_args[0][0]
-                    self.assertEqual(network1['network']['id'],
-                                     subnet_arg['network_id'])
-
     def test_dhcp_service_with_create_multiple_dhcp_subnets(self):
         # Test if multiple DHCP-enabled subnets cannot be created in a network.
         with self.network() as network:
