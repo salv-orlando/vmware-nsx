@@ -41,13 +41,6 @@ def lsn_remove(context, lsn_id):
         context.session.query(nsx_models.Lsn).filter_by(lsn_id=lsn_id).delete()
 
 
-def lsn_remove_for_network(context, network_id):
-    """Remove information about the Logical Service Node given its network."""
-    with db_api.CONTEXT_WRITER.using(context):
-        context.session.query(nsx_models.Lsn).filter_by(
-            net_id=network_id).delete()
-
-
 def lsn_get_for_network(context, network_id, raise_on_err=True):
     """Retrieve LSN information given its network id."""
     query = context.session.query(nsx_models.Lsn)

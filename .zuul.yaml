@@ -4,6 +4,7 @@
       - check-requirements
       - openstack-python3-ussuri-jobs-neutron
       - openstack-python3-ussuri-jobs
+      - openstack-cover-jobs
     check:
       jobs:
         - vmware-tox-lower-constraints
@@ -54,6 +55,19 @@
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
               - openstack/octavia
+        - openstack-tox-cover:
+            timeout: 5400
+            required-projects:
+              - openstack/neutron
+              - openstack/networking-l2gw
+              - openstack/networking-sfc
+              - x/vmware-nsxlib
+              - openstack/neutron-fwaas
+              - openstack/neutron-dynamic-routing
+              - openstack/neutron-vpnaas
+              - x/tap-as-a-service
+              - openstack/octavia
+            voting: false
     gate:
       queue: vmware-nsx
       jobs:

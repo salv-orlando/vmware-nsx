@@ -24,7 +24,7 @@ from oslo_utils import excutils
 from vmware_nsx._i18n import _
 from vmware_nsx.api_client import exception as api_exc
 from vmware_nsx.common import exceptions as p_exc
-from vmware_nsx.common import nsx_utils
+from vmware_nsx.db import db as nsx_db
 from vmware_nsx.db import lsn_db
 from vmware_nsx.dhcp_meta import constants as const
 from vmware_nsx.nsxlib.mh import lsn as lsn_api
@@ -46,6 +46,36 @@ lsn_opts = [
 
 def register_lsn_opts(config):
     config.CONF.register_opts(lsn_opts, "NSX_LSN")
+
+
+def get_nsx_switch_ids(session, cluster, neutron_network_id):
+    """Return the NSX switch id for a given neutron network.
+
+    First lookup for mappings in Neutron database. If no mapping is
+    found, query the NSX backend and add the mappings.
+    """
+    nsx_switch_ids = nsx_db.get_nsx_switch_ids(
+        session, neutron_network_id)
+    if not nsx_switch_ids:
+        # Find logical switches from backend.
+        # This is a rather expensive query, but it won't be executed
+        # more than once for each network in Neutron's lifetime
+        nsx_switches = switch_api.get_lswitches(cluster, neutron_network_id)
+        if not nsx_switches:
+            LOG.warning("Unable to find NSX switches for Neutron network "
+                        "%s", neutron_network_id)
+            return
+        nsx_switch_ids = []
+        with session.begin(subtransactions=True):
+            for nsx_switch in nsx_switches:
+                nsx_switch_id = nsx_switch['uuid']
+                nsx_switch_ids.append(nsx_switch_id)
+                # Create DB mapping
+                nsx_db.add_neutron_nsx_network_mapping(
+                    session,
+                    neutron_network_id,
+                    nsx_switch_id)
+    return nsx_switch_ids
 
 
 class LsnManager(object):
@@ -199,7 +229,7 @@ class LsnManager(object):
         """Connect network to LSN via specified port and port_data."""
         try:
             lsn_id = None
-            switch_id = nsx_utils.get_nsx_switch_ids(
+            switch_id = get_nsx_switch_ids(
                 context.session, self.cluster, network_id)[0]
             lswitch_port_id = switch_api.get_port_by_neutron_tag(
                 self.cluster, switch_id, port_id)['uuid']
@@ -233,7 +263,7 @@ class LsnManager(object):
         tenant_id = subnet['tenant_id']
         lswitch_port_id = None
         try:
-            switch_id = nsx_utils.get_nsx_switch_ids(
+            switch_id = get_nsx_switch_ids(
                 context.session, self.cluster, network_id)[0]
             lswitch_port_id = switch_api.create_lport(
                 self.cluster, switch_id, tenant_id,
