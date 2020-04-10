@@ -882,6 +882,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             context, network_id, network)
         self._extension_manager.process_update_network(context, net_data,
                                                        updated_net)
+        if psec.PORTSECURITY in net_data:
+            self._process_network_port_security_update(
+                context, net_data, updated_net)
         self._process_l3_update(context, updated_net, network['network'])
         self._extend_network_dict_provider(context, updated_net)
 
