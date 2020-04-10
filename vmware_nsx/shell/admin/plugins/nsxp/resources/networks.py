@@ -86,7 +86,7 @@ def migrate_dhcp_to_policy(resource, event, trigger, **kwargs):
         nets = plugin.get_networks(ctx)
         for net in nets:
             # skip non-dhcp networks
-            dhcp_port = plugin._get_sunbet_dhcp_port(ctx, net['id'])
+            dhcp_port = plugin._get_net_dhcp_port(ctx, net['id'])
             if not dhcp_port:
                 LOG.info("Skipping network %s: No DHCP subnet found",
                          net['id'])
