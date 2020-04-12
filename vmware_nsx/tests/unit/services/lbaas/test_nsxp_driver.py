@@ -19,6 +19,7 @@ from neutron_lib import context
 from neutron_lib import exceptions as n_exc
 
 from vmware_nsx.services.lbaas import base_mgr
+from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import healthmonitor_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import l7policy_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import l7rule_mgr
@@ -133,12 +134,14 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
         self.last_completor_succees = success
         self.last_completor_called = True
 
-    def setUp(self):
-        super(BaseTestEdgeLbaasV2, self).setUp()
-
+    def reset_completor(self):
         self.last_completor_succees = False
         self.last_completor_called = False
 
+    def setUp(self):
+        super(BaseTestEdgeLbaasV2, self).setUp()
+
+        self.reset_completor()
         self.context = context.get_admin_context()
         octavia_objects = {
             'loadbalancer': loadbalancer_mgr.EdgeLoadBalancerManagerFromDict(),
@@ -290,6 +293,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
         return 'load_balancer'
 
     def test_create(self):
+        self.reset_completor()
         neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
                           'external_gateway_info': {'external_fixed_ips': []}}
         with mock.patch.object(lb_utils, 'get_network_from_subnet',
@@ -321,6 +325,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
 
     def test_create_same_router_fail(self):
+        self.reset_completor()
         neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
                           'external_gateway_info': {'external_fixed_ips': []}}
         with mock.patch.object(lb_utils, 'get_network_from_subnet',
@@ -345,6 +350,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
 
     def test_create_external_vip(self):
+        self.reset_completor()
         with mock.patch.object(lb_utils, 'get_router_from_network',
                               return_value=None),\
             mock.patch.object(lb_utils, 'get_network_from_subnet',
@@ -366,7 +372,82 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                 tags=mock.ANY, size='SMALL',
                 connectivity_path=None)
 
+    def test_create_no_services(self):
+        self.reset_completor()
+        neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
+                          'external_gateway_info': {'external_fixed_ips': []}}
+        with mock.patch.object(lb_utils, 'get_network_from_subnet',
+                               return_value=LB_NETWORK), \
+            mock.patch.object(lb_utils, 'get_router_from_network',
+                              return_value=ROUTER_ID),\
+            mock.patch.object(self.core_plugin, 'get_router',
+                              return_value=neutron_router), \
+            mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
+                              return_value=[]),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=False) as plugin_has_lb,\
+            mock.patch.object(self.core_plugin, 'service_router_has_services',
+                              return_value=False), \
+            mock.patch.object(self.service_client, 'get_router_lb_service',
+                              return_value=None),\
+            mock.patch.object(self.service_client, 'create_or_overwrite'
+                              ) as create_service,\
+            mock.patch.object(self.core_plugin,
+                              "create_service_router") as create_sr:
+            self.edge_driver.loadbalancer.create(
+                self.context, self.lb_dict, self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+            # Service should be created with connectivity path
+            create_service.assert_called_once_with(
+                mock.ANY, lb_service_id=LB_ID,
+                description=self.lb_dict['description'],
+                tags=mock.ANY, size='SMALL',
+                connectivity_path=mock.ANY)
+            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+            create_sr.assert_called_once()
+
+    def test_create_with_port(self):
+        self.reset_completor()
+        neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
+                          'external_gateway_info': {'external_fixed_ips': []}}
+        neutron_port = {'id': 'port-id', 'name': 'dummy', 'device_owner': ''}
+        with mock.patch.object(lb_utils, 'get_network_from_subnet',
+                               return_value=LB_NETWORK), \
+            mock.patch.object(lb_utils, 'get_router_from_network',
+                              return_value=ROUTER_ID),\
+            mock.patch.object(self.core_plugin, 'get_router',
+                              return_value=neutron_router), \
+            mock.patch.object(self.core_plugin, 'get_port',
+                              return_value=neutron_port), \
+            mock.patch.object(self.core_plugin, 'update_port'
+                              ) as update_port, \
+            mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
+                              return_value=[]),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=False) as plugin_has_lb,\
+            mock.patch.object(self.service_client, 'get_router_lb_service',
+                              return_value=None),\
+            mock.patch.object(self.service_client, 'create_or_overwrite'
+                              ) as create_service:
+
+            self.edge_driver.loadbalancer.create(
+                self.context, self.lb_dict, self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+            # Service should be created with connectivity path
+            create_service.assert_called_once_with(
+                mock.ANY, lb_service_id=LB_ID,
+                description=self.lb_dict['description'],
+                tags=mock.ANY, size='SMALL',
+                connectivity_path=mock.ANY)
+            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+            update_port.assert_called_once()
+
     def test_update(self):
+        self.reset_completor()
         new_lb = lb_models.LoadBalancer(LB_ID, 'yyy-yyy', 'lb1-new',
                                         'new-description', 'some-subnet',
                                         'port-id', LB_VIP)
@@ -377,6 +458,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
         self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=ROUTER_ID),\
             mock.patch.object(self.service_client, 'get'
@@ -392,8 +474,106 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(lb_utils, 'get_router_from_network',
+                               return_value=ROUTER_ID),\
+            mock.patch.object(self.service_client, 'get'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'delete'
+                              ) as mock_delete_lb_service:
+            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
+
+            self.edge_driver.loadbalancer.delete_cascade(
+                self.context, self.lb_dict, self.completor)
+
+            mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
+    def test_delete_with_router_id(self):
+        self.reset_completor()
+        with mock.patch.object(lb_utils, 'get_router_from_network',
+                               return_value=None),\
+            mock.patch.object(self.service_client, 'get'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'delete'
+                              ) as mock_delete_lb_service:
+            mock_get_lb_service.return_value = {
+                'id': LB_SERVICE_ID,
+                'connectivity_path': 'infra/%s' % ROUTER_ID}
+
+            self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
+                                                 self.completor)
+
+            mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
+    def test_delete_no_services(self):
+        self.reset_completor()
+        with mock.patch.object(lb_utils, 'get_router_from_network',
+                               return_value=None),\
+            mock.patch.object(self.service_client,
+                              'get') as mock_get_lb_service, \
+            mock.patch.object(self.core_plugin, 'service_router_has_services',
+                              return_value=False), \
+            mock.patch.object(self.core_plugin,
+                              'delete_service_router') as delete_sr, \
+            mock.patch.object(self.service_client, 'delete'
+                              ) as mock_delete_lb_service:
+            mock_get_lb_service.return_value = {
+                'id': LB_SERVICE_ID,
+                'connectivity_path': 'infra/%s' % ROUTER_ID}
+
+            self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
+                                                 self.completor)
+
+            mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            delete_sr.assert_called_once_with(ROUTER_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
+    def test_delete_with_port(self):
+        self.reset_completor()
+        neutron_port = {'id': 'port-id', 'name': 'dummy',
+                        'device_owner': lb_const.VMWARE_LB_VIP_OWNER}
+        with mock.patch.object(lb_utils, 'get_router_from_network',
+                               return_value=ROUTER_ID),\
+            mock.patch.object(self.service_client, 'get'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.core_plugin, 'get_port',
+                              return_value=neutron_port), \
+            mock.patch.object(self.core_plugin, 'update_port'
+                              ) as update_port, \
+            mock.patch.object(self.service_client, 'delete'
+                              ) as mock_delete_lb_service:
+            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
+
+            self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
+                                                 self.completor)
+
+            mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            update_port.assert_called_once()
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
     def test_stats(self):
-        pass
+        lb_with_listener = self.lb_dict
+        lb_with_listener['listeners'] = [self.listener_dict]
+        BYTES = 100
+        stats = {'results': [{'virtual_servers': [
+            {'virtual_server_path': 'infra/%s' % self.listener.id,
+             'statistics': {'bytes_in': BYTES, 'bytes_out': BYTES}}]}]}
+        expected = {'active_connections': 0,
+                    'bytes_in': BYTES,
+                    'bytes_out': BYTES,
+                    'total_connections': 0}
+        with mock.patch.object(self.service_client, 'get_statistics',
+                               return_value=stats):
+            statistics = self.edge_driver.loadbalancer.stats(
+                self.context, lb_with_listener)
+            self.assertEqual(expected, statistics)
 
     def test_refresh(self):
         pass
@@ -427,6 +607,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         return 'listener'
 
     def _create_listener(self, protocol='HTTP'):
+        self.reset_completor()
         with mock.patch.object(self.core_plugin, 'get_floatingips'
                                ) as mock_get_floatingips, \
             mock.patch.object(self.core_plugin,
@@ -466,6 +647,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         self._create_listener(protocol='HTTPS')
 
     def test_create_terminated_https(self):
+        self.reset_completor()
         with mock.patch.object(self.core_plugin, 'get_floatingips'
                                ) as mock_get_floatingips, \
             mock.patch.object(self.core_plugin,
@@ -498,6 +680,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_default_pool(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy', self.pool.id,
                                       LB_ID, 'HTTP', protocol_port=80,
@@ -531,6 +714,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_used_default_pool(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy', self.pool.id,
                                       LB_ID, 'HTTP', protocol_port=80,
@@ -550,8 +734,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               self.edge_driver.listener.create,
                               self.context, listener_dict,
                               self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def test_create_listener_with_session_persistence(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy',
                                       self.pool_persistency.id,
@@ -590,6 +777,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_session_persistence_fail(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy',
                                       self.pool_persistency.id,
@@ -608,8 +796,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               self.edge_driver.listener.create,
                               self.context, listener_dict,
                               self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           None, LB_ID, protocol_port=80,
@@ -630,7 +821,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_default_pool(self):
-        self.assertFalse(self.last_completor_called)
+        self.reset_completor()
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           self.pool, LB_ID, protocol_port=80,
@@ -651,6 +842,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_session_persistence(self):
+        self.reset_completor()
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           self.pool_persistency.id,
@@ -680,6 +872,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_session_persistence_change(self):
+        self.reset_completor()
         old_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1', 'description',
                                           self.pool_persistency.id,
@@ -733,6 +926,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock_delete_pp.assert_called_once()
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(self.service_client, 'get'
                                ) as mock_get_lb_service, \
             mock.patch.object(self.app_client, 'delete'
@@ -752,6 +946,28 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(self.service_client, 'get'
+                               ) as mock_get_lb_service, \
+            mock.patch.object(self.app_client, 'delete'
+                              ) as mock_delete_app_profile, \
+            mock.patch.object(self.vs_client, 'delete'
+                              ) as mock_delete_virtual_server:
+            mock_get_lb_service.return_value = {
+                'id': LB_SERVICE_ID,
+                'virtual_server_ids': [LB_VS_ID]}
+
+            self.edge_driver.listener.delete_cascade(
+                self.context, self.listener_dict,
+                self.completor)
+
+            mock_delete_virtual_server.assert_called_with(LB_VS_ID)
+            mock_delete_app_profile.assert_called_with(LISTENER_ID)
+
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
 
 class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
     def setUp(self):
@@ -762,6 +978,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
         return 'pool'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(self.pp_client, 'create_or_overwrite'
                                ) as mock_create_pp, \
             mock.patch.object(self.vs_client, 'update', return_value=None
@@ -775,6 +992,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def _test_create_with_persistency(self, vs_data, verify_func):
+        self.reset_completor()
         with mock.patch.object(self.edge_driver.pool, '_get_pool_tags'),\
             mock.patch.object(self.pp_cookie_client, 'create_or_overwrite'
                               ) as mock_create_pp, \
@@ -855,6 +1073,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                           self.context, pool_dict, self.completor)
 
     def test_update(self):
+        self.reset_completor()
         new_pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool-name', '',
                                   None, 'HTTP', 'LEAST_CONNECTIONS',
                                   listener=self.listener)
@@ -867,6 +1086,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
 
     def test_update_multiple_listeners(self):
         """Verify update action will fail if multiple listeners are set"""
+        self.reset_completor()
         new_pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool1', '',
                                   None, 'HTTP', 'ROUND_ROBIN',
                                   loadbalancer_id=LB_ID,
@@ -878,9 +1098,12 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                           self.edge_driver.pool.update,
                           self.context, self.pool_dict, new_pool_dict,
                           self.completor)
+        self.assertTrue(self.last_completor_called)
+        self.assertFalse(self.last_completor_succees)
 
     def _test_update_with_persistency(self, vs_data, old_pool, new_pool,
                                       verify_func, cookie=False):
+        self.reset_completor()
         old_pool_dict = lb_translators.lb_pool_obj_to_dict(old_pool)
         new_pool_dict = lb_translators.lb_pool_obj_to_dict(new_pool)
         with mock.patch.object(self.edge_driver.pool, '_get_pool_tags'),\
@@ -980,6 +1203,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                                            self.pool, verify_func)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(self.vs_client, 'update', return_value=None
                                ) as mock_update_virtual_server, \
             mock.patch.object(self.pool_client, 'delete'
@@ -993,7 +1217,24 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(self.vs_client, 'update', return_value=None
+                               ) as mock_update_virtual_server, \
+            mock.patch.object(self.pool_client, 'delete'
+                              ) as mock_delete_pool:
+            self.edge_driver.pool.delete_cascade(
+                self.context, self.pool_dict,
+                self.completor)
+
+            mock_update_virtual_server.assert_called_with(
+                LB_VS_ID, lb_persistence_profile_id=None, pool_id=None)
+            mock_delete_pool.assert_called_with(LB_POOL_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
     def test_delete_with_persistency(self):
+        self.reset_completor()
         with mock.patch.object(self.vs_client, 'get'
                                ) as mock_vs_get, \
             mock.patch.object(self.vs_client, 'update', return_value=None
@@ -1165,6 +1406,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
         return 'member'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
                                ) as mock_get_pool_members, \
             mock.patch.object(lb_utils, 'get_network_from_subnet'
@@ -1197,6 +1439,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_external_vip(self):
+        self.reset_completor()
         with mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
                                ) as mock_get_pool_members, \
             mock.patch.object(lb_utils, 'get_network_from_subnet'
@@ -1240,6 +1483,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             plugin_has_lb.assert_called_once_with(mock.ANY, LB_ROUTER_ID)
 
     def test_update(self):
+        self.reset_completor()
         new_member = lb_models.Member(MEMBER_ID, LB_TENANT_ID, POOL_ID,
                                       MEMBER_ADDRESS, 80, 2, pool=self.pool,
                                       name='member-nnn-nnn')
@@ -1257,6 +1501,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(self.pool_client, 'get'
                                ) as mock_get_pool, \
             mock.patch.object(lb_utils, 'get_network_from_subnet'
@@ -1274,6 +1519,23 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(self.pool_client, 'get'
+                               ) as mock_get_pool, \
+            mock.patch.object(lb_utils, 'get_network_from_subnet'
+                              ) as mock_get_network_from_subnet, \
+            mock.patch.object(self.pool_client, 'remove_pool_member'
+                              ) as mock_update_pool_with_members:
+            mock_get_pool.return_value = LB_POOL_WITH_MEMBER
+            mock_get_network_from_subnet.return_value = LB_NETWORK
+            self.edge_driver.member.delete_cascade(
+                self.context, self.member_dict,
+                self.completor)
+
+            mock_update_pool_with_members.assert_not_called()
+            self.assertFalse(self.last_completor_called)
+
 
 class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
     def setUp(self):
@@ -1284,6 +1546,7 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
         return 'health_monitor'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(self.monitor_client, 'create_or_overwrite'
                                ) as mock_create_monitor, \
             mock.patch.object(self.pool_client, 'add_monitor_to_pool'
@@ -1298,6 +1561,7 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_http(self):
+        self.reset_completor()
         with mock.patch.object(self.http_monitor_client, 'create_or_overwrite'
                                ) as mock_create_monitor, \
             mock.patch.object(self.pool_client, 'add_monitor_to_pool'
@@ -1316,7 +1580,26 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_create_without_pool(self):
+        self.reset_completor()
+        hm = lb_models.HealthMonitor(HM_ID, LB_TENANT_ID, 'PING', 3, 3,
+                                     1, pool=None, name='hm1')
+        hm_dict = lb_translators.lb_hm_obj_to_dict(hm)
+        with mock.patch.object(self.monitor_client, 'create_or_overwrite'
+                               ) as mock_create_monitor, \
+            mock.patch.object(self.pool_client, 'add_monitor_to_pool'
+                              ) as mock_add_monitor_to_pool:
+            self.assertRaises(
+                n_exc.BadRequest,
+                self.edge_driver.healthmonitor.create,
+                self.context, hm_dict, self.completor)
+            mock_create_monitor.assert_called_once()
+            mock_add_monitor_to_pool.assert_not_called()
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
+
     def test_update(self):
+        self.reset_completor()
         with mock.patch.object(self.monitor_client, 'update'
                                ) as mock_update_monitor:
             new_hm = lb_models.HealthMonitor(
@@ -1332,11 +1615,27 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(self.pool_client, 'remove_monitor_from_pool'
                                ) as mock_remove_monitor_from_pool, \
             mock.patch.object(self.monitor_client, 'delete'
                               ) as mock_delete_monitor:
             self.edge_driver.healthmonitor.delete(
+                self.context, self.hm_dict, self.completor)
+
+            mock_remove_monitor_from_pool.assert_called_with(
+                LB_POOL_ID, mock.ANY)
+            mock_delete_monitor.assert_called_with(LB_MONITOR_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(self.pool_client, 'remove_monitor_from_pool'
+                               ) as mock_remove_monitor_from_pool, \
+            mock.patch.object(self.monitor_client, 'delete'
+                              ) as mock_delete_monitor:
+            self.edge_driver.healthmonitor.delete_cascade(
                 self.context, self.hm_dict, self.completor)
 
             mock_remove_monitor_from_pool.assert_called_with(
@@ -1355,6 +1654,7 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
         return 'l7policy'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(self.vs_client, 'get'
                                ) as mock_get_virtual_server, \
             mock.patch.object(self.vs_client, 'add_lb_rule'
@@ -1369,6 +1669,7 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_l7policy = lb_models.L7Policy(L7POLICY_ID, LB_TENANT_ID,
                                           name='new-policy',
                                           listener_id=LISTENER_ID,
@@ -1393,9 +1694,20 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(self.vs_client, 'remove_lb_rule'
                                ) as mock_vs_remove_rule:
             self.edge_driver.l7policy.delete(
+                self.context, self.l7policy_dict, self.completor)
+            mock_vs_remove_rule.assert_called_with(LB_VS_ID, mock.ANY)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(self.vs_client, 'remove_lb_rule'
+                               ) as mock_vs_remove_rule:
+            self.edge_driver.l7policy.delete_cascade(
                 self.context, self.l7policy_dict, self.completor)
             mock_vs_remove_rule.assert_called_with(LB_VS_ID, mock.ANY)
             self.assertTrue(self.last_completor_called)
@@ -1411,6 +1723,7 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
         return 'l7rule'
 
     def test_create(self):
+        self.reset_completor()
         self.l7policy.rules = [self.l7rule]
         with mock.patch.object(self.vs_client, 'update_lb_rule'
                                ) as mock_update_virtual_server:
@@ -1421,6 +1734,7 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_l7rule = lb_models.L7Rule(L7RULE_ID, LB_TENANT_ID,
                                       l7policy_id=L7POLICY_ID,
                                       compare_type='STARTS_WITH',
@@ -1440,6 +1754,7 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         self.l7policy.rules = [self.l7rule]
         with mock.patch.object(self.vs_client, 'update_lb_rule'
                                ) as mock_update_virtual_server:
@@ -1448,3 +1763,13 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
             mock_update_virtual_server.assert_called_once()
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
+
+    def test_delete_cascade(self):
+        self.reset_completor()
+        self.l7policy.rules = [self.l7rule]
+        with mock.patch.object(self.vs_client, 'update_lb_rule'
+                               ) as mock_update_virtual_server:
+            self.edge_driver.l7rule.delete_cascade(
+                self.context, self.l7rule_dict, self.completor)
+            mock_update_virtual_server.assert_not_called()
+            self.assertFalse(self.last_completor_called)

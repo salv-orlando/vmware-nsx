@@ -49,7 +49,7 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         return body
 
     def create(self, context, hm, completor):
-        pool_id = hm['pool']['id']
+        pool_id = hm.get('pool', {}).get('id')
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool
         monitor_client = lb_utils.get_monitor_policy_client(
             self.core_plugin.nsxpolicy.load_balancer, hm)

@@ -158,12 +158,14 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
         self.last_completor_succees = success
         self.last_completor_called = True
 
-    def setUp(self):
-        super(BaseTestEdgeLbaasV2, self).setUp()
-
+    def reset_completor(self):
         self.last_completor_succees = False
         self.last_completor_called = False
 
+    def setUp(self):
+        super(BaseTestEdgeLbaasV2, self).setUp()
+
+        self.reset_completor()
         self.context = context.get_admin_context()
         octavia_objects = {
             'loadbalancer': loadbalancer_mgr.EdgeLoadBalancerManagerFromDict(),
@@ -309,6 +311,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
         return 'load_balancer'
 
     def test_create(self):
+        self.reset_completor()
         neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
                           'external_gateway_info': {'external_fixed_ips': []}}
         with mock.patch.object(lb_utils, 'validate_lb_subnet'
@@ -340,6 +343,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             create_service.assert_called_once()
 
     def test_create_service_exists(self):
+        self.reset_completor()
         with mock.patch.object(lb_utils, 'validate_lb_subnet'
                                ) as mock_validate_lb_subnet,\
             mock.patch.object(lb_utils, 'get_router_from_network'),\
@@ -363,6 +367,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             create_service.assert_not_called()
 
     def test_create_external_vip(self):
+        self.reset_completor()
         with mock.patch.object(lb_utils, 'validate_lb_subnet'
                                ) as mock_validate_lb_subnet,\
             mock.patch.object(lb_utils, 'get_router_from_network',
@@ -387,6 +392,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             create_service.assert_called_once()
 
     def test_update(self):
+        self.reset_completor()
         new_lb = lb_models.LoadBalancer(LB_ID, 'yyy-yyy', 'lb1-new',
                                         'new-description', 'some-subnet',
                                         'port-id', LB_VIP)
@@ -397,6 +403,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
         self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_loadbalancer_binding'
                                ) as mock_get_lb_binding, \
             mock.patch.object(self.service_client, 'get'
@@ -412,6 +419,31 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
 
             self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
                                                  self.completor)
+
+            mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+            mock_delete_lb_binding.assert_called_with(
+                self.context.session, LB_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_loadbalancer_binding'
+                               ) as mock_get_lb_binding, \
+            mock.patch.object(self.service_client, 'get'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'delete'
+                              ) as mock_delete_lb_service, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(nsx_db, 'delete_nsx_lbaas_loadbalancer_binding'
+                              ) as mock_delete_lb_binding:
+            mock_get_lb_binding.return_value = LB_BINDING
+            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
+
+            self.edge_driver.loadbalancer.delete_cascade(
+                self.context, self.lb_dict, self.completor)
 
             mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
             mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
@@ -467,6 +499,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         return 'listener'
 
     def _create_listener(self, protocol='HTTP'):
+        self.reset_completor()
         with mock.patch.object(self.core_plugin, 'get_floatingips'
                                ) as mock_get_floatingips, \
             mock.patch.object(self.app_client, 'create'
@@ -505,6 +538,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         self._create_listener(protocol='HTTPS')
 
     def test_create_terminated_https(self):
+        self.reset_completor()
         with mock.patch.object(self.core_plugin, 'get_floatingips'
                                ) as mock_get_floatingips, \
             mock.patch.object(self.tm_client, 'create_cert'
@@ -539,6 +573,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_default_pool(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy', self.pool.id,
                                       LB_ID, 'HTTP', protocol_port=80,
@@ -578,6 +613,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_used_default_pool(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy', self.pool.id,
                                       LB_ID, 'HTTP', protocol_port=80,
@@ -598,8 +634,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               self.edge_driver.listener.create,
                               self.context, listener_dict,
                               self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def test_create_listener_with_session_persistence(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy',
                                       self.pool_persistency.id,
@@ -642,6 +681,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_listener_with_session_persistence_fail(self):
+        self.reset_completor()
         listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                       'listener1', 'Dummy',
                                       self.pool_persistency.id,
@@ -663,8 +703,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               self.edge_driver.listener.create,
                               self.context, listener_dict,
                               self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           None, LB_ID, protocol_port=80,
@@ -685,7 +728,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_default_pool(self):
-        self.assertFalse(self.last_completor_called)
+        self.reset_completor()
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           self.pool, LB_ID, protocol_port=80,
@@ -710,6 +753,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_session_persistence(self):
+        self.reset_completor()
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1-new', 'new-description',
                                           self.pool_persistency.id,
@@ -741,6 +785,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update_with_session_persistence_change(self):
+        self.reset_completor()
         old_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
                                           'listener1', 'description',
                                           self.pool_persistency.id,
@@ -795,8 +840,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             # No reason to check parameters here, it's
             # all mocked out
             mock_delete_pp.assert_called_once()
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_listener_binding'
                                ) as mock_get_listener_binding, \
             mock.patch.object(nsx_db, 'get_nsx_lbaas_loadbalancer_binding'
@@ -833,6 +881,44 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_listener_binding'
+                               ) as mock_get_listener_binding, \
+            mock.patch.object(nsx_db, 'get_nsx_lbaas_loadbalancer_binding'
+                              ) as mock_get_lb_binding, \
+            mock.patch.object(self.service_client, 'get'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'remove_virtual_server'
+                              ) as mock_remove_virtual_server, \
+            mock.patch.object(self.app_client, 'delete'
+                              ) as mock_delete_app_profile, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(self.vs_client, 'delete'
+                              ) as mock_delete_virtual_server, \
+            mock.patch.object(nsx_db, 'delete_nsx_lbaas_listener_binding',
+                              ) as mock_delete_listener_binding:
+            mock_get_listener_binding.return_value = LISTENER_BINDING
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+            mock_get_lb_binding.return_value = LB_BINDING
+            mock_get_lb_service.return_value = {
+                'id': LB_SERVICE_ID,
+                'virtual_server_ids': [LB_VS_ID]}
+
+            self.edge_driver.listener.delete_cascade(
+                self.context, self.listener_dict, self.completor)
+
+            mock_remove_virtual_server.assert_called_with(LB_SERVICE_ID,
+                                                          LB_VS_ID)
+            mock_delete_virtual_server.assert_called_with(LB_VS_ID)
+            mock_delete_app_profile.assert_called_with(APP_PROFILE_ID)
+
+            mock_delete_listener_binding.assert_called_with(
+                self.context.session, LB_ID, LISTENER_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
 
 class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
     def setUp(self):
@@ -843,6 +929,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
         return 'pool'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(self.pool_client, 'create'
                                ) as mock_create_pool, \
             mock.patch.object(nsx_db, 'add_nsx_lbaas_pool_binding'
@@ -872,6 +959,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def _test_create_with_persistency(self, vs_data, verify_func):
+        self.reset_completor()
         with mock.patch.object(self.pool_client, 'create'
                                ) as mock_create_pool, \
             mock.patch.object(nsx_db, 'add_nsx_lbaas_pool_binding'
@@ -959,6 +1047,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
 
     def test_create_multiple_listeners(self):
         """Verify creation will fail if multiple listeners are set"""
+        self.reset_completor()
         pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool1', '',
                               None, 'HTTP', 'ROUND_ROBIN',
                               loadbalancer_id=LB_ID,
@@ -969,8 +1058,11 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
         self.assertRaises(n_exc.BadRequest,
                           self.edge_driver.pool.create,
                           self.context, pool_dict, self.completor)
+        self.assertTrue(self.last_completor_called)
+        self.assertFalse(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool-name', '',
                                   None, 'HTTP', 'LEAST_CONNECTIONS',
                                   listener=self.listener)
@@ -987,6 +1079,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
 
     def test_update_multiple_listeners(self):
         """Verify update action will fail if multiple listeners are set"""
+        self.reset_completor()
         new_pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool1', '',
                                   None, 'HTTP', 'ROUND_ROBIN',
                                   loadbalancer_id=LB_ID,
@@ -1001,9 +1094,12 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                               self.edge_driver.pool.update,
                               self.context, self.pool_dict, new_pool_dict,
                               self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def _test_update_with_persistency(self, vs_data, old_pool, new_pool,
                                       verify_func):
+        self.reset_completor()
         old_pool_dict = lb_translators.lb_pool_obj_to_dict(old_pool)
         new_pool_dict = lb_translators.lb_pool_obj_to_dict(new_pool)
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
@@ -1065,6 +1161,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                                            self.pool, verify_func)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
                                ) as mock_get_pool_binding, \
             mock.patch.object(self.vs_client, 'update', return_value=None
@@ -1092,7 +1189,37 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
+                               ) as mock_get_pool_binding, \
+            mock.patch.object(self.vs_client, 'update', return_value=None
+                              ) as mock_update_virtual_server, \
+            mock.patch.object(self.pool_client, 'delete'
+                              ) as mock_delete_pool, \
+            mock.patch.object(nsx_db, 'delete_nsx_lbaas_pool_binding'
+                              ) as mock_delete_pool_binding, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(nsx_db, 'get_nsx_lbaas_loadbalancer_binding'
+                              ) as mock_get_lb_binding:
+            mock_get_pool_binding.return_value = POOL_BINDING
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+            mock_get_lb_binding.return_value = None
+
+            self.edge_driver.pool.delete_cascade(
+                self.context, self.pool_dict, self.completor)
+
+            mock_update_virtual_server.assert_called_with(
+                LB_VS_ID, persistence_profile_id=None, pool_id=None)
+            mock_delete_pool.assert_called_with(LB_POOL_ID)
+            mock_delete_pool_binding.assert_called_with(
+                self.context.session, LB_ID, POOL_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
     def test_delete_with_persistency(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
                                ) as mock_get_pool_binding, \
             mock.patch.object(self.vs_client, 'get'
@@ -1301,6 +1428,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
         return 'member'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(lb_utils, 'validate_lb_member_subnet'
                                ) as mock_validate_lb_subnet, \
             mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
@@ -1339,6 +1467,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_external_vip(self):
+        self.reset_completor()
         with mock.patch.object(lb_utils, 'validate_lb_member_subnet'
                                ) as mock_validate_lb_subnet, \
             mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
@@ -1383,6 +1512,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                 mock.ANY, LB_ID, LB_ROUTER_ID)
 
     def test_create_member_different_router(self):
+        self.reset_completor()
         with mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
                                ) as mock_get_pool_members, \
             mock.patch.object(lb_utils, 'get_network_from_subnet'
@@ -1398,8 +1528,11 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                               self.context,
                               self.member_dict,
                               self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_member = lb_models.Member(MEMBER_ID, LB_TENANT_ID, POOL_ID,
                                       MEMBER_ADDRESS, 80, 2, pool=self.pool,
                                       name='member-nnn-nnn')
@@ -1420,6 +1553,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
                                ) as mock_get_pool_binding, \
             mock.patch.object(self.pool_client, 'get'
@@ -1442,6 +1576,29 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
+                               ) as mock_get_pool_binding, \
+            mock.patch.object(self.pool_client, 'get'
+                              ) as mock_get_pool, \
+            mock.patch.object(lb_utils, 'get_network_from_subnet'
+                              ) as mock_get_network_from_subnet, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(self.pool_client, 'update_pool_with_members'
+                              ) as mock_update_pool_with_members:
+            mock_get_pool_binding.return_value = POOL_BINDING
+            mock_get_pool.return_value = LB_POOL_WITH_MEMBER
+            mock_get_network_from_subnet.return_value = LB_NETWORK
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+
+            self.edge_driver.member.delete_cascade(
+                self.context, self.member_dict, self.completor)
+
+            mock_update_pool_with_members.assert_not_called()
+            self.assertFalse(self.last_completor_called)
+
 
 class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
     def setUp(self):
@@ -1452,6 +1609,7 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
         return 'health_monitor'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(self.monitor_client, 'create'
                                ) as mock_create_monitor, \
             mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
@@ -1475,6 +1633,7 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_create_http(self):
+        self.reset_completor()
         with mock.patch.object(self.monitor_client, 'create'
                                ) as mock_create_monitor, \
             mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
@@ -1504,6 +1663,7 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         with mock.patch.object(self.monitor_client, 'update'
                                ) as mock_update_monitor, \
             mock.patch.object(nsx_db, 'get_nsx_lbaas_monitor_binding'
@@ -1523,6 +1683,7 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_monitor_binding'
                                ) as mock_get_monitor_binding, \
             mock.patch.object(self.pool_client, 'remove_monitor_from_pool'
@@ -1547,6 +1708,32 @@ class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_monitor_binding'
+                               ) as mock_get_monitor_binding, \
+            mock.patch.object(self.pool_client, 'remove_monitor_from_pool'
+                              ) as mock_remove_monitor_from_pool, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(self.monitor_client, 'delete'
+                              ) as mock_delete_monitor, \
+            mock.patch.object(nsx_db, 'delete_nsx_lbaas_monitor_binding'
+                              ) as mock_delete_monitor_binding:
+            mock_get_monitor_binding.return_value = HM_BINDING
+
+            self.edge_driver.healthmonitor.delete_cascade(
+                self.context, self.hm_dict, self.completor)
+
+            mock_remove_monitor_from_pool.assert_called_with(LB_POOL_ID,
+                                                             LB_MONITOR_ID)
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+            mock_delete_monitor.assert_called_with(LB_MONITOR_ID)
+            mock_delete_monitor_binding.assert_called_with(
+                self.context.session, LB_ID, POOL_ID, HM_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
 
 class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
     def setUp(self):
@@ -1557,6 +1744,7 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
         return 'l7policy'
 
     def test_create(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_listener_binding'
                                ) as mock_get_listener_binding, \
             mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
@@ -1585,6 +1773,7 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_l7policy = lb_models.L7Policy(L7POLICY_ID, LB_TENANT_ID,
                                           name='new-policy',
                                           listener_id=LISTENER_ID,
@@ -1629,6 +1818,7 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         with mock.patch.object(nsx_db, 'get_nsx_lbaas_l7policy_binding'
                                ) as mock_get_l7policy_binding, \
             mock.patch.object(self.vs_client, 'remove_rule'
@@ -1653,6 +1843,32 @@ class TestEdgeLbaasV2L7Policy(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_l7policy_binding'
+                               ) as mock_get_l7policy_binding, \
+            mock.patch.object(self.vs_client, 'remove_rule'
+                              ) as mock_vs_remove_rule, \
+            mock.patch.object(self.rule_client, 'delete'
+                              ) as mock_delete_rule, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(nsx_db, 'delete_nsx_lbaas_l7policy_binding'
+                              ) as mock_delete_l7policy_binding:
+            mock_get_l7policy_binding.return_value = L7POLICY_BINDING
+            mock_get_neutron_from_nsx_router_id.return_value = LB_ROUTER_ID
+
+            self.edge_driver.l7policy.delete_cascade(
+                self.context, self.l7policy_dict, self.completor)
+
+            mock_vs_remove_rule.assert_called_with(LB_VS_ID, LB_RULE_ID)
+            mock_delete_rule.assert_called_with(LB_RULE_ID)
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+            mock_delete_l7policy_binding.assert_called_with(
+                self.context.session, L7POLICY_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
 
 class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
     def setUp(self):
@@ -1663,6 +1879,7 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
         return 'l7rule'
 
     def test_create(self):
+        self.reset_completor()
         self.l7policy.rules = [self.l7rule]
         create_rule_body = {
             'match_conditions': [{
@@ -1695,6 +1912,7 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_update(self):
+        self.reset_completor()
         new_l7rule = lb_models.L7Rule(L7RULE_ID, LB_TENANT_ID,
                                       l7policy_id=L7POLICY_ID,
                                       compare_type='STARTS_WITH',
@@ -1736,6 +1954,7 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
     def test_delete(self):
+        self.reset_completor()
         self.l7policy.rules = [self.l7rule]
         delete_rule_body = {
             'match_conditions': [],
@@ -1765,3 +1984,25 @@ class TestEdgeLbaasV2L7Rule(BaseTestEdgeLbaasV2):
             mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
+
+    def test_delete_cascade(self):
+        self.reset_completor()
+        self.l7policy.rules = [self.l7rule]
+
+        with mock.patch.object(nsx_db, 'get_nsx_lbaas_l7policy_binding'
+                               ) as mock_get_l7policy_binding, \
+            mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding'
+                              ) as mock_get_pool_binding, \
+            mock.patch.object(nsx_db, 'get_neutron_from_nsx_router_id'
+                              ) as mock_get_neutron_from_nsx_router_id, \
+            mock.patch.object(self.rule_client, 'update'
+                              ) as mock_update_rule:
+            mock_get_l7policy_binding.return_value = L7POLICY_BINDING
+            mock_get_pool_binding.return_value = POOL_BINDING
+
+            self.edge_driver.l7rule.delete_cascade(
+                self.context, self.l7rule_dict, self.completor)
+
+            mock_update_rule.assert_not_called()
+            mock_get_neutron_from_nsx_router_id.router_id = ROUTER_ID
+            self.assertFalse(self.last_completor_called)
