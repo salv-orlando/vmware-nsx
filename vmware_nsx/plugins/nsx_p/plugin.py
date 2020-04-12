@@ -1539,6 +1539,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         If it was not realized or timed out retrying, it will return None
         The nova api will use this to attach to the instance.
         """
+        # DEBUG ADIT
+        #LOG.error("DEBUG ADIT _get_network_nsx_id called")
+        #raise Exception
         if network_id in NET_NEUTRON_2_NSX_ID_CACHE:
             return NET_NEUTRON_2_NSX_ID_CACHE[network_id]
 
@@ -1722,7 +1725,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         device_owner = port_data.get('device_owner')
         is_router_interface = (device_owner == l3_db.DEVICE_OWNER_ROUTER_INTF)
-        is_dhcp_port = (device_owner == const.DEVICE_OWNER_DHCP)
+        is_dhcp_port = (device_owner == const.DEVICE_OWNER_DHCP and
+                        self.use_policy_dhcp)
         is_octavia_port = (device_owner == oct_const.DEVICE_OWNER_OCTAVIA)
 
         if is_external_net or is_router_interface or is_dhcp_port:

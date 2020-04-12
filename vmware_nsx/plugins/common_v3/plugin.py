@@ -1160,6 +1160,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if db_entry:
             return True if db_entry.vlan_transparent else False
 
+    def _is_backend_port(self, context, port_data, delete=False):
+        # Can be implemented by each plugin
+        return True
+
     def _extend_nsx_port_dict_binding(self, context, port_data):
         # Not using the register api for this because we need the context
         # Some attributes were already initialized by _extend_port_portbinding
@@ -1175,6 +1179,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if (port_data.get('device_owner') ==
                 constants.DEVICE_OWNER_FLOATINGIP):
                 # floatingip belongs to an external net without nsx-id
+                port_data[pbin.VIF_DETAILS]['nsx-logical-switch-id'] = None
+            elif not self._is_backend_port(context, port_data):
+                # this port is not relevant for Nova
                 port_data[pbin.VIF_DETAILS]['nsx-logical-switch-id'] = None
             else:
                 port_data[pbin.VIF_DETAILS]['nsx-logical-switch-id'] = (
