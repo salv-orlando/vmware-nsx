@@ -30,7 +30,6 @@ from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.extensions import advancedserviceproviders as as_providers
 from vmware_nsx.plugins.nsx_p import availability_zones as nsx_az
 from vmware_nsx.tests.unit.nsx_p import test_plugin
-from vmware_nsxlib.v3 import core_resources
 from vmware_nsxlib.v3.policy import core_resources as nsx_resources
 from vmware_nsxlib.v3 import utils as nsxlib_utils
 
@@ -67,14 +66,10 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         self.az_metadata_route = '3.3.3.3'
         set_az_in_config(self._az_name,
                          native_metadata_route=self.az_metadata_route)
-        self._patcher = mock.patch.object(core_resources.NsxLibDhcpProfile,
-                                          'get')
-        self._patcher.start()
         self._initialize_azs()
         self.plugin._init_dhcp_metadata()
 
     def tearDown(self):
-        self._patcher.stop()
         cfg.CONF.set_override('dhcp_agent_notification',
                               self._orig_dhcp_agent_notification)
         super(NsxPolicyDhcpTestCase, self).tearDown()
@@ -217,7 +212,10 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         # Test if DHCP service is disabled when directly deleting a network
         # with a DHCP-enabled subnet.
         with self.network() as network:
-            with self.subnet(network=network, enable_dhcp=True):
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(network=network, enable_dhcp=True):
                 self.plugin.delete_network(context.get_admin_context(),
                                            network['network']['id'])
                 self._verify_dhcp_service(network['network']['id'],
@@ -249,7 +247,10 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         # Test if DHCP service is enabled on a network when a DHCP-enabled
         # subnet is created.
         with self.network() as network:
-            with self.subnet(network=network, enable_dhcp=True):
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(network=network, enable_dhcp=True):
                 self._verify_dhcp_service(network['network']['id'],
                                           network['network']['tenant_id'],
                                           True)
@@ -257,8 +258,11 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
     def test_dhcp_service_with_create_multiple_dhcp_subnets(self):
         # Test if multiple DHCP-enabled subnets cannot be created in a network.
         with self.network() as network:
-            with self.subnet(network=network, cidr='10.0.0.0/24',
-                             enable_dhcp=True):
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(network=network, cidr='10.0.0.0/24',
+                            enable_dhcp=True):
                 subnet = {'subnet': {'network_id': network['network']['id'],
                                      'cidr': '20.0.0.0/24',
                                      'enable_dhcp': True}}
@@ -270,7 +274,10 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         # Test if DHCP service is disabled on a network when a DHCP-disabled
         # subnet is deleted.
         with self.network() as network:
-            with self.subnet(network=network, enable_dhcp=True) as subnet:
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(network=network, enable_dhcp=True) as subnet:
                 self._verify_dhcp_service(network['network']['id'],
                                           network['network']['tenant_id'],
                                           True)
@@ -284,7 +291,10 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         # Test if DHCP service is enabled on a network when a DHCP-disabled
         # subnet is updated to DHCP-enabled.
         with self.network() as network:
-            with self.subnet(network=network, enable_dhcp=False) as subnet:
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(network=network, enable_dhcp=False) as subnet:
                 self._verify_dhcp_service(network['network']['id'],
                                           network['network']['tenant_id'],
                                           False)
@@ -299,18 +309,21 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         # Test if a DHCP-disabled subnet cannot be updated to DHCP-enabled
         # if a DHCP-enabled subnet already exists in the same network.
         with self.network() as network:
-            with self.subnet(network=network, cidr='10.0.0.0/24',
-                             enable_dhcp=True):
-                with self.subnet(network=network, cidr='20.0.0.0/24',
-                                 enable_dhcp=False) as subnet:
-                    self._verify_dhcp_service(network['network']['id'],
-                                              network['network']['tenant_id'],
-                                              True)
-                    data = {'subnet': {'enable_dhcp': True}}
-                    self.assertRaises(
-                        n_exc.InvalidInput, self.plugin.update_subnet,
-                        context.get_admin_context(), subnet['subnet']['id'],
-                        data)
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(network=network, cidr='10.0.0.0/24',
+                            enable_dhcp=True),\
+                self.subnet(network=network, cidr='20.0.0.0/24',
+                            enable_dhcp=False) as subnet:
+                self._verify_dhcp_service(network['network']['id'],
+                                          network['network']['tenant_id'],
+                                          True)
+                data = {'subnet': {'enable_dhcp': True}}
+                self.assertRaises(
+                    n_exc.InvalidInput, self.plugin.update_subnet,
+                    context.get_admin_context(), subnet['subnet']['id'],
+                    data)
 
     def test_dhcp_service_with_update_dhcp_port(self):
         # Test if DHCP server IP is updated when the corresponding DHCP port
@@ -318,7 +331,10 @@ class NsxPolicyDhcpTestCase(test_plugin.NsxPPluginTestCaseMixin):
         with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
                         'NsxPolicySegmentApi.'
                         'update') as update_segment_dhcp:
-            with self.subnet(cidr='10.0.0.0/24', enable_dhcp=True) as subnet:
+            # make sure the plugin does not wait for segment realization
+            with mock.patch.object(self.plugin, '_get_network_nsx_id',
+                                   side_effect=Exception),\
+                self.subnet(cidr='10.0.0.0/24', enable_dhcp=True) as subnet:
                 filters = {
                     'network_id': [subnet['subnet']['network_id']],
                     'device_owner': [constants.DEVICE_OWNER_DHCP]
@@ -888,14 +904,16 @@ class NsxPolicyMetadataTestCase(test_plugin.NsxPPluginTestCaseMixin):
         self._az_name = 'zone1'
         self._az_metadata_proxy = 'dummy'
         set_az_in_config(self._az_name, metadata_proxy=self._az_metadata_proxy)
-        self._patcher = mock.patch.object(core_resources.NsxLibMetadataProxy,
-                                          'get')
-        self._patcher.start()
         self._initialize_azs()
         self.plugin._init_dhcp_metadata()
 
+        # make sure the plugin does not wait for segment realization
+        self.realization_patcher = mock.patch.object(
+            self.plugin, '_get_network_nsx_id', side_effect=Exception)
+        self.realization_patcher.start()
+
     def tearDown(self):
-        self._patcher.stop()
+        self.realization_patcher.stop()
         cfg.CONF.set_override('dhcp_agent_notification',
                               self._orig_dhcp_agent_notification)
         super(NsxPolicyMetadataTestCase, self).tearDown()
