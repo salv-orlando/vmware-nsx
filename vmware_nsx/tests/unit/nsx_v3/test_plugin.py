@@ -537,24 +537,6 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
             # should succeed, and net should have port security disabled
             self.assertFalse(res['network']['port_security_enabled'])
 
-    def test_create_ens_network_with_port_sec(self):
-        cfg.CONF.set_override('ens_support', True, 'nsx_v3')
-        providernet_args = {psec.PORTSECURITY: True}
-        with mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
-                        return_value='2.3.0'),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportZone."
-                       "get_host_switch_mode", return_value="ENS"),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibLogicalSwitch."
-                       "get", return_value={'transport_zone_id': 'xxx'}):
-            result = self._create_network(fmt='json', name='ens_net',
-                                          admin_state_up=True,
-                                          providernet_args=providernet_args,
-                                          arg_list=(psec.PORTSECURITY,))
-            res = self.deserialize('json', result)
-            # should fail
-            self.assertEqual('NsxENSPortSecurity',
-                             res['NeutronError']['type'])
-
     def test_create_ens_network_with_port_sec_supported(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
         providernet_args = {psec.PORTSECURITY: True}
@@ -657,29 +639,6 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                               self.plugin.update_network,
                               context.get_admin_context(),
                               network['id'], data)
-
-    def test_update_ens_network(self):
-        cfg.CONF.set_override('ens_support', True, 'nsx_v3')
-        providernet_args = {psec.PORTSECURITY: False}
-        with mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
-                        return_value='2.3.0'),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportZone."
-                       "get_host_switch_mode", return_value="ENS"),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibLogicalSwitch."
-                       "get", return_value={'transport_zone_id': 'xxx'}):
-            result = self._create_network(fmt='json', name='ens_net',
-                                          admin_state_up=True,
-                                          providernet_args=providernet_args,
-                                          arg_list=(psec.PORTSECURITY,))
-            net = self.deserialize('json', result)
-            net_id = net['network']['id']
-            args = {'network': {psec.PORTSECURITY: True}}
-            req = self.new_update_request('networks', args,
-                                          net_id, fmt='json')
-            res = self.deserialize('json', req.get_response(self.api))
-            # should fail
-            self.assertEqual('NsxENSPortSecurity',
-                             res['NeutronError']['type'])
 
     def test_update_ens_network_psec_supported(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
@@ -1699,25 +1658,6 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
             port = self.deserialize(self.fmt, port_req.get_response(self.api))
             self.assertFalse(port['port']['port_security_enabled'])
 
-    def test_create_ens_port_with_port_sec(self):
-        with self.subnet() as subnet,\
-            mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
-                       return_value='2.3.0'),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportZone."
-                       "get_host_switch_mode", return_value="ENS"),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibLogicalSwitch."
-                       "get", return_value={'transport_zone_id': 'xxx'}):
-            args = {'port': {'network_id': subnet['subnet']['network_id'],
-                             'tenant_id': subnet['subnet']['tenant_id'],
-                             'fixed_ips': [{'subnet_id':
-                                            subnet['subnet']['id']}],
-                             psec.PORTSECURITY: True}}
-            port_req = self.new_create_request('ports', args)
-            res = self.deserialize('json', port_req.get_response(self.api))
-            # should fail
-            self.assertEqual('NsxENSPortSecurity',
-                             res['NeutronError']['type'])
-
     def test_create_ens_port_with_port_sec_supported(self):
         with self.subnet() as subnet,\
             mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportZone."
@@ -1734,29 +1674,6 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
             res = self.deserialize('json', port_req.get_response(self.api))
             # should succeed
             self.assertTrue(res['port'][psec.PORTSECURITY])
-
-    def test_update_ens_port(self):
-        with self.subnet() as subnet,\
-            mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
-                       return_value='2.3.0'),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibTransportZone."
-                       "get_host_switch_mode", return_value="ENS"),\
-            mock.patch("vmware_nsxlib.v3.core_resources.NsxLibLogicalSwitch."
-                       "get", return_value={'transport_zone_id': 'xxx'}):
-            args = {'port': {'network_id': subnet['subnet']['network_id'],
-                             'tenant_id': subnet['subnet']['tenant_id'],
-                             'fixed_ips': [{'subnet_id':
-                                            subnet['subnet']['id']}],
-                             psec.PORTSECURITY: False}}
-            port_req = self.new_create_request('ports', args)
-            port = self.deserialize(self.fmt, port_req.get_response(self.api))
-            port_id = port['port']['id']
-            args = {'port': {psec.PORTSECURITY: True}}
-            req = self.new_update_request('ports', args, port_id)
-            res = self.deserialize('json', req.get_response(self.api))
-            # should fail
-            self.assertEqual('NsxENSPortSecurity',
-                             res['NeutronError']['type'])
 
     def test_update_ens_port_psec_supported(self):
         with self.subnet() as subnet,\

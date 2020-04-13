@@ -662,22 +662,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _allow_ens_networks(self):
         return True
 
-    def _ens_psec_supported(self):
-        """ENS security features are always enabled on NSX versions which
-        the policy plugin supports.
-        """
-        return True
-
     def _ens_qos_supported(self):
         return self.nsxpolicy.feature_supported(
             nsxlib_consts.FEATURE_ENS_WITH_QOS)
-
-    def _validate_ens_net_portsecurity(self, net_data):
-        """ENS security features are always enabled on NSX versions which
-        the policy plugin supports.
-        So no validation is needed
-        """
-        pass
 
     def _assert_on_resource_admin_state_down(self, resource_data):
         """Network & port admin state is only supported with passthrough api"""
