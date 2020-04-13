@@ -45,6 +45,7 @@ from vmware_nsx.tests.unit.nsx_v import test_plugin as test_v_plugin
 from vmware_nsx.tests.unit.nsx_v3 import test_plugin as test_v3_plugin
 from vmware_nsxlib.v3 import core_resources
 from vmware_nsxlib.v3 import resources as nsx_v3_resources
+from vmware_nsxlib.v3 import security as nsx_v3_security
 
 LOG = logging.getLogger(__name__)
 NSX_INI_PATH = vmware.get_fake_conf('nsx.ini.test')
@@ -169,12 +170,16 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
 
         # Create a router to make sure we have deployed an edge
         self.router = self._create_router()
+        self.dist_router = self._create_router(dist=True)
         self.network = self._create_net()
 
     def tearDown(self):
         if self.router and self.router.get('id'):
             self._plugin.delete_router(
                 self.edgeapi.context, self.router['id'])
+        if self.dist_router and self.dist_router.get('id'):
+            self._plugin.delete_router(
+                self.edgeapi.context, self.dist_router['id'])
         if self.network and self.network.get('id'):
             self._plugin.delete_network(
                 self.edgeapi.context, self.network['id'])
@@ -188,13 +193,16 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
         args['property'].extend(params)
         self._test_resource('edges', 'nsx-update', **args)
 
-    def _create_router(self):
+    def _create_router(self, dist=False):
         # Create an exclusive router (with an edge)
         tenant_id = uuidutils.generate_uuid()
         data = {'router': {'tenant_id': tenant_id}}
         data['router']['name'] = 'dummy'
         data['router']['admin_state_up'] = True
-        data['router']['router_type'] = 'exclusive'
+        if dist:
+            data['router']['distributes'] = True
+        else:
+            data['router']['router_type'] = 'exclusive'
 
         return self._plugin.create_router(self.edgeapi.context, data)
 
@@ -259,11 +267,16 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
                 "policy-id=1",
                 "network_id=net-1",
                 "net-id=net-1",
+                "network=net-1",
+                "port=port-1",
                 "security-group-id=sg-1",
                 "dvs-id=dvs-1",
                 "moref=virtualwire-1",
                 "teamingpolicy=LACP_ACTIVE",
-                "log-allowed-traffic=true"
+                "log-allowed-traffic=true",
+                "az-name=default",
+                "transit-network=abc",
+                "moref=abc",
                 ]
         self._test_resources_with_args(
             resources.nsxv_resources, args)
@@ -311,6 +324,11 @@ class TestNsxv3AdminUtils(AbstractTestAdminUtils,
         self._patch_object(core_resources.NsxLibSwitchingProfile,
                            'find_by_display_name',
                            return_value=[{'id': uuidutils.generate_uuid()}])
+        self._patch_object(nsx_v3_security.NsxLibFirewallSection,
+                           'get_excludelist',
+                           return_value={'members': [{
+                                'target_type': 'LogicalPort',
+                                'target_id': 'port_id'}]})
         super(TestNsxv3AdminUtils, self)._init_mock_plugin()
 
         self._plugin = nsxv3_utils.NsxV3PluginWrapper()
@@ -336,9 +354,15 @@ class TestNsxv3AdminUtils(AbstractTestAdminUtils,
         args = ["dhcp_profile_uuid=e5b9b249-0034-4729-8ab6-fe4dacaa3a12",
                 "metadata_proxy_uuid=e5b9b249-0034-4729-8ab6-fe4dacaa3a12",
                 "nsx-id=e5b9b249-0034-4729-8ab6-fe4dacaa3a12",
+                "net-id=e5b9b249-0034-4729-8ab6-fe4dacaa3a12",
                 "availability-zone=default",
                 "server-ip=1.1.1.1",
-                "log-allowed-traffic=true"
+                "log-allowed-traffic=true",
+                "value=10",
+                "old-tier0=olduuid",
+                "new-tier0=newuuid",
+                "project-id=aaa",
+                "host-moref=dummy-moref"
                 ]
         # Create some neutron objects for the utilities to run on
         self._create_router()
@@ -378,3 +402,22 @@ class TestNsxpAdminUtils(AbstractTestAdminUtils,
         with self.network():
             # Run all utilities with backend objects
             self._test_resources(resources.nsxp_resources)
+
+    def test_resources_with_common_args(self):
+        """Run all nsxp admin utilities with some common arguments
+
+        Using arguments some apis need to improves the test coverage
+        """
+        args = ["realization_interval=1",
+                "dhcp-config=dumyuuid",
+                "old-tier0=olduuid",
+                "new-tier0=newuuid",
+                "firewall-match=internal"]
+        # Create some neutron objects for the utilities to run on
+        self._create_router()
+        with self._create_l3_ext_network() as network:
+            with self.subnet(network=network, enable_dhcp=False) as subnet:
+                with self.port(subnet=subnet):
+                    # Run all utilities with backend objects
+                    self._test_resources_with_args(
+                        resources.nsxp_resources, args)

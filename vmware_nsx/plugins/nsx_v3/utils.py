@@ -346,9 +346,11 @@ def get_security_groups_mappings(context):
 
 
 def get_orphaned_firewall_sections(context, nsxlib):
-    fw_sections = nsxlib.firewall_section.list()
-    sg_mappings = get_security_groups_mappings(context)
     orphaned_sections = []
+    fw_sections = nsxlib.firewall_section.list()
+    if not fw_sections:
+        return orphaned_sections
+    sg_mappings = get_security_groups_mappings(context)
     for fw_section in fw_sections:
         for sg_db in sg_mappings:
             if fw_section['id'] == sg_db['section-id']:
@@ -356,6 +358,7 @@ def get_orphaned_firewall_sections(context, nsxlib):
         else:
             # Skip non-neutron sections, by tags
             neutron_obj = False
+            LOG.error("DEBUG ADIT fw_section %s", fw_section)
             for tag in fw_section.get('tags', []):
                 if tag['scope'] == 'os-api-version':
                     neutron_obj = True

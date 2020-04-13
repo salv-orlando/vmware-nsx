@@ -149,13 +149,13 @@ def update_nat_firewall_match(resource, event, trigger, **kwargs):
         for rule in rules:
             if not nsxpolicy.feature_supported(
                 nsx_constants.FEATURE_PARTIAL_UPDATES):
-                if rule['firewall_match'] == old_firewall_match:
+                if rule.get('firewall_match', '') == old_firewall_match:
                     nsxpolicy.tier1_nat_rule.update(
                         router['id'], rule['id'],
                         firewall_match=new_firewall_match)
             else:
                 with policy_trans.NsxPolicyTransaction():
-                    if rule['firewall_match'] == old_firewall_match:
+                    if rule.get('firewall_match', '') == old_firewall_match:
                         nsxpolicy.tier1_nat_rule.update(
                             router['id'], rule['id'],
                             firewall_match=new_firewall_match)

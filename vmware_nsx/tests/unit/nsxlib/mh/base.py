@@ -22,9 +22,9 @@ from vmware_nsx.api_client import client
 from vmware_nsx.api_client import exception
 from vmware_nsx.api_client import version
 from vmware_nsx.common import config  # noqa
-from vmware_nsx import nsx_cluster as cluster
 from vmware_nsx.tests import unit as vmware
 from vmware_nsx.tests.unit.nsxlib import fake
+from vmware_nsx.tests.unit.nsxlib.mh import nsx_cluster as cluster
 
 _uuid = test_base._uuid
 
