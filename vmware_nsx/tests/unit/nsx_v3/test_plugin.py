@@ -827,6 +827,26 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                 self.assertEqual('InvalidInput',
                                  res['NeutronError']['type'])
 
+    def test_update_network_port_sec(self):
+        data = {'network': {
+                'name': 'psec_net',
+                'tenant_id': 'some_tenant',
+                'admin_state_up': True,
+                'shared': False,
+                'port_security_enabled': True}}
+        network = self.plugin.create_network(context.get_admin_context(),
+                                             data)
+        self.assertEqual(True, network['port_security_enabled'])
+        data = {'network': {
+                'id': network['id'],
+                'admin_state_up': True,
+                'shared': False,
+                'port_security_enabled': False,
+                'tenant_id': 'some_tenant'}}
+        res = self.plugin.update_network(context.get_admin_context(),
+                                         network['id'], data)
+        self.assertEqual(False, res['port_security_enabled'])
+
 
 class TestSubnetsV2(common_v3.NsxV3TestSubnets, NsxV3PluginTestCaseMixin):
 
