@@ -1539,9 +1539,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         If it was not realized or timed out retrying, it will return None
         The nova api will use this to attach to the instance.
         """
-        # DEBUG ADIT
-        #LOG.error("DEBUG ADIT _get_network_nsx_id called")
-        #raise Exception
         if network_id in NET_NEUTRON_2_NSX_ID_CACHE:
             return NET_NEUTRON_2_NSX_ID_CACHE[network_id]
 

@@ -358,7 +358,6 @@ def get_orphaned_firewall_sections(context, nsxlib):
         else:
             # Skip non-neutron sections, by tags
             neutron_obj = False
-            LOG.error("DEBUG ADIT fw_section %s", fw_section)
             for tag in fw_section.get('tags', []):
                 if tag['scope'] == 'os-api-version':
                     neutron_obj = True
