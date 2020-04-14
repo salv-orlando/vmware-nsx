@@ -3021,16 +3021,22 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 seg_subnets = self._get_segment_subnets(
                     context, network_id, interface_subnets=net_rtr_subnets)
 
-                if not net_rtr_subnets:
+                if not net_rtr_subnets and not seg_subnets:
                     # Remove the tier1 connectivity of this segment
                     # This must be done is a separate call as it uses PUT
                     self.nsxpolicy.segment.remove_connectivity_and_subnets(
                         segment_id)
+                else:
+                    if not net_rtr_subnets:
+                        # Remove connectivity path
+                        # This must be done is a separate call as it uses PUT
+                        self.nsxpolicy.segment.remove_connectivity_path(
+                            segment_id)
 
-                # update remaining (DHCP/ipv4/6) subnets
-                if seg_subnets:
-                    self.nsxpolicy.segment.update(segment_id,
-                                                  subnets=seg_subnets)
+                    # update remaining (DHCP/ipv4/6) subnets
+                    if seg_subnets:
+                        self.nsxpolicy.segment.update(segment_id,
+                                                      subnets=seg_subnets)
 
                 # will update the router only if needed
                 self._update_slaac_on_router(context, router_id,
