@@ -364,10 +364,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         (port_security, has_ip) = self._determine_port_security_and_has_ip(
             context, port_data)
         port_data[psec.PORTSECURITY] = port_security
-        # No port security is allowed if the port belongs to an ENS TZ
-        if (port_security and is_ens_tz_port and
-            not self._ens_psec_supported()):
-            raise nsx_exc.NsxENSPortSecurity()
         self._process_port_port_security_create(
                 context, port_data, neutron_db)
 
@@ -438,10 +434,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 updated_port[addr_apidef.ADDRESS_PAIRS])
 
         if updated_port[psec.PORTSECURITY] and psec.PORTSECURITY in port_data:
-            # No port security is allowed if the port belongs to an ENS TZ
-            if is_ens_tz_port and not self._ens_psec_supported():
-                raise nsx_exc.NsxENSPortSecurity()
-
             # No port security is allowed if the port has a direct vnic type
             if direct_vnic_type:
                 err_msg = _("Security features are not supported for "
@@ -887,10 +879,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 context, net_id)
         return qos_policy_id
 
-    def _ens_psec_supported(self):
-        """Should be implemented by each plugin"""
-        pass
-
     def _ens_qos_supported(self):
         """Should be implemented by each plugin"""
         pass
@@ -909,12 +897,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _get_tier0_uplink_cidrs(self, tier0_id):
         """Should be implemented by each plugin"""
-        pass
-
-    def _validate_ens_net_portsecurity(self, net_data):
-        """Validate/Update the port security of the new network for ENS TZ
-        Should be implemented by the plugin if necessary
-        """
         pass
 
     def _is_ens_tz_net(self, context, net_id):
@@ -1121,7 +1103,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if not self._allow_ens_networks():
                 raise NotImplementedError(_("ENS support is disabled"))
             self._assert_on_ens_with_qos(network_data)
-            self._validate_ens_net_portsecurity(network_data)
 
         return {'is_provider_net': is_provider_net,
                 'net_type': net_type,

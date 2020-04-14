@@ -967,30 +967,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         return created_net
 
-    def _ens_psec_supported(self):
-        return self.nsxlib.feature_supported(
-            nsxlib_consts.FEATURE_ENS_WITH_SEC)
-
     def _ens_qos_supported(self):
         return self.nsxlib.feature_supported(
             nsxlib_consts.FEATURE_ENS_WITH_QOS)
-
-    def _validate_ens_net_portsecurity(self, net_data):
-        """Validate/Update the port security of the new network for ENS TZ"""
-        if not self._ens_psec_supported():
-            if cfg.CONF.nsx_v3.disable_port_security_for_ens:
-                # Override the port-security to False
-                if net_data[psec.PORTSECURITY]:
-                    LOG.warning("Disabling port security for new network")
-                    # Set the port security to False
-                    net_data[psec.PORTSECURITY] = False
-
-            elif net_data.get(psec.PORTSECURITY):
-                # Port security enabled is not allowed
-                raise nsx_exc.NsxENSPortSecurity()
-            else:
-                # Update the default port security to False if not set
-                net_data[psec.PORTSECURITY] = False
 
     def delete_network(self, context, network_id):
         if cfg.CONF.nsx_v3.native_dhcp_metadata:
@@ -1035,7 +1014,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         utils.raise_if_updates_provider_attributes(net_data)
         extern_net = self._network_is_external(context, id)
         is_nsx_net = self._network_is_nsx_net(context, id)
-        is_ens_net = self._is_ens_tz_net(context, id)
 
         # Validate the updated parameters
         self._validate_update_network(context, id, original_net, net_data)
@@ -1045,11 +1023,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         self._extension_manager.process_update_network(context, net_data,
                                                        updated_net)
         if psec.PORTSECURITY in net_data:
-            # do not allow to enable port security on ENS networks
-            if (net_data[psec.PORTSECURITY] and
-                not original_net[psec.PORTSECURITY] and is_ens_net and
-                not self._ens_psec_supported()):
-                raise nsx_exc.NsxENSPortSecurity()
             self._process_network_port_security_update(
                 context, net_data, updated_net)
         self._process_l3_update(context, updated_net, network['network'])
@@ -1318,8 +1291,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             else:
                 profiles.append(self._no_switch_security)
         if device_owner == const.DEVICE_OWNER_DHCP:
-            if ((not is_ens_tz_port or self._ens_psec_supported()) and
-                not cfg.CONF.nsx_v3.native_dhcp_metadata):
+            if not cfg.CONF.nsx_v3.native_dhcp_metadata:
                 profiles.append(self._dhcp_profile)
 
         # Add QoS switching profile, if exists
@@ -1333,8 +1305,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         port_mac_learning = (
             validators.is_attr_set(port_data.get(mac_ext.MAC_LEARNING)) and
             port_data.get(mac_ext.MAC_LEARNING) is True)
-        if ((not is_ens_tz_port or self._ens_psec_supported()) and
-            self._mac_learning_profile):
+        if self._mac_learning_profile:
             if force_mac_learning or port_mac_learning:
                 profiles.append(self._mac_learning_profile)
                 if is_ens_tz_port:
@@ -1453,14 +1424,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         LOG.warning(err_msg)
         raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _disable_ens_portsec(self, port_data):
-        if (cfg.CONF.nsx_v3.disable_port_security_for_ens and
-            not self._ens_psec_supported()):
-            LOG.warning("Disabling port security for network %s",
-                        port_data['network_id'])
-            port_data[psec.PORTSECURITY] = False
-            port_data['security_groups'] = []
-
     def base_create_port(self, context, port):
         neutron_db = super(NsxV3Plugin, self).create_port(context, port)
         self._extension_manager.process_create_port(
@@ -1474,8 +1437,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         self._validate_create_port(context, port_data)
         self._assert_on_dhcp_relay_without_router(context, port_data)
         is_ens_tz_port = self._is_ens_tz_port(context, port_data)
-        if is_ens_tz_port:
-            self._disable_ens_portsec(port_data)
 
         is_external_net = self._network_is_external(
             context, port_data['network_id'])
@@ -1518,23 +1479,12 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                             'disabled')
                     LOG.error(msg)
                     raise n_exc.InvalidInput(error_message=msg)
-                if (is_ens_tz_port and not self._ens_psec_supported() and
-                    not port_data.get(mac_ext.MAC_LEARNING)):
-                    msg = _('Cannot disable Mac learning for ENS TZ')
-                    LOG.error(msg)
-                    raise n_exc.InvalidInput(error_message=msg)
                 # save the mac learning value in the DB
                 self._create_mac_learning_state(context, port_data)
             elif mac_ext.MAC_LEARNING in port_data:
                 # This is due to the fact that the default is
                 # ATTR_NOT_SPECIFIED
                 port_data.pop(mac_ext.MAC_LEARNING)
-            # For a ENZ TZ mac learning is always enabled
-            if (is_ens_tz_port and not self._ens_psec_supported() and
-                mac_ext.MAC_LEARNING not in port_data):
-                # Set the default and add to the DB
-                port_data[mac_ext.MAC_LEARNING] = True
-                self._create_mac_learning_state(context, port_data)
 
         # Operations to backend should be done outside of DB transaction.
         # NOTE(arosen): ports on external networks are nat rules and do
@@ -1723,7 +1673,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         # Update the DHCP profile
         if (updated_device_owner == const.DEVICE_OWNER_DHCP and
-            (not is_ens_tz_port or self._ens_psec_supported()) and
             not cfg.CONF.nsx_v3.native_dhcp_metadata):
             switch_profile_ids.append(self._dhcp_profile)
 
@@ -1741,8 +1690,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             psec_is_on)
         port_mac_learning = updated_port.get(mac_ext.MAC_LEARNING) is True
         # Add mac_learning profile if it exists and is configured
-        if ((not is_ens_tz_port or self._ens_psec_supported()) and
-            self._mac_learning_profile):
+        if self._mac_learning_profile:
             if force_mac_learning or port_mac_learning:
                 switch_profile_ids.append(self._mac_learning_profile)
                 if is_ens_tz_port:
@@ -1837,11 +1785,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             self._extend_nsx_port_dict_binding(context, updated_port)
             mac_learning_state = updated_port.get(mac_ext.MAC_LEARNING)
             if mac_learning_state is not None:
-                if (not mac_learning_state and is_ens_tz_port and
-                    not self._ens_psec_supported()):
-                    msg = _('Mac learning cannot be disabled with ENS TZ')
-                    LOG.error(msg)
-                    raise n_exc.InvalidInput(error_message=msg)
                 if port_security and mac_learning_state:
                     msg = _('Mac learning requires that port security be '
                             'disabled')

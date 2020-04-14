@@ -482,6 +482,9 @@ nsx_v3_opts = nsx_v3_and_p + [
                 help=_("(Optional) Indicates whether ENS transport zones can "
                        "be used")),
     cfg.BoolOpt('disable_port_security_for_ens',
+                # This flag was relevant only for NSX version that did not
+                # support ENS with security features
+                deprecated_for_removal=True,
                 default=False,
                 help=_("When True, port security will be set to False for "
                        "newly created ENS networks and ports, overriding "
