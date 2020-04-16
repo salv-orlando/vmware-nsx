@@ -25,8 +25,8 @@ from neutron_lib.plugins import directory
 from vmware_nsx.common import config
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.extensions import projectpluginmap
+from vmware_nsx.plugins.common_v3 import utils as v3_utils
 from vmware_nsx.plugins.nsx_v3 import plugin
-from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
 from vmware_nsx.services.fwaas.nsx_v3 import fwaas_callbacks_v2
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsxlib.v3 import nsx_constants

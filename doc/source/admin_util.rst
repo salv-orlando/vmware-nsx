@@ -424,10 +424,6 @@ Security Groups & NSX Security Groups
 
     nsxadmin -r security-groups -o fix-mismatch
 
-- Update NSX security groups dynamic criteria for NSX-T CrossHairs::
-
-    nsxadmin -r nsx-security-groups -o migrate-to-dynamic-criteria
-
 - Update logging flag of the security groups on the NSX DFW::
 
     nsxadmin -r security-groups -o update-logging --property log-allowed-traffic=true
@@ -465,10 +461,6 @@ Metadata Proxy
 
     nsxadmin -r metadata-proxy -o list
 
-- Resync metadata proxies for NSX-T version 1.1.0 and above (enable MD proxy, or update the uuid). This is only for migrating to native metadata support::
-
-    nsxadmin -r metadata-proxy -o nsx-update --property metadata_proxy_uuid=<metadata_proxy_uuid>
-
 - update the ip of the Nova server in the metadata proxy server on the NSX::
 
     nsxadmin -r metadata-proxy -o nsx-update-ip --property server-ip=<server-ip> --property availability-zone=<optional zone name>
@@ -479,10 +471,6 @@ DHCP Bindings
 - List DHCP bindings in Neutron::
 
     nsxadmin -r dhcp-binding -o list
-
-- Resync DHCP bindings for NSX-T version 1.1.0 and above. This is only for migrating to native DHCP support::
-
-    nsxadmin -r dhcp-binding -o nsx-update --property dhcp_profile_uuid=<dhcp_profile_uuid>
 
 - Recreate dhcp server for a neutron network::
 
@@ -671,30 +659,6 @@ Client Certificate
 - List certificates associated with openstack principal identity in NSX::
 
     nsxadmin -r certificate -o nsx-list
-
-Upgrade Steps (NSX-T Version 1.0.0 to Version 1.1.0)
-----------------------------------------------------
-
-1. Upgrade NSX backend from version 1.0.0 to version 1.1.0
-
-2. Create a DHCP-Profile and a Metadata-Proxy in NSX backend
-
-3. Stop Neutron
-
-4. Install version 1.1.0 Neutron plugin
-
-5. Run admin tools to migrate version 1.0.0 objects to version 1.1.0 objects
-
-     nsxadmin -r metadata-proxy -o nsx-update --property metadata_proxy_uuid=<UUID of Metadata-Proxy created in Step 2>
-
-     nsxadmin -r dhcp-binding -o nsx-update --property dhcp_profile_uuid=<UUID of DHCP-Profile created in Step 2>
-
-6. Start Neutron
-
-7. Make sure /etc/nova/nova.conf has
-   metadata_proxy_shared_secret = <Secret of Metadata-Proxy created in Step 2>
-
-8. Restart VMs or ifdown/ifup their network interface to get new DHCP options
 
 Steps to create a TVD admin user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

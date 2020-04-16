@@ -59,7 +59,6 @@ class Operations(enum.Enum):
     NSX_REDISTRIBURE = 'nsx-redistribute'
     NSX_REORDER = 'nsx-reorder'
     NSX_TAG_DEFAULT = 'nsx-tag-default'
-    MIGRATE_TO_DYNAMIC_CRITERIA = 'migrate-to-dynamic-criteria'
     NSX_MIGRATE_V_V3 = 'nsx-migrate-v-v3'
     MIGRATE_TO_POLICY = 'migrate-to-policy'
     LIST_POLICIES = 'list-policies'
@@ -98,8 +97,7 @@ nsxv3_resources = {
     constants.FIREWALL_NSX_GROUPS: Resource(
         constants.FIREWALL_NSX_GROUPS, [
             Operations.LIST.value,
-            Operations.LIST_MISMATCHES.value,
-            Operations.MIGRATE_TO_DYNAMIC_CRITERIA.value]),
+            Operations.LIST_MISMATCHES.value]),
     constants.ORPHANED_FIREWALL_SECTIONS: Resource(
         constants.ORPHANED_FIREWALL_SECTIONS, [
             Operations.NSX_LIST.value,
@@ -120,11 +118,9 @@ nsxv3_resources = {
             Operations.UPDATE_TIER0.value]),
     constants.DHCP_BINDING: Resource(constants.DHCP_BINDING,
                                      [Operations.LIST.value,
-                                      Operations.NSX_UPDATE.value,
                                       Operations.NSX_RECREATE.value]),
     constants.METADATA_PROXY: Resource(constants.METADATA_PROXY,
                                        [Operations.LIST.value,
-                                        Operations.NSX_UPDATE.value,
                                         Operations.NSX_UPDATE_IP.value]),
     constants.ORPHANED_DHCP_SERVERS: Resource(constants.ORPHANED_DHCP_SERVERS,
                                               [Operations.NSX_LIST.value,

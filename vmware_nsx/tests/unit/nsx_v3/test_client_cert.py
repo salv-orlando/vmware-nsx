@@ -21,8 +21,8 @@ from oslo_config import cfg
 from neutron.tests.unit import testlib_api
 
 from vmware_nsx.common import exceptions as nsx_exc
+from vmware_nsx.plugins.common_v3 import utils
 from vmware_nsx.plugins.nsx_v3 import cert_utils
-from vmware_nsx.plugins.nsx_v3 import utils
 
 
 class NsxV3ClientCertProviderTestCase(testlib_api.SqlTestCase):

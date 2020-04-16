@@ -87,6 +87,7 @@ from vmware_nsx.extensions import secgroup_rule_local_ip_prefix
 from vmware_nsx.extensions import securitygrouplogging as sg_logging
 from vmware_nsx.plugins.common.housekeeper import housekeeper
 from vmware_nsx.plugins.common_v3 import plugin as nsx_plugin_common
+from vmware_nsx.plugins.common_v3 import utils as common_utils
 from vmware_nsx.plugins.nsx import utils as tvd_utils
 from vmware_nsx.plugins.nsx_v3 import availability_zones as nsx_az
 from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
@@ -195,8 +196,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         self.supported_extension_aliases.extend(
             self._extension_manager.extension_aliases())
 
-        self.nsxlib = v3_utils.get_nsxlib_wrapper()
-        nsxlib_utils.set_inject_headers_callback(v3_utils.inject_headers)
+        self.nsxlib = common_utils.get_nsxlib_wrapper()
+        nsxlib_utils.set_inject_headers_callback(common_utils.inject_headers)
 
         registry.subscribe(
             self.on_subnetpool_address_scope_updated,
@@ -1142,8 +1143,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             dhcp_name = self.nsxlib.native_dhcp.build_server_name(
                 network['name'], network['id'])
             az = self.get_network_az_by_net_id(context, network['id'])
-            domain_name = self.nsxlib.native_dhcp.build_server_domain_name(
-                network.get('dns_domain'), az.dns_domain)
+            domain_name = common_utils.get_network_dns_domain(
+                az, network)
             try:
                 # There should be only 1 dhcp server
                 # Update its name and domain

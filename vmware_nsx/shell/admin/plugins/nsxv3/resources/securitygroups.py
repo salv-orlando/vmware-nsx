@@ -33,7 +33,6 @@ from vmware_nsx.shell.admin.plugins.nsxv3.resources import utils as v3_utils
 from vmware_nsx.shell import resources as shell
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as consts
-from vmware_nsxlib.v3 import security
 
 LOG = logging.getLogger(__name__)
 
@@ -253,54 +252,6 @@ def fix_security_groups(resource, event, trigger, **kwargs):
             plugin.save_security_group_rule_mappings(context_, rules['rules'])
 
 
-def _update_ports_dynamic_criteria_tags():
-    nsxlib = v3_utils.get_connected_nsxlib()
-    for port in neutron_db.get_ports():
-        secgroups = neutron_sg.get_port_security_groups(port['id'])
-        # Nothing to do with ports that are not associated with any sec-group.
-        if not secgroups:
-            continue
-
-        _, lport_id = neutron_db.get_lswitch_and_lport_id(port['id'])
-        criteria_tags = nsxlib.ns_group.get_lport_tags(secgroups)
-        nsxlib.logical_port.update(
-            lport_id, False, tags_update=criteria_tags)
-
-
-def _update_security_group_dynamic_criteria():
-    nsxlib = v3_utils.get_connected_nsxlib()
-    secgroups = neutron_sg.get_security_groups()
-    for sg in secgroups:
-        nsgroup_id = neutron_sg.get_nsgroup_id(sg['id'])
-        membership_criteria = nsxlib.ns_group.get_port_tag_expression(
-            security.PORT_SG_SCOPE, sg['id'])
-        try:
-            # We want to add the dynamic criteria and remove all direct members
-            # they will be added by the manager using the new criteria.
-            nsxlib.ns_group.update(nsgroup_id,
-                                   membership_criteria=membership_criteria,
-                                   members=[])
-        except Exception as e:
-            LOG.warning("Failed to update membership criteria for nsgroup "
-                        "%(nsgroup_id)s, request to backend returned "
-                        "with error: %(error)s",
-                        {'nsgroup_id': nsgroup_id, 'error': str(e)})
-
-
-@admin_utils.output_header
-def migrate_nsgroups_to_dynamic_criteria(resource, event, trigger, **kwargs):
-    """Update NSX security groups dynamic criteria for NSXv3 CrossHairs"""
-    nsxlib = v3_utils.get_connected_nsxlib()
-    if not nsxlib.feature_supported(consts.FEATURE_DYNAMIC_CRITERIA):
-        LOG.error("Dynamic criteria grouping feature isn't supported by "
-                  "this NSX version.")
-        return
-    # First, we add the criteria tags for all ports.
-    _update_ports_dynamic_criteria_tags()
-    # Update security-groups with dynamic criteria and remove direct members.
-    _update_security_group_dynamic_criteria()
-
-
 def list_orphaned_sections(resource, event, trigger, **kwargs):
     """List orphaned firewall sections"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -472,10 +423,6 @@ def reuse_default_section(resource, event, trigger, **kwargs):
 registry.subscribe(update_security_groups_logging,
                    constants.SECURITY_GROUPS,
                    shell.Operations.UPDATE_LOGGING.value)
-
-registry.subscribe(migrate_nsgroups_to_dynamic_criteria,
-                   constants.FIREWALL_NSX_GROUPS,
-                   shell.Operations.MIGRATE_TO_DYNAMIC_CRITERIA.value)
 
 registry.subscribe(fix_security_groups,
                    constants.FIREWALL_SECTIONS,

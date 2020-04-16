@@ -41,7 +41,6 @@ LOG = log.getLogger(__name__)
 
 MAX_DISPLAY_NAME_LEN = 40
 NEUTRON_VERSION = n_version.version_info.release_string()
-OS_NEUTRON_ID_SCOPE = 'os-neutron-id'
 
 
 # Allowed network types for the NSX Plugin

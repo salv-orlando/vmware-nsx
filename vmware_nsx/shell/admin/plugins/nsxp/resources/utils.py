@@ -21,8 +21,8 @@ from neutron_lib.plugins import directory
 from oslo_log import log as logging
 
 from vmware_nsx.common import config
+from vmware_nsx.plugins.common_v3 import utils as v3_utils
 from vmware_nsx.plugins.nsx_p import plugin
-from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
 from vmware_nsx.shell.admin.plugins.common import formatters
 
 LOG = logging.getLogger(__name__)

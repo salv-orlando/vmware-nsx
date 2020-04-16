@@ -75,8 +75,8 @@ from vmware_nsx.extensions import providersecuritygroup as provider_sg
 from vmware_nsx.extensions import secgroup_rule_local_ip_prefix as sg_prefix
 from vmware_nsx.extensions import securitygrouplogging as sg_logging
 from vmware_nsx.plugins.common_v3 import plugin as nsx_plugin_common
+from vmware_nsx.plugins.common_v3 import utils as v3_utils
 from vmware_nsx.plugins.nsx_p import availability_zones as nsxp_az
-from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
 from vmware_nsx.services.fwaas.common import utils as fwaas_utils
 from vmware_nsx.services.fwaas.nsx_p import fwaas_callbacks_v2
 from vmware_nsx.services.lbaas import lb_const
@@ -1145,7 +1145,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if is_ipv6:
                 network = self._get_network(context, net_id)
                 kwargs['domain_names'] = [
-                    self._get_network_dns_domain(net_az, network)]
+                    v3_utils.get_network_dns_domain(net_az, network)]
                 dhcp_config = policy_defs.SegmentDhcpConfigV6(**kwargs)
             else:
                 dhcp_config = policy_defs.SegmentDhcpConfigV4(**kwargs)

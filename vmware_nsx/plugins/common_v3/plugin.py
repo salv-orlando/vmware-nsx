@@ -25,7 +25,6 @@ from sqlalchemy import exc as sql_exc
 import webob.exc
 
 from six import moves
-from six import string_types
 
 from neutron.db import agents_db
 from neutron.db import agentschedulers_db
@@ -88,6 +87,7 @@ from vmware_nsx.extensions import advancedserviceproviders as as_providers
 from vmware_nsx.extensions import maclearning as mac_ext
 from vmware_nsx.extensions import providersecuritygroup as provider_sg
 from vmware_nsx.plugins.common import plugin
+from vmware_nsx.plugins.common_v3 import utils as common_utils
 from vmware_nsx.services.qos.common import utils as qos_com_utils
 from vmware_nsx.services.vpnaas.common_v3 import ipsec_utils
 
@@ -1477,47 +1477,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.warning(err_msg)
             raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _get_network_dns_domain(self, az, network):
-        dns_domain = None
-        if network.get('dns_domain'):
-            net_dns = network['dns_domain']
-            if isinstance(net_dns, string_types):
-                dns_domain = net_dns
-            elif hasattr(net_dns, "dns_domain"):
-                dns_domain = net_dns.dns_domain
-        if not dns_domain or not validators.is_attr_set(dns_domain):
-            dns_domain = az.dns_domain
-        return dns_domain
-
-    def _build_dhcp_server_config(self, context, network, subnet, port, az):
-
-        name = self.nsxlib.native_dhcp.build_server_name(
-            network['name'], network['id'])
-
-        net_tags = self.nsxlib.build_v3_tags_payload(
-            network, resource_type='os-neutron-net-id',
-            project_name=context.tenant_name)
-
-        dns_domain = self._get_network_dns_domain(az, network)
-
-        dns_nameservers = subnet['dns_nameservers']
-        if not dns_nameservers or not validators.is_attr_set(dns_nameservers):
-            dns_nameservers = az.nameservers
-
-        # There must be exactly one fixed ip matching given subnet
-        fixed_ip_addr = [fip['ip_address'] for fip in port['fixed_ips']
-                         if fip['subnet_id'] == subnet['id']]
-        return self.nsxlib.native_dhcp.build_server(
-            name,
-            ip_address=fixed_ip_addr[0],
-            cidr=subnet['cidr'],
-            gateway_ip=subnet['gateway_ip'],
-            host_routes=subnet['host_routes'],
-            dns_domain=dns_domain,
-            dns_nameservers=dns_nameservers,
-            dhcp_profile_id=az._native_dhcp_profile_uuid,
-            tags=net_tags)
-
     def _enable_native_dhcp(self, context, network, subnet, az=None):
         # Enable native DHCP service on the backend for this network.
         # First create a Neutron DHCP port and use its assigned IP
@@ -1569,8 +1528,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         self._process_portbindings_create_and_update(
             context, port_data, neutron_port)
 
-        server_data = self._build_dhcp_server_config(
-            context, network, subnet, neutron_port, az)
+        server_data = common_utils.build_dhcp_server_config(
+            self.nsxlib, context.tenant_name, network, subnet,
+            neutron_port, az)
         port_tags = self.nsxlib.build_v3_tags_payload(
             neutron_port, resource_type='os-neutron-dport-id',
             project_name=context.tenant_name)
