@@ -100,7 +100,6 @@ from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import core_defs as policy_defs
 from vmware_nsxlib.v3.policy import transaction as policy_trans
 from vmware_nsxlib.v3.policy import utils as p_utils
-from vmware_nsxlib.v3 import security
 from vmware_nsxlib.v3 import utils as nsxlib_utils
 
 LOG = log.getLogger(__name__)
@@ -1619,7 +1618,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             project_name=context.tenant_name))
 
         if self._is_excluded_port(device_owner, is_psec_on):
-            tags.append({'scope': security.PORT_SG_SCOPE,
+            tags.append({'scope': v3_utils.PORT_SG_SCOPE,
                          'tag': NSX_P_EXCLUDE_LIST_TAG})
 
         if self.support_external_port_tagging:
@@ -3423,7 +3422,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         # Create the group membership criteria to match excluded neutron
         # ports by scope and tag
-        scope_and_tag = "%s|%s" % (security.PORT_SG_SCOPE,
+        scope_and_tag = "%s|%s" % (v3_utils.PORT_SG_SCOPE,
                                    NSX_P_EXCLUDE_LIST_TAG)
         conditions = [self.nsxpolicy.group.build_condition(
             cond_val=scope_and_tag,

@@ -14,9 +14,20 @@
 
 from oslo_log import log as logging
 
+from neutron.db import allowedaddresspairs_db as addr_pair_db
+from neutron.db import db_base_plugin_v2
+from neutron.db import l3_db
+from neutron.db import portsecurity_db
+from neutron_lib.callbacks import registry
+from neutron_lib import constants as const
+from neutron_lib import context as neutron_context
+from neutron_lib.plugins import constants as plugin_constants
+from neutron_lib.plugins import directory
+
 from vmware_nsx.common import utils as nsx_utils
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.dvs import dvs
+from vmware_nsx.plugins.common_v3 import utils as common_utils
 from vmware_nsx.plugins.nsx_v3 import plugin
 from vmware_nsx.plugins.nsx_v3 import utils as plugin_utils
 from vmware_nsx.shell.admin.plugins.common import constants
@@ -27,17 +38,6 @@ from vmware_nsx.shell import resources as shell
 from vmware_nsxlib.v3 import exceptions as nsx_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 from vmware_nsxlib.v3 import resources
-from vmware_nsxlib.v3 import security
-
-from neutron.db import allowedaddresspairs_db as addr_pair_db
-from neutron.db import db_base_plugin_v2
-from neutron.db import l3_db
-from neutron.db import portsecurity_db
-from neutron_lib.callbacks import registry
-from neutron_lib import constants as const
-from neutron_lib import context as neutron_context
-from neutron_lib.plugins import constants as plugin_constants
-from neutron_lib.plugins import directory
 
 LOG = logging.getLogger(__name__)
 
@@ -232,7 +232,7 @@ def migrate_exclude_ports(resource, event, trigger, **kwargs):
                 LOG.info("Port %s is not defined in DB", neutron_port_id)
                 continue
             # Update tag for the port
-            tags_update = [{'scope': security.PORT_SG_SCOPE,
+            tags_update = [{'scope': common_utils.PORT_SG_SCOPE,
                             'tag': nsxlib_consts.EXCLUDE_PORT}]
             _port_client.update(port_id, None,
                                 tags_update=tags_update)
@@ -271,7 +271,7 @@ def tag_default_ports(resource, event, trigger, **kwargs):
             except nsx_exc.ResourceNotFound:
                 continue
             tags_update = nsx_port['tags']
-            tags_update += [{'scope': security.PORT_SG_SCOPE,
+            tags_update += [{'scope': common_utils.PORT_SG_SCOPE,
                              'tag': plugin.NSX_V3_DEFAULT_SECTION}]
             nsxlib.logical_port.update(nsx_id, None,
                                        tags_update=tags_update)

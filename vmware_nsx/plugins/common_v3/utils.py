@@ -36,6 +36,8 @@ from vmware_nsxlib.v3 import policy
 LOG = logging.getLogger(__name__)
 
 OS_NEUTRON_ID_SCOPE = 'os-neutron-id'
+PORT_SG_SCOPE = 'os-security-group'
+
 NSX_NEUTRON_PLUGIN = 'NSX Neutron plugin'
 
 

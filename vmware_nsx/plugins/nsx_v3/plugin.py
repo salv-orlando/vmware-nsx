@@ -111,7 +111,6 @@ from vmware_nsxlib.v3 import core_resources as nsx_resources
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 from vmware_nsxlib.v3 import router as nsxlib_router
-from vmware_nsxlib.v3 import security
 from vmware_nsxlib.v3 import utils as nsxlib_utils
 
 
@@ -553,7 +552,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 # Create a new NSGroup for default section
                 membership_criteria = (
                     self.nsxlib.ns_group.get_port_tag_expression(
-                        security.PORT_SG_SCOPE, NSX_V3_DEFAULT_SECTION))
+                        common_utils.PORT_SG_SCOPE, NSX_V3_DEFAULT_SECTION))
                 nsgroup = self.nsxlib.ns_group.create(
                     NSX_V3_FW_DEFAULT_NS_GROUP,
                     'OS Default Section Port NSGroup',
@@ -577,7 +576,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 # Create a new NSGroup for excluded ports.
                 membership_criteria = (
                     self.nsxlib.ns_group.get_port_tag_expression(
-                        security.PORT_SG_SCOPE, nsxlib_consts.EXCLUDE_PORT))
+                        common_utils.PORT_SG_SCOPE,
+                        nsxlib_consts.EXCLUDE_PORT))
                 nsgroup = self.nsxlib.ns_group.create(
                     NSX_V3_EXCLUDED_PORT_NSGROUP_NAME,
                     'Neutron Excluded Port NSGroup',
@@ -1210,6 +1210,19 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         LOG.error(err_msg)
         raise n_exc.InvalidInput(error_message=err_msg)
 
+    def get_lport_tags(self, secgroups):
+        if len(secgroups) > nsxlib_utils.MAX_NSGROUPS_CRITERIA_TAGS:
+            raise nsx_exc.NumberOfNsgroupCriteriaTagsReached(
+                max_num=nsxlib_utils.MAX_NSGROUPS_CRITERIA_TAGS)
+        tags = []
+        for sg in secgroups:
+            tags = nsxlib_utils.add_v3_tag(
+                tags, common_utils.PORT_SG_SCOPE, sg)
+        if not tags:
+            # This port shouldn't be associated with any security-group
+            tags = [{'scope': common_utils.PORT_SG_SCOPE, 'tag': None}]
+        return tags
+
     def _create_port_at_the_backend(self, context, port_data,
                                     l2gw_port_check, psec_is_on,
                                     is_ens_tz_port):
@@ -1230,19 +1243,19 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             tags = nsxlib_utils.add_v3_tag(tags, resource_type, device_id)
 
         if self._is_excluded_port(device_owner, psec_is_on):
-            tags.append({'scope': security.PORT_SG_SCOPE,
+            tags.append({'scope': common_utils.PORT_SG_SCOPE,
                          'tag': nsxlib_consts.EXCLUDE_PORT})
         else:
             # If port has no security-groups then we don't need to add any
             # security criteria tag.
             if port_data[ext_sg.SECURITYGROUPS]:
-                tags += self.nsxlib.ns_group.get_lport_tags(
+                tags += self.get_lport_tags(
                     port_data[ext_sg.SECURITYGROUPS] +
                     port_data[provider_sg.PROVIDER_SECURITYGROUPS])
             # Add port to the default list
             if (device_owner != l3_db.DEVICE_OWNER_ROUTER_INTF and
                 device_owner != const.DEVICE_OWNER_DHCP):
-                tags.append({'scope': security.PORT_SG_SCOPE,
+                tags.append({'scope': common_utils.PORT_SG_SCOPE,
                              'tag': NSX_V3_DEFAULT_SECTION})
 
         address_bindings = (self._build_address_bindings(port_data)
@@ -1646,22 +1659,22 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                                                    original_ps)
         if updated_excluded != original_excluded:
             if updated_excluded:
-                tags_update.append({'scope': security.PORT_SG_SCOPE,
+                tags_update.append({'scope': common_utils.PORT_SG_SCOPE,
                                     'tag': nsxlib_consts.EXCLUDE_PORT})
             else:
-                tags_update.append({'scope': security.PORT_SG_SCOPE,
+                tags_update.append({'scope': common_utils.PORT_SG_SCOPE,
                                     'tag': None})
 
-        tags_update += self.nsxlib.ns_group.get_lport_tags(
+        tags_update += self.get_lport_tags(
             updated_port.get(ext_sg.SECURITYGROUPS, []) +
             updated_port.get(provider_sg.PROVIDER_SECURITYGROUPS, []))
         # Only set the default section tag if there is no port security
         if not updated_excluded:
-            tags_update.append({'scope': security.PORT_SG_SCOPE,
+            tags_update.append({'scope': common_utils.PORT_SG_SCOPE,
                                 'tag': NSX_V3_DEFAULT_SECTION})
         else:
             # Ensure that the 'exclude' tag is set
-            tags_update.append({'scope': security.PORT_SG_SCOPE,
+            tags_update.append({'scope': common_utils.PORT_SG_SCOPE,
                                 'tag': nsxlib_consts.EXCLUDE_PORT})
 
         # Add availability zone profiles first (so that specific profiles will
@@ -2913,11 +2926,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         tags = self.nsxlib.build_v3_tags_payload(
             secgroup, resource_type='os-neutron-secgr-id',
             project_name=secgroup['tenant_id'])
-        name = self.nsxlib.ns_group.get_name(secgroup)
+        name = self.get_nsgroup_name(secgroup)
 
         tag_expression = (
             self.nsxlib.ns_group.get_port_tag_expression(
-                security.PORT_SG_SCOPE, secgroup['id']))
+                common_utils.PORT_SG_SCOPE, secgroup['id']))
 
         ns_group = self.nsxlib.ns_group.create(
             name, secgroup['description'], tags, tag_expression)
@@ -3049,6 +3062,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             msg = _("Cannot modify NSX internal security group")
             raise n_exc.InvalidInput(error_message=msg)
 
+    def get_nsgroup_name(self, security_group):
+        # Adding the security-group id to the NSGroup name,
+        # for usability purposes.
+        return '%(name)s - %(id)s' % security_group
+
     def update_security_group(self, context, id, security_group):
         orig_secgroup = self.get_security_group(
             context, id, fields=['id', 'name', 'description'])
@@ -3064,8 +3082,12 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         try:
             nsgroup_id, section_id = nsx_db.get_sg_mappings(
                 context.session, id)
+            nsgroup_name = self.get_nsgroup_name(secgroup_res)
             self.nsxlib.ns_group.update_nsgroup_and_section(
-                secgroup_res, nsgroup_id, section_id,
+                nsgroup_name,
+                secgroup_res['description'],
+                secgroup_res.get(sg_logging.LOGGING, False),
+                nsgroup_id, section_id,
                 cfg.CONF.nsx_v3.log_security_groups_allowed_traffic)
         except nsx_lib_exc.ManagerError:
             with excutils.save_and_reraise_exception():
