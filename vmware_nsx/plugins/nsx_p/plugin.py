@@ -1288,8 +1288,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _init_ipv6_gateway(self, subnet):
         # Override neutron decision to verify that also for ipv6 the first
         # ip in the cidr is not used, as the NSX does not support xxxx::0 as a
-        # segment subnet gateway.
-        if (subnet.get('gateway_ip') is const.ATTR_NOT_SPECIFIED and
+        # segment subnet gateway in versions supporting policy DHCP
+
+        if (self.nsxpolicy.feature_supported(
+                nsxlib_consts.FEATURE_NSX_POLICY_DHCP) and
+            subnet.get('gateway_ip') is const.ATTR_NOT_SPECIFIED and
             subnet.get('ip_version') == const.IP_VERSION_6 and
             subnet.get('cidr') and subnet['cidr'] != const.ATTR_NOT_SPECIFIED):
             net = netaddr.IPNetwork(subnet['cidr'])
@@ -1325,6 +1328,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     @nsx_plugin_common.api_replay_mode_wrapper
     def create_subnet(self, context, subnet):
+        self._init_ipv6_gateway(subnet['subnet'])
         if not self.use_policy_dhcp:
             # Subnet with MP DHCP
             return self._create_subnet_with_mp_dhcp(context, subnet)
@@ -1333,7 +1337,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         net_id = subnet['subnet']['network_id']
         network = self._get_network(context, net_id)
         self._validate_single_ipv6_subnet(context, network, subnet['subnet'])
-        self._init_ipv6_gateway(subnet['subnet'])
         net_az = self.get_network_az_by_net_id(context, net_id)
 
         # Allow manipulation of only 1 subnet of the same network at once
