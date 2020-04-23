@@ -372,7 +372,6 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
                 # TODO(asarfaty): Consider keeping the FW with default allow
                 # rule instead of deletion as it may be created again soon
                 self.delete_router_gateway_policy(router_id)
-                self.cleanup_router_fw_resources(router_id)
 
     def create_or_update_router_gateway_policy(self, context, router_id,
                                                router, fw_rules):
