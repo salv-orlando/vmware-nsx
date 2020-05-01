@@ -25,8 +25,9 @@ from vmware_nsx.common import locking
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.plugins.nsx_v.vshield.common import exceptions as vcns_exc
 from vmware_nsx.services.lbaas import base_mgr
+from vmware_nsx.services.lbaas import lb_common
 from vmware_nsx.services.lbaas import lb_const
-from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
+from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_v_common
 
 LOG = logging.getLogger(__name__)
 
@@ -132,9 +133,9 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
             return cert_binding['edge_cert_id']
 
         request = {
-            'pemEncoding': certificate.get_certificate(),
-            'privateKey': certificate.get_private_key()}
-        passphrase = certificate.get_private_key_passphrase()
+            'pemEncoding': certificate.get('certificate'),
+            'privateKey': certificate.get('private_key')}
+        passphrase = certificate.get('passphrase')
         if passphrase:
             request['passphrase'] = passphrase
         cert_obj = self.vcns.upload_edge_certificate(edge_id, request)[1]
@@ -166,7 +167,7 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         if certificate:
             try:
                 edge_cert_id = self._upload_certificate(
-                    context, edge_id, listener['default_tls_container_id'],
+                    context, edge_id, certificate['ref'],
                     certificate)
             except Exception:
                 with excutils.save_and_reraise_exception():
@@ -178,7 +179,7 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         try:
             with locking.LockManager.get_lock(edge_id):
                 h = (self.vcns.create_app_profile(edge_id, app_profile))[0]
-                app_profile_id = lb_common.extract_resource_id(h['location'])
+                app_profile_id = lb_v_common.extract_resource_id(h['location'])
         except vcns_exc.VcnsApiException:
             with excutils.save_and_reraise_exception():
                 completor(success=False)
@@ -193,7 +194,7 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         try:
             with locking.LockManager.get_lock(edge_id):
                 h = self.vcns.create_vip(edge_id, vse)[0]
-                edge_vse_id = lb_common.extract_resource_id(h['location'])
+                edge_vse_id = lb_v_common.extract_resource_id(h['location'])
 
             nsxv_db.add_nsxv_lbaas_listener_binding(context.session,
                                                     lb_id,
@@ -231,19 +232,19 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
         edge_cert_id = None
         if certificate:
-            if (old_listener['default_tls_container_id'] !=
-                    new_listener['default_tls_container_id']):
+            if (lb_common.get_listener_cert_ref(old_listener) !=
+                lb_common.get_listener_cert_ref(new_listener)):
                 try:
                     edge_cert_id = self._upload_certificate(
                         context, edge_id,
-                        new_listener['default_tls_container_id'],
+                        certificate['ref'],
                         certificate)
                 except Exception:
                     with excutils.save_and_reraise_exception():
                         completor(success=False)
             else:
                 cert_binding = nsxv_db.get_nsxv_lbaas_certificate_binding(
-                    context.session, new_listener['default_tls_container_id'],
+                    context.session, certificate['ref'],
                     edge_id)
                 edge_cert_id = cert_binding['edge_cert_id']
 

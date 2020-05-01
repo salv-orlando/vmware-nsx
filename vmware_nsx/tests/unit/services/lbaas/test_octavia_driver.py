@@ -47,8 +47,7 @@ class TestNsxProviderDriver(testtools.TestCase):
         if not code_ok:
             return
         # init the NSX driver without the RPC & certificate
-        with mock.patch(DRIVER + '._init_rpc_messaging'), \
-            mock.patch(DRIVER + '._init_cert_manager'):
+        with mock.patch(DRIVER + '._init_rpc_messaging'):
             self.driver = driver.NSXOctaviaDriver()
             self.driver.client = mock.Mock()
 
@@ -66,6 +65,11 @@ class TestNsxProviderDriver(testtools.TestCase):
         self.l7rule_id = uuidutils.generate_uuid()
         self.project_id = uuidutils.generate_uuid()
         self.default_tls_container_ref = uuidutils.generate_uuid()
+        self.default_tls_container_data = {
+            'ref': self.default_tls_container_ref,
+            'certificate': 'cert_text',
+            'private_key': 'pk_text',
+            'passphrase': 'pp_text'}
         self.sni_container_ref_1 = uuidutils.generate_uuid()
         self.sni_container_ref_2 = uuidutils.generate_uuid()
 
@@ -134,7 +138,7 @@ class TestNsxProviderDriver(testtools.TestCase):
             connection_limit=5,
             default_pool=self.ref_pool,
             default_pool_id=self.pool_id,
-            default_tls_container_data='default_cert_data',
+            default_tls_container_data=self.default_tls_container_data,
             default_tls_container_ref=self.default_tls_container_ref,
             description='The listener',
             insert_headers={'X-Forwarded-For': 'true'},
@@ -222,8 +226,9 @@ class TestNsxProviderDriver(testtools.TestCase):
     def test_listener_create(self):
         with mock.patch.object(self.driver.client, 'cast') as cast_method:
             self.driver.listener_create(self.ref_listener)
-            cast_method.assert_called_with({}, 'listener_create', cert=None,
-                                           listener=mock.ANY)
+            cast_method.assert_called_with(
+                {}, 'listener_create', cert=self.default_tls_container_data,
+                listener=mock.ANY)
             driver_obj = cast_method.call_args[1]['listener']
             self.assertIn('id', driver_obj)
             self.assertIn('project_id', driver_obj)
@@ -255,9 +260,11 @@ class TestNsxProviderDriver(testtools.TestCase):
     def test_listener_update(self):
         with mock.patch.object(self.driver.client, 'cast') as cast_method:
             self.driver.listener_update(self.ref_listener, self.ref_listener)
-            cast_method.assert_called_with({}, 'listener_update', cert=None,
-                                           old_listener=mock.ANY,
-                                           new_listener=mock.ANY)
+            cast_method.assert_called_with(
+                {}, 'listener_update',
+                cert=self.default_tls_container_data,
+                old_listener=mock.ANY,
+                new_listener=mock.ANY)
             driver_obj = cast_method.call_args[1]['new_listener']
             self.assertIn('id', driver_obj)
             self.assertIn('project_id', driver_obj)

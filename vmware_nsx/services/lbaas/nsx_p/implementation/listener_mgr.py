@@ -52,13 +52,13 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         nsxpolicy = self.core_plugin.nsxpolicy
         cert_client = nsxpolicy.certificate
         ssl_client = nsxpolicy.load_balancer.client_ssl_profile
-        passphrase = certificate.get_private_key_passphrase()
+        passphrase = certificate.get('passphrase')
         if not passphrase:
             passphrase = core_resources.IGNORE
         cert_client.create_or_overwrite(
             cert_href, certificate_id=listener_id,
-            pem_encoded=certificate.get_certificate(),
-            private_key=certificate.get_private_key(),
+            pem_encoded=certificate.get('certificate'),
+            private_key=certificate.get('private_key'),
             passphrase=passphrase,
             tags=tags)
 
@@ -103,7 +103,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 kwargs['lb_persistence_profile_id'] = ''
         if certificate:
             ssl_profile_binding = self._upload_certificate(
-                listener['id'], listener['default_tls_container_id'], tags,
+                listener['id'], certificate['ref'], tags,
                 certificate=certificate)
             if (listener['protocol'] ==
                     lb_const.LB_PROTOCOL_TERMINATED_HTTPS and
@@ -304,7 +304,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                       "NSX: %s", app_profile_id, e)
 
         # Delete imported NSX cert if there is any
-        if listener.get('default_tls_container_id'):
+        if lb_common.get_listener_cert_ref(listener):
             cert_client = self.core_plugin.nsxpolicy.certificate
             try:
                 cert_client.delete(listener['id'])
