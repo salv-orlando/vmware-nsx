@@ -2615,6 +2615,78 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
             nsx_plugin.STATELESS_DHCP_NDRA_PROFILE_ID,
             sub2_ipversion=4)
 
+    def _add_external_gateway_to_router(self, router_id, network_id,
+                                        expected_code=exc.HTTPOk.code,
+                                        neutron_context=None, ext_ips=None,
+                                        **kwargs):
+        # Copy the neutron api to add support for disabled SNAT
+        ext_ips = ext_ips or []
+        body = {'router':
+                {'external_gateway_info': {'network_id': network_id}}}
+        if ext_ips:
+            body['router']['external_gateway_info'][
+                'external_fixed_ips'] = ext_ips
+        if 'policy_id' in kwargs:
+            body['router']['external_gateway_info'][
+                'qos_policy_id'] = kwargs.get('policy_id')
+        if 'enable_snat' in kwargs:
+            body['router']['external_gateway_info'][
+                'enable_snat'] = kwargs.get('enable_snat')
+        return self._update('routers', router_id, body,
+                            expected_code=expected_code,
+                            neutron_context=neutron_context)
+
+    def test_router_vlan_interface_sr(self):
+        providernet_args = {pnet.NETWORK_TYPE: 'vlan',
+                            pnet.SEGMENTATION_ID: 11}
+
+        with mock.patch('vmware_nsxlib.v3.policy.core_resources.'
+                        'NsxPolicyTransportZoneApi.get_transport_type',
+                        return_value=nsx_constants.TRANSPORT_TYPE_VLAN), \
+            self.network(name='vlan_net',
+                         providernet_args=providernet_args,
+                         arg_list=(pnet.NETWORK_TYPE,
+                                   pnet.SEGMENTATION_ID)) as net,\
+            self.router() as r,\
+            self.subnet(cidr='2001::/64', network=net,
+                        ip_version=6, enable_dhcp=False,
+                        ipv6_address_mode=None,
+                        ipv6_ra_mode=None) as if_subnet,\
+            self._create_l3_ext_network() as ext_net,\
+            self.subnet(network=ext_net, cidr='10.0.0.0/16',
+                        enable_dhcp=False) as ext_sub,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.get_edge_cluster_path",
+                       return_value=None),\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.get_realized_id"),\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.set_edge_cluster_path"
+                       ) as add_srv_router,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicyTier1Api.remove_edge_cluster"
+                       ) as del_srv_router:
+
+            # Add router GW
+            self._add_external_gateway_to_router(
+                r['router']['id'],
+                ext_sub['subnet']['network_id'],
+                enable_snat=False)
+
+            # Adding subnet interface
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            # verify service router was created
+            add_srv_router.assert_called_once_with(r['router']['id'], mock.ANY)
+
+            # Removing subnet interface
+            self._router_interface_action(
+                'remove', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+            # verify service router was removed
+            del_srv_router.assert_called_once_with(r['router']['id'])
+
     def _test_router_vlan_interface_ndprofile(self, profile_with,
                                               enable_dhcp=True, mode='slaac'):
         providernet_args = {pnet.NETWORK_TYPE: 'vlan',

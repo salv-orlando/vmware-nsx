@@ -2333,10 +2333,22 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return self.nsxpolicy.tier0.get_edge_cluster_path(
             tier0_uuid)
 
+    def _get_router_vlan_interfaces(self, context, router_id):
+        # return data about VLAN subnet connected to the router
+        rtr_subnets = self._load_router_subnet_cidrs_from_db(
+            context, router_id)
+        vlan_subnets = []
+        for sub in rtr_subnets:
+            net_id = sub['network_id']
+            if not self._is_overlay_network(context, net_id):
+                vlan_subnets.append(sub)
+        return vlan_subnets
+
     def service_router_has_services(self, context, router_id, router=None):
         """Check if the neutron router has any services
         which require a backend service router
-        currently those are: SNAT, Loadbalancer, Edge firewall
+        currently those are: SNAT, Loadbalancer, Edge firewall,
+        VPNaaS & Vlan interfaces
         """
         if not router:
             router = self._get_router(context, router_id)
@@ -2344,10 +2356,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         fw_exist = self._router_has_edge_fw_rules(context, router)
         vpn_exist = self.service_router_has_vpnaas(context, router_id)
         lb_exist = False
+        vlan_interfaces = []
         if not (fw_exist or snat_exist or vpn_exist):
-            lb_exist = self.service_router_has_loadbalancers(
-                context, router_id)
-        return snat_exist or lb_exist or fw_exist or vpn_exist
+            vlan_interfaces = self._get_router_vlan_interfaces(
+                context.elevated(), router_id)
+            if not vlan_interfaces:
+                lb_exist = self.service_router_has_loadbalancers(
+                    context, router_id)
+        return (snat_exist or lb_exist or fw_exist or vpn_exist or
+                vlan_interfaces)
 
     def service_router_has_loadbalancers(self, context, router_id):
         tags_to_search = [{'scope': lb_const.LR_ROUTER_TYPE, 'tag': router_id}]
@@ -2940,6 +2957,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                             ip_addresses=[rtr_subnet['gateway_ip']],
                             prefix_len=prefix_len))
 
+                # Service router is mandatory for VLAN interfaces
+                if not self.verify_sr_at_backend(router_id):
+                    self.create_service_router(
+                        context, router_id, router=router_db,
+                        update_firewall=False)
+
                 ndra_profile_id = self._get_subnet_ndra_profile(subnet)
                 self.nsxpolicy.tier1.add_segment_interface(
                     router_id, segment_id,
@@ -3047,6 +3070,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 else:
                     self.nsxpolicy.tier1.remove_segment_interface(
                         router_id, segment_id)
+
+                if not self._core_plugin.service_router_has_services(
+                    context.elevated(), router_id):
+                    self.delete_service_router(router_id)
 
             # try to delete the SNAT/NO_DNAT rules of this subnet
             router_db = self._get_router(context, router_id)
