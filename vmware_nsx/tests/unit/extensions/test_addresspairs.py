@@ -19,6 +19,7 @@ from oslo_config import cfg
 
 from neutron.tests.unit.db import test_allowedaddresspairs_db as ext_pairs
 
+from vmware_nsx.tests.unit.nsx_p import test_plugin as test_p_plugin
 from vmware_nsx.tests.unit.nsx_v import test_plugin as test_nsx_v_plugin
 from vmware_nsx.tests.unit.nsx_v3 import test_constants as v3_constants
 from vmware_nsx.tests.unit.nsx_v3 import test_plugin as test_v3_plugin
@@ -38,6 +39,56 @@ class TestAllowedAddressPairsNSXv2(test_v3_plugin.NsxV3PluginTestCaseMixin,
 
     def test_create_port_security_false_allowed_address_pairs(self):
         self.skipTest('TBD')
+
+    def test_create_overlap_with_fixed_ip(self):
+        self.skipTest('Not supported')
+
+
+class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
+                                  ext_pairs.TestAllowedAddressPairs):
+
+    def setUp(self, plugin=test_p_plugin.PLUGIN_NAME,
+              ext_mgr=None,
+              service_plugins=None):
+        super(TestAllowedAddressPairsNSXp, self).setUp(
+            plugin=plugin, ext_mgr=ext_mgr, service_plugins=service_plugins)
+
+    def test_create_bad_address_pairs_with_cidr(self):
+        address_pairs = [{'mac_address': '00:00:00:00:00:01',
+                          'ip_address': '10.0.0.1/24'}]
+        self._create_port_with_address_pairs(address_pairs, 400)
+
+    def test_create_port_allowed_address_pairs_v6(self):
+        with self.network() as net:
+            address_pairs = [{'ip_address': '1001::12'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            address_pairs[0]['mac_address'] = port['port']['mac_address']
+            self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
+                             address_pairs)
+            self._delete('ports', port['port']['id'])
+
+    def test_update_add_bad_address_pairs_with_cidr(self):
+        with self.network() as net:
+            res = self._create_port(self.fmt, net['network']['id'])
+            port = self.deserialize(self.fmt, res)
+            address_pairs = [{'mac_address': '00:00:00:00:00:01',
+                              'ip_address': '10.0.0.1/24'}]
+            update_port = {'port': {addr_apidef.ADDRESS_PAIRS:
+                                    address_pairs}}
+            req = self.new_update_request('ports', update_port,
+                                          port['port']['id'])
+            res = req.get_response(self.api)
+            self.assertEqual(res.status_int, 400)
+            self._delete('ports', port['port']['id'])
+
+    def test_create_port_security_false_allowed_address_pairs(self):
+        self.skipTest('TBD')
+
+    def test_create_overlap_with_fixed_ip(self):
+        self.skipTest('Not supported')
 
 
 class TestAllowedAddressPairsNSXv3(test_v3_plugin.NsxV3PluginTestCaseMixin,
@@ -82,6 +133,9 @@ class TestAllowedAddressPairsNSXv3(test_v3_plugin.NsxV3PluginTestCaseMixin,
 
     def test_create_port_security_false_allowed_address_pairs(self):
         self.skipTest('TBD')
+
+    def test_create_overlap_with_fixed_ip(self):
+        self.skipTest('Not supported')
 
 
 class TestAllowedAddressPairsNSXv(test_nsx_v_plugin.NsxVPluginV2TestCase,
