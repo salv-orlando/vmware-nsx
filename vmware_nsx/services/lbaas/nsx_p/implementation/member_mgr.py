@@ -61,20 +61,17 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # attach it to a router. If not, set the LB service connectivity path
         # to the member subnet's router.
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
-        service = service_client.get(lb['id'])
+        service = p_utils.get_lb_nsx_lb_service(
+            self.core_plugin.nsxpolicy, lb['id'])
+        if not service:
+            completor(success=False)
+            msg = (_('Cannot find loadbalancer %(lb_id)s service') %
+                   {'lb_id': lb['id']})
+            raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
+
         if not service.get('connectivity_path'):
             router_id = lb_utils.get_router_from_network(
                 context, self.core_plugin, member['subnet_id'])
-            # Validate that there is no other LB on this router
-            # as NSX does not allow it
-            if self.core_plugin.service_router_has_loadbalancers(
-                context.elevated(), router_id):
-                completor(success=False)
-                msg = (_('Cannot attach a loadbalancer %(lb_id)s on router '
-                         '%(router)s, as it already has a loadbalancer') %
-                       {'lb_id': lb['id'], 'router': router_id})
-                raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
-
             if not self.core_plugin.service_router_has_services(context,
                                                                 router_id):
                 self.core_plugin.create_service_router(context, router_id)
@@ -84,21 +81,39 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             tags = p_utils.get_tags(self.core_plugin,
                                     router_id,
                                     lb_const.LR_ROUTER_TYPE,
-                                    lb.get('tenant_id'), context.project_name)
-            try:
-                service_client.update(lb['id'],
-                                      tags=tags,
-                                      connectivity_path=connectivity_path)
-                p_utils.update_router_lb_vip_advertisement(
-                    context, self.core_plugin, router_id)
-            except Exception as e:
-                with excutils.save_and_reraise_exception():
+                                    member.get('tenant_id'),
+                                    context.project_name)
+            tags.append(p_utils.get_service_lb_tag(lb['id']))
+            lb_name = p_utils.get_service_lb_name(lb, router_id)
+
+            # Validate that there is no other LB on this router
+            # as NSX does not allow it
+            with p_utils.get_lb_rtr_lock(router_id):
+                if self.core_plugin.service_router_has_loadbalancers(
+                    context.elevated(), router_id):
                     completor(success=False)
-                    LOG.error('Failed to set connectivity for loadbalancer '
-                              '%(lb)s on subnet %(sub)s with error %(err)s',
-                              {'lb': lb['id'],
-                               'sub': member['subnet_id'],
-                               'err': e})
+                    msg = (_('Cannot attach a loadbalancer %(lb_id)s on '
+                             'router %(router)s, as it already has a '
+                             'loadbalancer') %
+                           {'lb_id': lb['id'], 'router': router_id})
+                    raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
+
+                try:
+                    service_client.update(service['id'],
+                                          name=lb_name,
+                                          tags=tags,
+                                          connectivity_path=connectivity_path)
+                    p_utils.update_router_lb_vip_advertisement(
+                        context, self.core_plugin, router_id)
+                except Exception as e:
+                    with excutils.save_and_reraise_exception():
+                        completor(success=False)
+                        LOG.error('Failed to set connectivity for '
+                                  'loadbalancer  %(lb)s on subnet %(sub)s '
+                                  'with error %(err)s',
+                                  {'lb': lb['id'],
+                                   'sub': member['subnet_id'],
+                                   'err': e})
 
     def create(self, context, member, completor):
         pool_client = self.core_plugin.nsxpolicy.load_balancer.lb_pool

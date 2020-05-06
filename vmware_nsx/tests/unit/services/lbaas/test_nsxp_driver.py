@@ -301,15 +301,18 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                                return_value=LB_NETWORK), \
             mock.patch.object(lb_utils, 'get_router_from_network',
                               return_value=ROUTER_ID),\
+            mock.patch.object(lb_utils, 'get_tags', return_value=[]),\
             mock.patch.object(self.core_plugin, 'get_router',
                               return_value=neutron_router), \
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
                               return_value=[]),\
             mock.patch.object(self.core_plugin,
-                              'service_router_has_loadbalancers',
-                              return_value=False) as plugin_has_lb,\
+                              'service_router_has_services',
+                              return_value=False) as plugin_has_sr,\
             mock.patch.object(self.service_client, 'get_router_lb_service',
                               return_value=None),\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': []}),\
             mock.patch.object(self.service_client, 'create_or_overwrite'
                               ) as create_service:
 
@@ -323,9 +326,48 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                 description=self.lb_dict['description'],
                 tags=mock.ANY, size='SMALL',
                 connectivity_path=mock.ANY)
-            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+            # Verify that the tags contain the loadbalancer id
+            actual_tags = create_service.mock_calls[0][-1]['tags']
+            found_tag = False
+            for tag in actual_tags:
+                if (tag['scope'] == p_utils.SERVICE_LB_TAG_SCOPE and
+                    tag['tag'] == LB_ID):
+                    found_tag = True
+            self.assertTrue(found_tag)
+            plugin_has_sr.assert_called_once_with(mock.ANY, ROUTER_ID)
 
-    def test_create_same_router_fail(self):
+    def test_create_same_router(self):
+        self.reset_completor()
+        neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
+                          'external_gateway_info': {'external_fixed_ips': []}}
+        old_lb_id = 'aaa'
+        lb_service = {'id': old_lb_id,
+                      'tags': [{'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                                'tag': old_lb_id}]}
+        with mock.patch.object(lb_utils, 'get_network_from_subnet',
+                               return_value=LB_NETWORK), \
+            mock.patch.object(lb_utils, 'get_router_from_network',
+                              return_value=ROUTER_ID),\
+            mock.patch.object(self.core_plugin, 'get_router',
+                              return_value=neutron_router), \
+            mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
+                              return_value=[]),\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_services',
+                              return_value=True) as plugin_has_sr,\
+            mock.patch.object(self.service_client,
+                              'update_customized') as service_update:
+            self.edge_driver.loadbalancer.create(
+                self.context, self.lb_dict, self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+            plugin_has_sr.assert_not_called()
+            service_update.assert_called_once()
+
+    def test_create_same_router_many_fail(self):
+        lb_service = {'id': 'first_lb', 'tags': []}
         self.reset_completor()
         neutron_router = {'id': ROUTER_ID, 'name': 'dummy',
                           'external_gateway_info': {'external_fixed_ips': []}}
@@ -337,9 +379,11 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                               return_value=neutron_router), \
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
                               return_value=[]),\
-            mock.patch.object(self.core_plugin,
-                              'service_router_has_loadbalancers',
-                              return_value=True) as plugin_has_lb,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
+            mock.patch.object(self.service_client, 'update_customized',
+                              side_effect=n_exc.BadRequest(resource='', msg='')
+                              ) as service_update,\
             mock.patch.object(self.service_client, 'get_router_lb_service',
                               return_value=None):
             self.assertRaises(
@@ -348,7 +392,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                 self.context, self.lb_dict, self.completor)
             self.assertTrue(self.last_completor_called)
             self.assertFalse(self.last_completor_succees)
-            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+            service_update.assert_called_once()
 
     def test_create_external_vip(self):
         self.reset_completor()
@@ -385,15 +429,14 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                               return_value=neutron_router), \
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
                               return_value=[]),\
-            mock.patch.object(self.core_plugin,
-                              'service_router_has_loadbalancers',
-                              return_value=False) as plugin_has_lb,\
             mock.patch.object(self.core_plugin, 'service_router_has_services',
-                              return_value=False), \
+                              return_value=False) as plugin_has_sr, \
             mock.patch.object(self.service_client, 'get_router_lb_service',
                               return_value=None),\
             mock.patch.object(self.service_client, 'create_or_overwrite'
                               ) as create_service,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': []}),\
             mock.patch.object(self.core_plugin,
                               "create_service_router") as create_sr:
             self.edge_driver.loadbalancer.create(
@@ -406,7 +449,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                 description=self.lb_dict['description'],
                 tags=mock.ANY, size='SMALL',
                 connectivity_path=mock.ANY)
-            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+            plugin_has_sr.assert_called_once_with(mock.ANY, ROUTER_ID)
             create_sr.assert_called_once()
 
     def test_create_with_port(self):
@@ -427,8 +470,8 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
                               return_value=[]),\
             mock.patch.object(self.core_plugin,
-                              'service_router_has_loadbalancers',
-                              return_value=False) as plugin_has_lb,\
+                              'service_router_has_services',
+                              return_value=False) as plugin_has_sr,\
             mock.patch.object(self.service_client, 'get_router_lb_service',
                               return_value=None),\
             mock.patch.object(self.service_client, 'create_or_overwrite'
@@ -444,7 +487,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
                 description=self.lb_dict['description'],
                 tags=mock.ANY, size='SMALL',
                 connectivity_path=mock.ANY)
-            plugin_has_lb.assert_called_once_with(mock.ANY, ROUTER_ID)
+            plugin_has_sr.assert_called_once_with(mock.ANY, ROUTER_ID)
             update_port.assert_called_once()
 
     def test_update(self):
@@ -460,101 +503,117 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
 
     def test_delete(self):
         self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID}
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=ROUTER_ID),\
-            mock.patch.object(self.service_client, 'get'
-                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'update_customized',
+                              side_effect=n_exc.BadRequest(resource='', msg='')
+                              ) as service_update,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
             mock.patch.object(self.service_client, 'delete'
                               ) as mock_delete_lb_service:
-            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
 
-            self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
-                                                 self.completor)
+            self.edge_driver.loadbalancer.delete(
+                self.context, self.lb_dict, self.completor)
 
             mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            service_update.assert_called_once()
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
     def test_delete_cascade(self):
         self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID}
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=ROUTER_ID),\
-            mock.patch.object(self.service_client, 'get'
-                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'update_customized',
+                              side_effect=n_exc.BadRequest(resource='', msg='')
+                              ) as service_update,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
             mock.patch.object(self.service_client, 'delete'
                               ) as mock_delete_lb_service:
-            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
 
             self.edge_driver.loadbalancer.delete_cascade(
                 self.context, self.lb_dict, self.completor)
 
             mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            service_update.assert_called_once()
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
     def test_delete_with_router_id(self):
         self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID,
+                      'connectivity_path': 'infra/%s' % ROUTER_ID}
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=None),\
-            mock.patch.object(self.service_client, 'get'
-                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'update_customized',
+                              side_effect=n_exc.BadRequest(resource='', msg='')
+                              ) as service_update,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
             mock.patch.object(self.service_client, 'delete'
                               ) as mock_delete_lb_service:
-            mock_get_lb_service.return_value = {
-                'id': LB_SERVICE_ID,
-                'connectivity_path': 'infra/%s' % ROUTER_ID}
 
             self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
                                                  self.completor)
 
             mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            service_update.assert_called_once()
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
     def test_delete_no_services(self):
         self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID,
+                      'connectivity_path': 'infra/%s' % ROUTER_ID}
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=None),\
-            mock.patch.object(self.service_client,
-                              'get') as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'update_customized',
+                              side_effect=n_exc.BadRequest(resource='', msg='')
+                              ) as service_update,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
             mock.patch.object(self.core_plugin, 'service_router_has_services',
                               return_value=False), \
             mock.patch.object(self.core_plugin,
                               'delete_service_router') as delete_sr, \
             mock.patch.object(self.service_client, 'delete'
                               ) as mock_delete_lb_service:
-            mock_get_lb_service.return_value = {
-                'id': LB_SERVICE_ID,
-                'connectivity_path': 'infra/%s' % ROUTER_ID}
-
             self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
                                                  self.completor)
 
             mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
             delete_sr.assert_called_once_with(ROUTER_ID)
+            service_update.assert_called_once()
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
     def test_delete_with_port(self):
         self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID}
         neutron_port = {'id': 'port-id', 'name': 'dummy',
                         'device_owner': lb_const.VMWARE_LB_VIP_OWNER}
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=ROUTER_ID),\
-            mock.patch.object(self.service_client, 'get'
-                              ) as mock_get_lb_service, \
+            mock.patch.object(self.service_client, 'update_customized',
+                              side_effect=n_exc.BadRequest(resource='', msg='')
+                              ) as service_update,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
             mock.patch.object(self.core_plugin, 'get_port',
                               return_value=neutron_port), \
             mock.patch.object(self.core_plugin, 'update_port'
                               ) as update_port, \
             mock.patch.object(self.service_client, 'delete'
                               ) as mock_delete_lb_service:
-            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
-
             self.edge_driver.loadbalancer.delete(self.context, self.lb_dict,
                                                  self.completor)
 
             mock_delete_lb_service.assert_called_with(LB_SERVICE_ID)
+            service_update.assert_called_once()
             update_port.assert_called_once()
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
@@ -597,6 +656,68 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             self.assertEqual(0, len(statuses['pools']))
             self.assertEqual(0, len(statuses['listeners']))
             self.assertEqual(0, len(statuses['members']))
+
+    def test_add_tags_callback(self):
+        callback = p_utils.add_service_tag_callback(LB_ID)
+
+        # Add a tag
+        body = {'tags': [{'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                          'tag': 'dummy_id'}]}
+        callback(body)
+        self.assertEqual(2, len(body['tags']))
+
+        # Tag already there
+        callback(body)
+        self.assertEqual(2, len(body['tags']))
+
+        # Too many tags
+        body['tags'] = []
+        for x in range(p_utils.SERVICE_LB_TAG_MAX):
+            body['tags'].append({
+                'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                'tag': 'dummy_id_%s' % x})
+        self.assertRaises(n_exc.BadRequest, callback, body)
+
+        # No tags
+        body['tags'] = []
+        callback(body)
+        self.assertEqual(1, len(body['tags']))
+
+    def test_add_tags_callback_only_first(self):
+        callback = p_utils.add_service_tag_callback(LB_ID, only_first=True)
+
+        # No tags
+        body = {'tags': []}
+        callback(body)
+        self.assertEqual(1, len(body['tags']))
+
+        # Tag already there
+        self.assertRaises(n_exc.BadRequest, callback, body)
+
+        # Another tag exists
+        body['tags'] = [{'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                         'tag': 'dummy'}]
+        self.assertRaises(n_exc.BadRequest, callback, body)
+
+    def test_del_tags_callback(self):
+        callback = p_utils.remove_service_tag_callback(LB_ID)
+
+        # remove a tag
+        body = {'tags': [{'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                          'tag': 'dummy_id'},
+                         {'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                          'tag': LB_ID}]}
+        callback(body)
+        self.assertEqual(1, len(body['tags']))
+
+        # Tag not there there
+        callback(body)
+        self.assertEqual(1, len(body['tags']))
+
+        # Last one
+        body['tags'] = [{'scope': p_utils.SERVICE_LB_TAG_SCOPE,
+                         'tag': LB_ID}]
+        self.assertRaises(n_exc.BadRequest, callback, body)
 
 
 class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
@@ -1441,6 +1562,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
 
     def test_create_external_vip(self):
         self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID}
         with mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
                                ) as mock_get_pool_members, \
             mock.patch.object(lb_utils, 'get_network_from_subnet'
@@ -1449,11 +1571,14 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                               ) as mock_get_router, \
             mock.patch.object(self.service_client, 'get_router_lb_service'
                               ) as mock_get_lb_service, \
-            mock.patch.object(self.service_client, 'get',
-                              return_value={}), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_services',
+                              return_value=False) as plugin_has_sr,\
             mock.patch.object(self.core_plugin,
                               'service_router_has_loadbalancers',
-                              return_value=False) as plugin_has_lb,\
+                              return_value=False),\
             mock.patch.object(self.pool_client, 'get'
                               ) as mock_get_pool, \
             mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
@@ -1481,7 +1606,42 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                 admin_state='ENABLED')
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
-            plugin_has_lb.assert_called_once_with(mock.ANY, LB_ROUTER_ID)
+            plugin_has_sr.assert_called_once_with(mock.ANY, LB_ROUTER_ID)
+
+    def test_create_external_vip_router_used(self):
+        self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID}
+        with mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
+                               ) as mock_get_pool_members, \
+            mock.patch.object(lb_utils, 'get_network_from_subnet'
+                              ) as mock_get_network, \
+            mock.patch.object(lb_utils, 'get_router_from_network'
+                              ) as mock_get_router, \
+            mock.patch.object(self.service_client, 'get_router_lb_service'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=True),\
+            mock.patch.object(self.pool_client, 'get'
+                              ) as mock_get_pool, \
+            mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
+                              return_value=[]),\
+            mock.patch.object(self.core_plugin, 'get_floatingips',
+                              return_value=[{
+                                  'fixed_ip_address': MEMBER_ADDRESS}]):
+            mock_get_pool_members.return_value = [self.member]
+            mock_get_network.return_value = EXT_LB_NETWORK
+            mock_get_router.return_value = LB_ROUTER_ID
+            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
+            mock_get_pool.return_value = LB_POOL
+
+            self.assertRaises(
+                n_exc.BadRequest, self.edge_driver.member.create,
+                self.context, self.member_dict, self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
 
     def test_update(self):
         self.reset_completor()

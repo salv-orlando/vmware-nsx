@@ -83,6 +83,7 @@ from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import healthmonitor_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import l7policy_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import l7rule_mgr
+from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils
 from vmware_nsx.services.lbaas.nsx_p.implementation import listener_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import loadbalancer_mgr
 from vmware_nsx.services.lbaas.nsx_p.implementation import member_mgr
@@ -2367,14 +2368,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 vlan_interfaces)
 
     def service_router_has_loadbalancers(self, context, router_id):
-        tags_to_search = [{'scope': lb_const.LR_ROUTER_TYPE, 'tag': router_id}]
-        router_lb_services = self.nsxpolicy.search_by_tags(
-            tags_to_search,
-            self.nsxpolicy.load_balancer.lb_service.entry_def.resource_type()
-        )['results']
-        non_delete_services = [srv for srv in router_lb_services
-                               if not srv.get('marked_for_delete')]
-        return True if non_delete_services else False
+        service = lb_utils.get_router_nsx_lb_service(self.nsxpolicy, router_id)
+        return True if service else False
 
     def service_router_has_vpnaas(self, context, router_id):
         """Return True if there is a vpn service attached to this router"""

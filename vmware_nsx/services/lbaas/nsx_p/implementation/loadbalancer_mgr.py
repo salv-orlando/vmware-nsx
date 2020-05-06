@@ -25,7 +25,6 @@ from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3.policy import utils as lib_p_utils
-from vmware_nsxlib.v3 import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -51,53 +50,74 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                      'router') %
                    {'lb_id': lb_id, 'subnet': lb['vip_subnet_id']})
             raise n_exc.BadRequest(resource='lbaas-subnet', msg=msg)
-
-        if router_id:
-            # Validate that there is no other LB on this router
-            # as NSX does not allow it
-            if self.core_plugin.service_router_has_loadbalancers(
-                context.elevated(), router_id):
-                completor(success=False)
-                msg = (_('Cannot create a loadbalancer %(lb_id)s on router '
-                         '%(router)s, as it already has a loadbalancer') %
-                       {'lb_id': lb_id, 'router': router_id})
-                raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
-
-            # Create the service router if it does not exist
-            if not self.core_plugin.service_router_has_services(
-                context.elevated(), router_id):
-                self.core_plugin.create_service_router(context, router_id)
-
-        lb_name = utils.get_name_and_uuid(lb['name'] or 'lb',
-                                          lb_id)
-        tags = p_utils.get_tags(self.core_plugin,
-                                router_id if router_id else '',
-                                lb_const.LR_ROUTER_TYPE,
-                                lb['tenant_id'], context.project_name)
-
-        lb_size = lb_utils.get_lb_flavor_size(self.flavor_plugin, context,
-                                              lb.get('flavor_id'))
-
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
-        try:
-            if network and network.get('router:external'):
-                connectivity_path = None
-            else:
-                connectivity_path = self.core_plugin.nsxpolicy.tier1.get_path(
-                    router_id)
-            service_client.create_or_overwrite(
-                lb_name, lb_service_id=lb['id'], description=lb['description'],
-                tags=tags, size=lb_size, connectivity_path=connectivity_path)
+        lb_service = None
+        if router_id:
+            # Check if a service was already created for this router
+            lb_service = p_utils.get_router_nsx_lb_service(
+                self.core_plugin.nsxpolicy, router_id)
 
-            # Add rule to advertise external vips
-            if router_id:
-                p_utils.update_router_lb_vip_advertisement(
-                    context, self.core_plugin, router_id)
-        except Exception as e:
-            with excutils.save_and_reraise_exception():
-                completor(success=False)
-                LOG.error('Failed to create loadbalancer %(lb)s for lb with '
-                          'exception %(e)s', {'lb': lb['id'], 'e': e})
+            if lb_service:
+                # Add the new LB to the service by adding the tag.
+                # At the same time verify maximum number of tags
+                try:
+                    with p_utils.get_lb_rtr_lock(router_id):
+                        service_client.update_customized(
+                            lb_service['id'],
+                            p_utils.add_service_tag_callback(lb['id']))
+                except n_exc.BadRequest:
+                    # This will fail if there are too many loadbalancers
+                    completor(success=False)
+                    msg = (_('Cannot create a loadbalancer %(lb_id)s on '
+                             'router %(router)s, as it already has too many '
+                             'loadbalancers') %
+                           {'lb_id': lb_id, 'router': router_id})
+                    raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
+                except Exception as e:
+                    with excutils.save_and_reraise_exception():
+                        completor(success=False)
+                        LOG.error('Failed to create loadbalancer %(lb)s for '
+                                  'lb with exception %(e)s',
+                                  {'lb': lb['id'], 'e': e})
+            else:
+                # Create the Tier1 service router if it does not exist
+                if not self.core_plugin.service_router_has_services(
+                    context.elevated(), router_id):
+                    self.core_plugin.create_service_router(context, router_id)
+
+        if not lb_service:
+            lb_name = p_utils.get_service_lb_name(lb, router_id)
+            tags = p_utils.get_tags(self.core_plugin,
+                                    router_id if router_id else '',
+                                    lb_const.LR_ROUTER_TYPE,
+                                    lb['tenant_id'], context.project_name)
+            tags.append(p_utils.get_service_lb_tag(lb['id']))
+
+            lb_size = lb_utils.get_lb_flavor_size(self.flavor_plugin, context,
+                                                  lb.get('flavor_id'))
+
+            try:
+                if network and network.get('router:external'):
+                    connectivity_path = None
+                else:
+                    tier1_srv = self.core_plugin.nsxpolicy.tier1
+                    connectivity_path = tier1_srv.get_path(router_id)
+                with p_utils.get_lb_rtr_lock(router_id):
+                    service_client.create_or_overwrite(
+                        lb_name, lb_service_id=lb['id'],
+                        description=lb['description'],
+                        tags=tags, size=lb_size,
+                        connectivity_path=connectivity_path)
+
+                # Add rule to advertise external vips
+                if router_id:
+                    p_utils.update_router_lb_vip_advertisement(
+                        context, self.core_plugin, router_id)
+            except Exception as e:
+                with excutils.save_and_reraise_exception():
+                    completor(success=False)
+                    LOG.error('Failed to create loadbalancer %(lb)s for lb '
+                              'with exception %(e)s', {'lb': lb['id'], 'e': e})
 
         # Make sure the vip port is marked with a device owner
         port = self.core_plugin.get_port(
@@ -120,39 +140,57 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         except n_exc.SubnetNotFound:
             LOG.warning("VIP subnet %s not found while deleting "
                         "loadbalancer %s", lb['vip_subnet_id'], lb['id'])
-
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
-
-        if not router_id:
-            # Try to get it from the service
-            try:
-                service = service_client.get(lb['id'])
-            except nsxlib_exc.ResourceNotFound:
-                pass
-            else:
+        service = p_utils.get_lb_nsx_lb_service(
+            self.core_plugin.nsxpolicy, lb['id'])
+        if service:
+            lb_service_id = service['id']
+            if not router_id:
                 router_id = lib_p_utils.path_to_id(
                     service.get('connectivity_path', ''))
-        try:
-            service_client.delete(lb['id'])
-        except Exception as e:
-            with excutils.save_and_reraise_exception():
-                completor(success=False)
-                LOG.error('Failed to delete loadbalancer %(lb)s for lb '
-                          'with error %(err)s',
-                          {'lb': lb['id'], 'err': e})
 
-        # if no router for vip - should check the member router
-        if router_id:
-            try:
-                if not self.core_plugin.service_router_has_services(
-                        context.elevated(), router_id):
-                    self.core_plugin.delete_service_router(router_id)
-            except Exception as e:
-                with excutils.save_and_reraise_exception():
-                    completor(success=False)
-                    LOG.error('Failed to delete service router upon deletion '
-                              'of loadbalancer %(lb)s with error %(err)s',
-                              {'lb': lb['id'], 'err': e})
+            if router_id:
+                with p_utils.get_lb_rtr_lock(router_id):
+                    # check if this is the last lb for this router and update
+                    # tags / delete service
+                    try:
+                        service_client.update_customized(
+                            lb_service_id,
+                            p_utils.remove_service_tag_callback(lb['id']))
+                    except n_exc.BadRequest:
+                        # This is the last Lb and service should be deleted
+                        try:
+                            service_client.delete(lb_service_id)
+                        except Exception as e:
+                            with excutils.save_and_reraise_exception():
+                                completor(success=False)
+                                LOG.error('Failed to delete loadbalancer '
+                                          '%(lb)s for lb with error %(err)s',
+                                          {'lb': lb['id'], 'err': e})
+                        # Remove the service router if no more services
+                        if not self.core_plugin.service_router_has_services(
+                                context.elevated(), router_id):
+                            try:
+                                self.core_plugin.delete_service_router(
+                                    router_id)
+                            except Exception as e:
+                                with excutils.save_and_reraise_exception():
+                                    completor(success=False)
+                                    LOG.error('Failed to delete service '
+                                              'router upon deletion '
+                                              'of loadbalancer %(lb)s with '
+                                              'error %(err)s',
+                                              {'lb': lb['id'], 'err': e})
+            else:
+                # LB without router (meaning external vip and no members)
+                try:
+                    service_client.delete(lb_service_id)
+                except Exception as e:
+                    with excutils.save_and_reraise_exception():
+                        completor(success=False)
+                        LOG.error('Failed to delete loadbalancer %(lb)s for '
+                                  'lb with error %(err)s',
+                                  {'lb': lb['id'], 'err': e})
 
         # Make sure the vip port is not marked with a vmware device owner
         try:
