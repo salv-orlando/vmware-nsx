@@ -640,14 +640,18 @@ NSX Policy Plugin
 
 - Replace an old tier0 (that might have been deleted) with a new one::
 
-    nsxadmin -r routers -o  update-tier0  --property old-tier0=<id> --property new-tier0=<id> 
+    nsxadmin -r routers -o  update-tier0  --property old-tier0=<id> --property new-tier0=<id>
 
 - Update the firewall_match value in neutron nat rules with a new value. Should be used when firewall_match_internal_addr config changes::
 
-    nsxadmin -r routers -o  update-nat-firewall-match --property firewall-match=external/internal 
+    nsxadmin -r routers -o  update-nat-firewall-match --property firewall-match=external/internal
 
 - Migrate networks DHCP from MP to Policy (for NSX 3.0 upgrades)::
     nsxadmin -r dhcp-binding -o migrate-to-policy --property dhcp-config=<id>
+
+- Update tags on a loadbalancer service
+    nsxadmin -r lb-services -o nsx-update-tags
+
 
 Client Certificate
 ~~~~~~~~~~~~~~~~~~

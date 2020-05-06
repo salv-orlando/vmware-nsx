@@ -19,6 +19,7 @@ from neutron_lib import exceptions as n_exc
 from oslo_log import log as logging
 
 from vmware_nsx._i18n import _
+from vmware_nsx.common import locking
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_const as p_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
@@ -29,6 +30,10 @@ from vmware_nsxlib.v3 import utils
 
 LOG = logging.getLogger(__name__)
 ADV_RULE_NAME = 'LB external VIP advertisement'
+SERVICE_LB_TAG_SCOPE = 'loadbalancer_id'
+#TODO(asarfaty): allow more LBs on the same router by setting multiple
+# ids in the same tag
+SERVICE_LB_TAG_MAX = 20
 
 
 def get_rule_match_conditions(policy):
@@ -259,3 +264,92 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, switch_type,
 
         return pp_id, None
     return None, None
+
+
+def get_router_nsx_lb_service(nsxpolicy, router_id):
+    tags_to_search = [{'scope': lb_const.LR_ROUTER_TYPE, 'tag': router_id}]
+    router_lb_services = nsxpolicy.search_by_tags(
+        tags_to_search,
+        nsxpolicy.load_balancer.lb_service.entry_def.resource_type()
+    )['results']
+    non_delete_services = [srv for srv in router_lb_services
+                           if not srv.get('marked_for_delete')]
+    if non_delete_services:
+        return non_delete_services[0]
+
+
+def get_lb_nsx_lb_service(nsxpolicy, lb_id):
+    tags_to_search = [{'scope': SERVICE_LB_TAG_SCOPE, 'tag': lb_id}]
+    lb_services = nsxpolicy.search_by_tags(
+        tags_to_search,
+        nsxpolicy.load_balancer.lb_service.entry_def.resource_type()
+    )['results']
+    non_delete_services = [srv for srv in lb_services
+                           if not srv.get('marked_for_delete')]
+    if non_delete_services:
+        return non_delete_services[0]
+
+
+def get_service_lb_name(lb, router_id=None):
+    if router_id:
+        return utils.get_name_and_uuid('rtr', router_id)
+    else:
+        return utils.get_name_and_uuid(lb.get('name') or 'lb', lb.get('id'))
+
+
+def get_service_lb_tag(lb_id):
+    return {'scope': SERVICE_LB_TAG_SCOPE, 'tag': lb_id}
+
+
+def add_service_tag_callback(lb_id, only_first=False):
+    """Return a callback that will validate and add a tag to the lb service"""
+    def _update_calback(body):
+        count = 0
+        for tag in body.get('tags', []):
+            if tag.get('scope') == SERVICE_LB_TAG_SCOPE:
+                if only_first:
+                    msg = _("A loadbalancer tag is already attached to the"
+                            " service")
+                    raise n_exc.BadRequest(
+                        resource='lbaas-loadbalancer-create', msg=msg)
+                if tag.get('tag') == lb_id:
+                    # No need to update
+                    return
+                count = count + 1
+        if count >= SERVICE_LB_TAG_MAX:
+            msg = _("Too many loadbalancers on the same router")
+            raise n_exc.BadRequest(resource='lbaas-loadbalancer-create',
+                                   msg=msg)
+        if 'tags' in body:
+            body['tags'].append(get_service_lb_tag(lb_id))
+        else:
+            body['tags'] = [get_service_lb_tag(lb_id)]
+
+    return _update_calback
+
+
+def remove_service_tag_callback(lb_id):
+    """Return a callback that will remove the tag from the lb service
+    If it is the last tag raise an error so that the service can be deleted
+    """
+    def _update_calback(body):
+        count = 0
+        match_tag = None
+        for tag in body.get('tags', []):
+            if tag.get('scope') == SERVICE_LB_TAG_SCOPE:
+                count = count + 1
+                if tag.get('tag') == lb_id:
+                    match_tag = tag
+        if match_tag:
+            if count <= 1:
+                msg = _("This LB service should be deleted")
+                raise n_exc.BadRequest(resource='lbaas-loadbalancer-delete',
+                                       msg=msg)
+            else:
+                body['tags'].remove(match_tag)
+
+    return _update_calback
+
+
+def get_lb_rtr_lock(router_id):
+    return locking.LockManager.get_lock('lb-router-%s' % str(router_id))
