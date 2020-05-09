@@ -22,8 +22,6 @@ from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 import oslo_messaging as messaging
 from oslo_messaging.rpc import dispatcher
-import pecan
-from stevedore import driver as stevedore_driver
 
 from octavia.api.drivers import utils as oct_utils
 from octavia.db import api as db_apis
@@ -76,7 +74,6 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
     def __init__(self):
         super(NSXOctaviaDriver, self).__init__()
         self._init_rpc_messaging()
-        self._init_cert_manager()
         self.repositories = repositories.Repositories()
 
     @log_helpers.log_method_call
@@ -87,13 +84,6 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                                   namespace='control', fanout=False,
                                   version='1.0')
         self.client = messaging.RPCClient(transport, target)
-
-    @log_helpers.log_method_call
-    def _init_cert_manager(self):
-        self.cert_manager = stevedore_driver.DriverManager(
-            namespace='octavia.cert_manager',
-            name=cfg.CONF.certificates.cert_manager,
-            invoke_on_load=True).driver
 
     def get_obj_project_id(self, obj_type, obj_dict):
         if obj_dict.get('project_id'):
@@ -309,7 +299,6 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                 # Generate the default pool object
                 obj_dict['default_pool'] = self._get_pool_dict(
                     obj_dict['default_pool_id'], is_update, project_id)
-            # TODO(asarfaty): add default_tls_container_id
 
         elif obj_type == 'Pool':
             if 'listener' not in obj_dict:
@@ -395,15 +384,21 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
               'new_loadbalancer': new_dict}
         self.client.cast({}, 'loadbalancer_update', **kw)
 
+    def _create_lb_certificate(self, listener_dict):
+        # Extract Octavia certificate data into a dict which is readable by
+        # the listener_mgr
+        if listener_dict.get('default_tls_container_ref'):
+            cert_data = listener_dict.get('default_tls_container_data', {})
+            return {'ref': listener_dict.get('default_tls_container_ref'),
+                    'certificate': cert_data.get('certificate'),
+                    'private_key': cert_data.get('private_key'),
+                    'passphrase': cert_data.get('passphrase')}
+
     # Listener
     @log_helpers.log_method_call
     def listener_create(self, listener):
-        cert = None
         dict_list = self.obj_to_dict(listener)
-        if dict_list.get('tls_certificate_id'):
-            context = pecan.request.context.get('octavia_context')
-            cert = self.cert_manager.get_cert(context,
-                                              dict_list['tls_certificate_id'])
+        cert = self._create_lb_certificate(dict_list)
         kw = {'listener': dict_list, 'cert': cert}
         self.client.cast({}, 'listener_create', **kw)
 
@@ -419,11 +414,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
         new_dict.update(self.obj_to_dict(
             new_listener, is_update=True,
             project_id=old_dict.get('project_id')))
-        cert = None
-        if new_dict.get('tls_certificate_id'):
-            context = pecan.request.context.get('octavia_context')
-            cert = self.cert_manager.get_cert(context,
-                                              new_dict['tls_certificate_id'])
+        cert = self._create_lb_certificate(new_dict)
         kw = {'old_listener': old_dict,
               'new_listener': new_dict,
               'cert': cert}
