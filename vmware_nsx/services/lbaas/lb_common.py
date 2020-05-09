@@ -58,3 +58,8 @@ def session_persistence_type_changed(pool, old_pool):
                  oldsp['type'] == lb_const.LB_SESSION_PERSISTENCE_SOURCE_IP)):
             return True
     return False
+
+
+def get_listener_cert_ref(listener):
+    return listener.get('default_tls_container_id',
+                        listener.get('default_tls_container_ref'))

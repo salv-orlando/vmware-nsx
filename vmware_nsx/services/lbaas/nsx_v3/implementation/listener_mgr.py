@@ -83,14 +83,14 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             # If so, use that certificate for ssl binding. Otherwise,
             # create a new certificate on NSX.
             cert_ids = tm_client.find_cert_with_pem(
-                certificate.get_certificate())
+                certificate.get('certificate'))
             if cert_ids:
                 nsx_cert_id = cert_ids[0]
             else:
                 nsx_cert_id = tm_client.create_cert(
-                    certificate.get_certificate(),
-                    private_key=certificate.get_private_key(),
-                    passphrase=certificate.get_private_key_passphrase(),
+                    certificate.get('certificate'),
+                    private_key=certificate.get('private_key'),
+                    passphrase=certificate.get('passphrase'),
                     tags=tags)
             return {
                 'client_ssl_profile_binding': {
