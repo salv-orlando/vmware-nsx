@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import mock
+from unittest import mock
 
 from neutron.tests.unit.db import test_db_base_plugin_v2 as test_db
 from neutron_lib.db import api as db_api

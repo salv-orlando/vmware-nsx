@@ -12,11 +12,11 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
-import mock
-from oslo_serialization import jsonutils
+from unittest import mock
 
 from neutron.tests import base
+from oslo_serialization import jsonutils
+
 from vmware_nsx.plugins.nsx_v.vshield import nsxv_loadbalancer
 from vmware_nsx.plugins.nsx_v.vshield import vcns
 

@@ -14,8 +14,8 @@
 #    under the License.
 
 import re
+from unittest import mock
 
-import mock
 from openstackclient.tests.unit.network.v2 import fakes as network_fakes
 from openstackclient.tests.unit.network.v2 import test_port
 from openstackclient.tests.unit import utils as tests_utils

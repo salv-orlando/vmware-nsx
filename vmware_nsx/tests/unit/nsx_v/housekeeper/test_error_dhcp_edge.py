@@ -15,8 +15,8 @@
 
 import copy
 import datetime
+from unittest import mock
 
-import mock
 from neutron.tests import base
 from neutron_lib.plugins import constants
 

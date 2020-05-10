@@ -14,8 +14,8 @@
 #    under the License.
 import copy
 import time
+from unittest import mock
 
-import mock
 import netaddr
 
 from neutron_lib.api.definitions import address_scope

@@ -13,13 +13,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from unittest import mock
 
-import mock
+from oslo_config import cfg
+
 from neutron.services.flavors import flavors_plugin
 from neutron.tests import base
 from neutron_lib import context
 from neutron_lib import exceptions as n_exc
-from oslo_config import cfg
 
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.services.lbaas import base_mgr

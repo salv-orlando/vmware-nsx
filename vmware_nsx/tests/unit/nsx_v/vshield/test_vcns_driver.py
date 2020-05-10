@@ -12,9 +12,9 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import mock
 
 from eventlet import greenthread
-import mock
 
 from neutron.tests import base
 from neutron_lib import context as neutron_context

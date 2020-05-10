@@ -12,13 +12,14 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import mock
 
-from neutron.tests import base
+from unittest import mock
 
 from networking_l2gw.db.l2gateway import l2gateway_db
+from neutron.tests import base
 from neutron_lib import context
 from neutron_lib import exceptions as n_exc
+
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs_utils

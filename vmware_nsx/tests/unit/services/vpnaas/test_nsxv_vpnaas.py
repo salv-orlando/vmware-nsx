@@ -15,7 +15,7 @@
 
 import contextlib
 
-import mock
+from unittest import mock
 
 from neutron_lib.api.definitions import external_net as extnet_apidef
 from neutron_lib import context

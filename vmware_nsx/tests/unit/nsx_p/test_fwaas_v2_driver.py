@@ -15,7 +15,7 @@
 
 import copy
 
-import mock
+from unittest import mock
 
 from neutron_lib.api.definitions import constants as fwaas_consts
 from neutron_lib.plugins import directory

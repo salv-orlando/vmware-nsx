@@ -12,16 +12,16 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
+from unittest import mock
 
-import mock
+from neutron.tests.unit import testlib_api
 from neutron_lib import constants
 from neutron_lib import context
+from neutron_lib import exceptions as n_exc
 from oslo_config import cfg
 from oslo_utils import uuidutils
 from six import moves
 
-from neutron.tests.unit import testlib_api
-from neutron_lib import exceptions as n_exc
 from vmware_nsx.common import config as conf
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import nsxv_constants

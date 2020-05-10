@@ -12,7 +12,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import mock
+from unittest import mock
 
 from neutron.tests.unit.extensions import test_securitygroup as test_ext_sg
 

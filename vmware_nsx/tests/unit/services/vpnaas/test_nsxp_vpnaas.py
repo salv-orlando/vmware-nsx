@@ -16,8 +16,7 @@
 from collections import namedtuple
 import contextlib
 
-import mock
-from oslo_utils import uuidutils
+from unittest import mock
 
 from neutron.db import l3_db
 from neutron.db.models import l3 as l3_models
@@ -26,6 +25,7 @@ from neutron_lib import context as n_ctx
 from neutron_lib.plugins import directory
 from neutron_vpnaas.db.vpn import vpn_models  # noqa
 from neutron_vpnaas.tests import base
+from oslo_utils import uuidutils
 
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.services.vpnaas.nsxp import ipsec_driver

@@ -17,7 +17,7 @@
 import os
 import time
 
-import mock
+from unittest import mock
 
 from vmware_nsx.api_client import client as nsx_client
 from vmware_nsx.api_client import eventlet_client

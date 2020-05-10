@@ -12,8 +12,8 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import mock
 
-import mock
 import netaddr
 from neutron.db import l3_db
 from neutron.db import models_v2

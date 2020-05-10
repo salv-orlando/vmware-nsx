@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from unittest import mock
 
-import mock
 from neutron.tests import base
 from neutron.tests.unit.api.v2 import test_base
 

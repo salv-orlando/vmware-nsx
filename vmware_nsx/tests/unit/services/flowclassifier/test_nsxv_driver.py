@@ -12,13 +12,10 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import mock
+from unittest import mock
+
 from oslo_config import cfg
 from oslo_utils import importutils
-
-from vmware_nsx.services.flowclassifier.nsx_v import driver as nsx_v_driver
-from vmware_nsx.tests import unit as vmware
-from vmware_nsx.tests.unit.nsx_v.vshield import fake_vcns
 
 from neutron.api import extensions as api_ext
 from neutron.common import config
@@ -32,6 +29,10 @@ from networking_sfc.services.flowclassifier.common import context as fc_ctx
 from networking_sfc.services.flowclassifier.common import exceptions as fc_exc
 from networking_sfc.tests import base
 from networking_sfc.tests.unit.db import test_flowclassifier_db
+
+from vmware_nsx.services.flowclassifier.nsx_v import driver as nsx_v_driver
+from vmware_nsx.tests import unit as vmware
+from vmware_nsx.tests.unit.nsx_v.vshield import fake_vcns
 
 
 class TestNsxvFlowClassifierDriver(

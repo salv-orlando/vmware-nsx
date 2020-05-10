@@ -13,8 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from unittest import mock
+
 import decorator
-import mock
 import netaddr
 from oslo_config import cfg
 from oslo_db import exception as db_exc

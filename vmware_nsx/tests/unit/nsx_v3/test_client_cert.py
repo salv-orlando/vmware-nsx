@@ -14,8 +14,8 @@
 # limitations under the License.
 
 import os
+from unittest import mock
 
-import mock
 from oslo_config import cfg
 
 from neutron.tests.unit import testlib_api

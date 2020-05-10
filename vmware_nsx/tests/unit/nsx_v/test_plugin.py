@@ -16,11 +16,11 @@
 import contextlib
 import copy
 import re
+from unittest import mock
 
 import decorator
 
 from eventlet import greenthread
-import mock
 import netaddr
 from neutron.db import securitygroups_db as sg_db
 from neutron.extensions import address_scope

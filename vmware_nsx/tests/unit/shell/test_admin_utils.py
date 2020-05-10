@@ -15,7 +15,8 @@
 
 import abc
 
-import mock
+from unittest import mock
+
 from oslo_config import cfg
 from oslo_log import _options
 from oslo_log import log as logging
@@ -296,7 +297,7 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
         except SystemExit:
             return
         else:
-            self.assertTrue(False)
+            self.fail()
 
 
 class TestNsxv3AdminUtils(AbstractTestAdminUtils,

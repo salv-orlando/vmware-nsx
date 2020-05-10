@@ -12,12 +12,13 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import mock
 
-import mock
+import six
+
 from neutron.tests import base
 from neutron_lib import exceptions
 from oslo_serialization import jsonutils
-import six
 
 from vmware_nsx.api_client import exception as api_exc
 from vmware_nsx.common import exceptions as nsx_exc

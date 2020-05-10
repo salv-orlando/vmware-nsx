@@ -12,7 +12,8 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import mock
+
+from unittest import mock
 
 from networking_l2gw.db.l2gateway import l2gateway_db
 from networking_l2gw.services.l2gateway.common import config

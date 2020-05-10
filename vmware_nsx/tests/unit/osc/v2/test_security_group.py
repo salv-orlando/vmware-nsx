@@ -14,12 +14,11 @@
 #    under the License.
 
 import re
+from unittest import mock
 
-import mock
 from openstackclient.tests.unit.network.v2 import (
     test_security_group_network as test_security_group)
 from openstackclient.tests.unit import utils as tests_utils
-
 
 from vmware_nsx.extensions import providersecuritygroup
 from vmware_nsx.extensions import securitygrouplogging

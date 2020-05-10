@@ -12,8 +12,8 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from unittest import mock
 
-import mock
 from neutron.tests import base
 
 from vmware_nsx.plugins.nsx_v.vshield import vcns_driver
