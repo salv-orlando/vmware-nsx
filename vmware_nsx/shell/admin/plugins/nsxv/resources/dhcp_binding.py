@@ -14,7 +14,6 @@
 
 
 import pprint
-import sys
 
 from neutron_lib import context as n_context
 from oslo_config import cfg
@@ -282,8 +281,6 @@ def nsx_recreate_dhcp_edge_by_net_id(net_id):
                     nsxv_manager.vcns.get_edge(edge_id)
                 except exceptions.ResourceNotFound:
                     # No edge on backend
-                    # prevent logger from logging this exception
-                    sys.exc_clear()
                     LOG.info("Edge %s does not exist on the NSX", edge_id)
                 else:
                     LOG.warning("Network %(net_id)s already has a dhcp edge: "
