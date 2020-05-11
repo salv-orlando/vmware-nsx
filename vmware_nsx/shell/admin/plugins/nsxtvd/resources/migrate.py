@@ -12,8 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
@@ -144,8 +142,6 @@ def delete_v_resources(context, objects):
                 try:
                     get_object(context, obj['id'])
                 except exceptions.NotFound:
-                    # prevent logger from logging this exception
-                    sys.exc_clear()
                     continue
 
                 try:
@@ -198,8 +194,7 @@ def create_t_resources(context, objects, ext_net):
                 try:
                     get_object(context, obj['id'])
                 except exceptions.NotFound:
-                    # prevent logger from logging this exception
-                    sys.exc_clear()
+                    pass
                 else:
                     # already exists (this will happen if we rerun from files,
                     # or if the deletion failed)
@@ -321,8 +316,7 @@ def create_t_resources(context, objects, ext_net):
                                 context, {'security_group_rule': rule_data})
                         except ext_sg.SecurityGroupRuleExists:
                             # default rules were already created.
-                            # prevent logger from logging this exception
-                            sys.exc_clear()
+                            pass
                         except Exception as e:
                             LOG.error(
                                 ">>Failed to create security group %(name)s "
@@ -401,7 +395,6 @@ def migrate_v_project_to_t(resource, event, trigger, **kwargs):
                     default="yes")
         file.close()
     except Exception:
-        sys.exc_clear()
         if from_file:
             LOG.error("Cannot run from file: files not found")
             return
