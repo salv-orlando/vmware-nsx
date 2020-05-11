@@ -16,6 +16,7 @@
 import random
 
 import netaddr
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from neutron_lib.exceptions import firewall_v2 as exceptions
@@ -179,14 +180,46 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
                 conditions=[expr], tags=tags)
             return group_id
 
-    def _create_network_group(self, router_id, neutron_net_id):
+    def update_segment_group(self, context, router_id, neutron_net_id):
+        """Update the segment group for fwaas rules in case fip changed"""
+        try:
+            group_id = '%s-%s' % (router_id, neutron_net_id)
+            self.nsxpolicy.group.get(policy_constants.DEFAULT_DOMAIN, group_id)
+        except Exception:
+            # no relevant group needs to be updated
+            return
+        self._create_network_group(context, router_id, neutron_net_id)
+
+    def _create_network_group(self, context, router_id, neutron_net_id):
         scope_and_tag = "%s|%s" % ('os-neutron-net-id', neutron_net_id)
         tags = []
         tags = nsxlib_utils.add_v3_tag(tags, ROUTER_FW_TAG, router_id)
-        expr = self.nsxpolicy.group.build_condition(
-            cond_val=scope_and_tag,
-            cond_key=policy_constants.CONDITION_KEY_TAG,
-            cond_member_type=nsx_constants.TARGET_TYPE_LOGICAL_SWITCH)
+        if cfg.CONF.nsx_p.firewall_match_internal_addr:
+            expr = self.nsxpolicy.group.build_condition(
+                cond_val=scope_and_tag,
+                cond_key=policy_constants.CONDITION_KEY_TAG,
+                cond_member_type=nsx_constants.TARGET_TYPE_LOGICAL_SWITCH)
+        else:
+            # Need to add fips to the network cidr
+            group_ips = []
+            subnets = self.core_plugin.get_subnets_by_network(
+                context.elevated(), neutron_net_id)
+            for subnet in subnets:
+                group_ips.append(subnet['cidr'])
+
+            filters = {
+                'network_id': [neutron_net_id],
+                'device_owner': ['compute:nova']
+            }
+            vm_ports = self.core_plugin.get_ports(context.elevated(), filters)
+            for vm_port in vm_ports:
+                fip_filter = {'port_id': [vm_port['id']]}
+                fips = self.core_plugin.get_floatingips(
+                    context.elevated(), fip_filter)
+                for fip in fips:
+                    group_ips.append(fip['floating_ip_address'])
+            expr = self.nsxpolicy.group.build_ip_address_expression(
+                group_ips)
         group_id = '%s-%s' % (router_id, neutron_net_id)
         self.nsxpolicy.group.create_or_overwrite_with_conditions(
             "Segment_%s" % neutron_net_id,
@@ -254,14 +287,15 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
             translated_rules.append(rule_entry)
         return translated_rules
 
-    def _get_port_translated_rules(self, project_id, router_id, neutron_net_id,
+    def _get_port_translated_rules(self, context, project_id, router_id,
+                                   neutron_net_id,
                                    firewall_group, plugin_rules):
         """Return the list of translated FWaaS rules per port
         Add the egress/ingress rules of this port +
         default drop rules in each direction for this port.
         """
         net_group_id = self._create_network_group(
-            router_id, neutron_net_id)
+            context, router_id, neutron_net_id)
         port_rules = []
         # Add the firewall group ingress/egress rules only if the fw is up
         if firewall_group['admin_state_up']:
@@ -335,7 +369,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
                 # Add the FWaaS rules for this port:ingress/egress firewall
                 # rules + default ingress/egress drop rule for this port
                 fw_rules.extend(self._get_port_translated_rules(
-                    project_id, router_id, port['network_id'], fwg,
+                    context, project_id, router_id, port['network_id'], fwg,
                     plugin_rules))
 
         # Add a default allow-all rule to all other traffic & ports

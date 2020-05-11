@@ -15,6 +15,7 @@
 from oslo_config import cfg
 
 from neutron.db import l3_dvr_db  # noqa
+from neutron import manager
 from neutron_lib import context
 from neutron_lib.plugins import constants as const
 from neutron_lib.plugins import directory
@@ -23,6 +24,7 @@ from oslo_log import log as logging
 from vmware_nsx.common import config
 from vmware_nsx.plugins.nsx_p import plugin
 from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
+from vmware_nsx.services.fwaas.nsx_p import fwaas_callbacks_v2
 from vmware_nsx.shell.admin.plugins.common import formatters
 
 LOG = logging.getLogger(__name__)
@@ -85,3 +87,28 @@ class NsxPolicyPluginWrapper(plugin.NsxPolicyPlugin):
 
     def __exit__(self, exc_type, exc_value, traceback):
         directory.add_plugin(const.CORE, None)
+
+    def _init_fwaas_plugin(self, provider, callbacks_class, plugin_callbacks):
+        fwaas_plugin_class = manager.NeutronManager.load_class_for_provider(
+            'neutron.service_plugins', provider)
+        fwaas_plugin = fwaas_plugin_class()
+        self.fwaas_callbacks = callbacks_class(False)
+        # override the fwplugin_rpc since there is no RPC support in adminutils
+        if plugin_callbacks:
+            self.fwaas_callbacks.fwplugin_rpc = plugin_callbacks(fwaas_plugin)
+        self.init_is_complete = True
+
+    def init_fwaas_for_admin_utils(self):
+        # initialize the FWaaS plugin and callbacks
+        self.fwaas_callbacks = None
+        # This is an ugly patch to find out if fwaas is enabled
+        service_plugins = cfg.CONF.service_plugins
+        for srv_plugin in service_plugins:
+            if 'firewall' in srv_plugin or 'fwaas' in srv_plugin:
+                if 'v2' in srv_plugin:
+                    # FWaaS V2
+                    self._init_fwaas_plugin(
+                        'firewall_v2',
+                        fwaas_callbacks_v2.NsxpFwaasCallbacksV2,
+                        None)
+                return

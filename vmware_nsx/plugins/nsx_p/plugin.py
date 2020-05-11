@@ -3216,6 +3216,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             with excutils.save_and_reraise_exception():
                 self.delete_floatingip(context, new_fip['id'])
 
+        if (port_id and not cfg.CONF.nsx_p.firewall_match_internal_addr and
+            self.fwaas_callbacks):
+            # Might need to update a group related to this fip
+            self.fwaas_callbacks.update_segment_group(
+                context, router_id, port_data['network_id'])
+
         return new_fip
 
     def delete_floatingip(self, context, fip_id):
@@ -3244,6 +3250,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self._delete_fip_nat_rules(router_id, fip_id)
 
         super(NsxPolicyPlugin, self).delete_floatingip(context, fip_id)
+
+        if (port_id and not cfg.CONF.nsx_p.firewall_match_internal_addr and
+            self.fwaas_callbacks):
+            # Might need to update a group related to this fip
+            self.fwaas_callbacks.update_segment_group(
+                context, router_id, port_data['network_id'])
 
     def update_floatingip(self, context, fip_id, floatingip):
         fip_data = floatingip['floatingip']
