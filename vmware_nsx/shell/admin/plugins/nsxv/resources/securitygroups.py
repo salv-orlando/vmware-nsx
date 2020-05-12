@@ -54,6 +54,7 @@ class NeutronSecurityGroupDB(
         super(NeutronSecurityGroupDB, self)
         # FIXME(roeyc): context is already defined in NeutrondDbClient
         self.context = n_context.get_admin_context()
+        admin_utils._init_plugin_mock_quota()
 
     def get_security_groups_mappings(self):
         q = self.context.session.query(

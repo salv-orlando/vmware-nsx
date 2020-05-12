@@ -24,6 +24,7 @@ from vmware_nsx.common import config
 from vmware_nsx.plugins.common_v3 import utils as v3_utils
 from vmware_nsx.plugins.nsx_p import plugin
 from vmware_nsx.shell.admin.plugins.common import formatters
+from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 
 LOG = logging.getLogger(__name__)
 _NSXPOLICY = None
@@ -78,6 +79,7 @@ class NsxPolicyPluginWrapper(plugin.NsxPolicyPlugin):
         config.register_nsxp_azs(cfg.CONF, cfg.CONF.nsx_p.availability_zones)
         super(NsxPolicyPluginWrapper, self).__init__()
         self.context = context.get_admin_context()
+        admin_utils._init_plugin_mock_quota()
 
     def __enter__(self):
         directory.add_plugin(const.CORE, self)
