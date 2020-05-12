@@ -267,7 +267,7 @@ def nsx_redo_metadata_cfg_for_edge(context, plugin, edge_id):
         if (binding['router_id'].startswith(
                 vcns_constants.BACKUP_ROUTER_PREFIX) or
                 binding['router_id'].startswith(
-                    vcns_constants.PLR_EDGE_PREFIX)or
+                    vcns_constants.PLR_EDGE_PREFIX) or
                 binding['router_id'].startswith(
                     lb_common.RESOURCE_ID_PFX)):
             LOG.error('Edge %s is not a metadata delivery appliance', edge_id)
@@ -329,7 +329,7 @@ def nsx_redo_metadata_cfg_for_az(context, plugin, az_name, check_az=True):
                              not binding['router_id'].startswith(
                                  vcns_constants.BACKUP_ROUTER_PREFIX) and
                              not binding['router_id'].startswith(
-                                    vcns_constants.PLR_EDGE_PREFIX)and
+                                    vcns_constants.PLR_EDGE_PREFIX) and
                              not binding['router_id'].startswith(
                                     lb_common.RESOURCE_ID_PFX))]))
 

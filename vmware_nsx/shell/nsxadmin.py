@@ -73,15 +73,15 @@ def _validate_resource_choice(resource, nsx_plugin):
         LOG.error('Supported list of NSX-V resources: %s',
                   resources.nsxv_resources_names)
         sys.exit(1)
-    elif nsx_plugin == 'nsxv3'and resource not in resources.nsxv3_resources:
+    elif nsx_plugin == 'nsxv3' and resource not in resources.nsxv3_resources:
         LOG.error('Supported list of NSX-V3 resources: %s',
                   resources.nsxv3_resources_names)
         sys.exit(1)
-    elif nsx_plugin == 'nsxtvd'and resource not in resources.nsxtvd_resources:
+    elif nsx_plugin == 'nsxtvd' and resource not in resources.nsxtvd_resources:
         LOG.error('Supported list of NSX-TVD resources: %s',
                   resources.nsxtvd_resources_names)
         sys.exit(1)
-    elif nsx_plugin == 'nsxp'and resource not in resources.nsxp_resources:
+    elif nsx_plugin == 'nsxp' and resource not in resources.nsxp_resources:
         LOG.error('Supported list of NSX-P resources: %s',
                   resources.nsxp_resources_names)
         sys.exit(1)
