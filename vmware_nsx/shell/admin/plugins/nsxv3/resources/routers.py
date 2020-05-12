@@ -12,8 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-
 from neutron.db import db_base_plugin_v2
 from neutron.db import l3_db
 from neutron_lib.callbacks import registry
@@ -176,8 +174,6 @@ def delete_backend_router(resource, event, trigger, **kwargs):
     try:
         nsxlib.logical_router.get(nsx_id, silent=True)
     except nsx_exc.ResourceNotFound:
-        # prevent logger from logging this exception
-        sys.exc_clear()
         LOG.warning("Backend router %s was not found.", nsx_id)
         return
 
@@ -193,8 +189,6 @@ def delete_backend_router(resource, event, trigger, **kwargs):
     try:
         nsxlib.logical_router.get(nsx_id, silent=True)
     except nsx_exc.ResourceNotFound:
-        # prevent logger from logging this exception
-        sys.exc_clear()
         LOG.info("Backend router %s was deleted.", nsx_id)
     else:
         LOG.error("Failed to delete backend router %s.", nsx_id)

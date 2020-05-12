@@ -13,7 +13,6 @@
 #    under the License.
 
 import re
-import sys
 import xml.etree.ElementTree as et
 
 from neutron_lib.callbacks import registry
@@ -284,7 +283,6 @@ def delete_nsx_portgroups(resource, event, trigger, **kwargs):
         except Exception as e:
             LOG.error("Failed to delete portgroup %(pg)s: %(e)s",
                       {'pg': portgroup['moref'], 'e': e})
-            sys.exc_clear()
         else:
             LOG.info("Successfully deleted portgroup %(pg)s",
                      {'pg': portgroup['moref']})

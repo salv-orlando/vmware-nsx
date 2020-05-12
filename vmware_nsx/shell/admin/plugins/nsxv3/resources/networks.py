@@ -12,8 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.plugins.nsx_v3 import utils as v3_utils
 from vmware_nsx.shell.admin.plugins.common import constants
@@ -100,8 +98,6 @@ def delete_backend_network(resource, event, trigger, **kwargs):
     try:
         nsxlib.logical_switch.get(nsx_id, silent=True)
     except nsx_exc.ResourceNotFound:
-        # prevent logger from logging this exception
-        sys.exc_clear()
         LOG.warning("Backend network %s was not found.", nsx_id)
         return
 
@@ -118,8 +114,6 @@ def delete_backend_network(resource, event, trigger, **kwargs):
     try:
         nsxlib.logical_switch.get(nsx_id, silent=True)
     except nsx_exc.ResourceNotFound:
-        # prevent logger from logging this exception
-        sys.exc_clear()
         LOG.info("Backend network %s was deleted.", nsx_id)
     else:
         LOG.error("Failed to delete backend network %s.", nsx_id)
