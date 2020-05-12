@@ -65,6 +65,7 @@ class NsxVPluginWrapper(plugin.NsxVPlugin):
         with mock.patch("vmware_nsx.plugins.common.housekeeper."
                         "housekeeper.NsxHousekeeper"):
             self.init_complete(0, 0, 0)
+        admin_utils._init_plugin_mock_quota()
 
     def start_rpc_listeners(self):
         pass
