@@ -43,6 +43,7 @@ class NeutronSecurityGroupApi(securitygroups_db.SecurityGroupDbMixin):
         super(NeutronSecurityGroupApi, self)
         self.context = neutron_context.get_admin_context()
         self.filters = v3_utils.get_plugin_filters(self.context)
+        admin_utils._init_plugin_mock_quota()
 
     def get_security_groups(self):
         return super(NeutronSecurityGroupApi,

@@ -14,6 +14,9 @@
 
 import sys
 
+import mock
+
+from neutron import quota
 import six
 from vmware_nsx._i18n import _
 from vmware_nsx.db import db
@@ -126,3 +129,8 @@ def get_plugin_filters(context, plugin):
         if maps:
             filters['project_id'] = [m.project for m in maps]
     return filters
+
+
+def _init_plugin_mock_quota():
+    mock.patch.object(quota.QuotaEngine, 'make_reservation').start()
+    mock.patch.object(quota.QuotaEngine, 'commit_reservation').start()

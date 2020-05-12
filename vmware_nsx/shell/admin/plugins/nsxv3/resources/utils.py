@@ -122,6 +122,7 @@ class NsxV3PluginWrapper(plugin.NsxV3Plugin):
         config.register_nsxv3_azs(cfg.CONF, cfg.CONF.nsx_v3.availability_zones)
         super(NsxV3PluginWrapper, self).__init__()
         self.context = context.get_admin_context()
+        admin_utils._init_plugin_mock_quota()
 
     def __enter__(self):
         directory.add_plugin(const.CORE, self)
