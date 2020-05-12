@@ -16,6 +16,7 @@ from neutron.db import db_base_plugin_v2
 from neutron.db import l3_db
 from neutron_lib.callbacks import registry
 from neutron_lib import context
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from vmware_nsx.db import nsx_models
@@ -136,29 +137,45 @@ def update_nat_firewall_match(resource, event, trigger, **kwargs):
     if firewall_match_str.lower() == 'internal':
         new_firewall_match = policy_constants.NAT_FIREWALL_MATCH_INTERNAL
         old_firewall_match = policy_constants.NAT_FIREWALL_MATCH_EXTERNAL
+        conf_match_internal = True
     else:
         new_firewall_match = policy_constants.NAT_FIREWALL_MATCH_EXTERNAL
         old_firewall_match = policy_constants.NAT_FIREWALL_MATCH_INTERNAL
+        conf_match_internal = False
+
+    cfg.CONF.set_override('firewall_match_internal_addr',
+                          conf_match_internal, 'nsx_p')
 
     nsxpolicy = p_utils.get_connected_nsxpolicy()
-    plugin = RoutersPlugin()
-    ctx = context.get_admin_context()
-    neutron_routers = plugin.get_routers(ctx)
-    for router in neutron_routers:
-        rules = nsxpolicy.tier1_nat_rule.list(router['id'])
-        for rule in rules:
-            if not nsxpolicy.feature_supported(
-                nsx_constants.FEATURE_PARTIAL_UPDATES):
-                if rule.get('firewall_match', '') == old_firewall_match:
-                    nsxpolicy.tier1_nat_rule.update(
-                        router['id'], rule['id'],
-                        firewall_match=new_firewall_match)
-            else:
-                with policy_trans.NsxPolicyTransaction():
-                    if rule.get('firewall_match', '') == old_firewall_match:
+    with p_utils.NsxPolicyPluginWrapper() as plugin:
+        # Make sure FWaaS was initialized
+        plugin.init_fwaas_for_admin_utils()
+
+        ctx = context.get_admin_context()
+        neutron_routers = plugin.get_routers(ctx)
+        for router in neutron_routers:
+            rules = nsxpolicy.tier1_nat_rule.list(router['id'])
+            for rule in rules:
+                if not nsxpolicy.feature_supported(
+                    nsx_constants.FEATURE_PARTIAL_UPDATES):
+                    if rule.get('firewall_match') == old_firewall_match:
                         nsxpolicy.tier1_nat_rule.update(
                             router['id'], rule['id'],
                             firewall_match=new_firewall_match)
+                else:
+                    with policy_trans.NsxPolicyTransaction():
+                        if rule.get('firewall_match') == old_firewall_match:
+                            nsxpolicy.tier1_nat_rule.update(
+                                router['id'], rule['id'],
+                                firewall_match=new_firewall_match)
+
+            if plugin.fwaas_callbacks:
+                # get all router interface networks
+                interface_ports = plugin._get_router_interfaces(
+                    ctx, router['id'])
+                for port in interface_ports:
+                    plugin.fwaas_callbacks.update_segment_group(
+                        ctx, router['id'], port['network_id'])
 
     LOG.info("Done.")
 
