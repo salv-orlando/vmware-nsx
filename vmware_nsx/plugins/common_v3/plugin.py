@@ -1107,7 +1107,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
         # validate the mdproxy TZ matches this one.
         if (not err_msg and physical_net and
-            self._has_native_dhcp_metadata()):
+            self._has_native_dhcp_metadata() and
+            net_type != utils.NsxV3NetworkTypes.NSX_NETWORK):
             if not self._validate_net_mdproxy_tz(
                 az, physical_net, mdproxy_uuid):
                 err_msg = (_('Network TZ %(tz)s does not match MD proxy '
