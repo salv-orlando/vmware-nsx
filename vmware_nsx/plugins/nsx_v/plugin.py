@@ -3276,7 +3276,13 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                           "enabled": True,
                           "action": "allow",
                           "application": {
-                              "applicationId": application_ids}}]
+                              "applicationId": application_ids}},
+                         {"name": "DHCPReply",
+                          "action": "allow",
+                          "enabled": True,
+                          "protocol": "udp",
+                          "source_port": "68",
+                          "destination_port": "67"}]
 
             except Exception as e:
                 LOG.error(
@@ -3288,7 +3294,13 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                       "enabled": True,
                       "action": "allow",
                       "protocol": "icmp",
-                      "icmp_type": 8}]
+                      "icmp_type": 8},
+                     {"name": "DHCPReply",
+                      "action": "allow",
+                      "enabled": True,
+                      "protocol": "udp",
+                      "source_port": "68",
+                      "destination_port": "67"}]
 
         if plugin.metadata_proxy_handler:
             rules += nsx_v_md_proxy.get_router_fw_rules()
