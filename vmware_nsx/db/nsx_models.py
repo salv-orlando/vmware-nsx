@@ -217,6 +217,7 @@ class NetworkConnection(model_base.BASEV2, model_base.HasProject,
 
 
 class NetworkGatewayDeviceReference(model_base.BASEV2, models.TimestampMixin):
+    # This table is no longer in use
     id = sa.Column(sa.String(36), primary_key=True)
     network_gateway_id = sa.Column(sa.String(36),
                                    sa.ForeignKey('networkgateways.id',
@@ -227,6 +228,7 @@ class NetworkGatewayDeviceReference(model_base.BASEV2, models.TimestampMixin):
 
 class NetworkGatewayDevice(model_base.BASEV2, model_base.HasId,
                            model_base.HasProject, models.TimestampMixin):
+    # This table is no longer in use
     nsx_id = sa.Column(sa.String(36))
     # Optional name for the gateway device
     name = sa.Column(sa.String(255))
@@ -242,6 +244,7 @@ class NetworkGatewayDevice(model_base.BASEV2, model_base.HasId,
 class NetworkGateway(model_base.BASEV2, model_base.HasId,
                      model_base.HasProject, models.TimestampMixin):
     """Defines the data model for a network gateway."""
+    # This table is no longer in use
     name = sa.Column(sa.String(255))
     default = sa.Column(sa.Boolean())
     devices = orm.relationship(NetworkGatewayDeviceReference,
@@ -317,6 +320,7 @@ class QosPolicySwitchProfile(model_base.BASEV2, models.TimestampMixin):
 
 class NsxPortMirrorSessionMapping(model_base.BASEV2):
     """Define a mapping between Tap Flow and PortMirrorSession object."""
+    # This table is no longer in use
     __tablename__ = 'nsx_port_mirror_session_mappings'
     tap_flow_id = sa.Column(sa.String(36),
                             nullable=False,

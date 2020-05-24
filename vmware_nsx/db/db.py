@@ -330,19 +330,6 @@ def delete_neutron_nsx_router_mapping(session, neutron_id):
         session, nsx_models.NeutronNsxRouterMapping, neutron_id)
 
 
-def unset_default_network_gateways(session):
-    with session.begin(subtransactions=True):
-        session.query(nsx_models.NetworkGateway).update(
-            {nsx_models.NetworkGateway.default: False})
-
-
-def set_default_network_gateway(session, gw_id):
-    with session.begin(subtransactions=True):
-        gw = (session.query(nsx_models.NetworkGateway).
-              filter_by(id=gw_id).one())
-        gw['default'] = True
-
-
 def set_multiprovider_network(session, network_id):
     with session.begin(subtransactions=True):
         multiprovider_network = nsx_models.MultiProviderNetworks(
@@ -400,29 +387,6 @@ def get_switch_profile_by_qos_policy(session, qos_policy_id):
 def delete_qos_policy_profile_mapping(session, qos_policy_id):
     return (session.query(nsx_models.QosPolicySwitchProfile).
             filter_by(qos_policy_id=qos_policy_id).delete())
-
-
-# NSXv3 Port Mirror Sessions DB methods.
-def add_port_mirror_session_mapping(session, tf_id, pm_session_id):
-    with session.begin(subtransactions=True):
-        mapping = nsx_models.NsxPortMirrorSessionMapping(
-            tap_flow_id=tf_id,
-            port_mirror_session_id=pm_session_id)
-        session.add(mapping)
-        return mapping
-
-
-def get_port_mirror_session_mapping(session, tf_id):
-    try:
-        return (session.query(nsx_models.NsxPortMirrorSessionMapping).
-                filter_by(tap_flow_id=tf_id).one())
-    except exc.NoResultFound:
-        raise nsx_exc.NsxPortMirrorSessionMappingNotFound(tf=tf_id)
-
-
-def delete_port_mirror_session_mapping(session, tf_id):
-    return (session.query(nsx_models.NsxPortMirrorSessionMapping).
-            filter_by(tap_flow_id=tf_id).delete())
 
 
 @db_api.CONTEXT_WRITER
