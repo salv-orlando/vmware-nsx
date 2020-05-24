@@ -84,6 +84,15 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
             self.assertEqual(res.status_int, 400)
             self._delete('ports', port['port']['id'])
 
+    def test_mac_configuration(self):
+        address_pairs = [{'mac_address': 'fa16.3e3e.3d01',
+                          'ip_address': '10.0.0.1'}]
+        self._create_port_with_address_pairs(address_pairs, 201)
+
+        address_pairs = [{'mac_address': 'fa-16-3e-3e-3d-c4',
+                          'ip_address': '10.0.0.1'}]
+        self._create_port_with_address_pairs(address_pairs, 201)
+
     def test_create_port_security_false_allowed_address_pairs(self):
         self.skipTest('TBD')
 
