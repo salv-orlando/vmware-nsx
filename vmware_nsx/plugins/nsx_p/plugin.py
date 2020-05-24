@@ -1514,7 +1514,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         address_bindings = []
         for fixed_ip in port_data['fixed_ips']:
             ip_addr = fixed_ip['ip_address']
-            mac_addr = port_data['mac_address']
+            mac_addr = self._format_mac_address(port_data['mac_address'])
             binding = self.nsxpolicy.segment_port.build_address_binding(
                 ip_addr, mac_addr)
             address_bindings.append(binding)
@@ -1530,7 +1530,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         for pair in port_data.get(addr_apidef.ADDRESS_PAIRS):
             binding = self.nsxpolicy.segment_port.build_address_binding(
-                pair['ip_address'], pair['mac_address'])
+                pair['ip_address'],
+                self._format_mac_address(pair['mac_address']))
             address_bindings.append(binding)
 
         return address_bindings
