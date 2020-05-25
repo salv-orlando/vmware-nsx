@@ -307,6 +307,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 context.elevated(), router_db.id, gw_network_id,
                 interface_subnet['id'], subnet=interface_subnet)
 
+    def _format_mac_address(self, mac):
+        # The NSX backend does not support mac format MMM.MMM.SSS.SSS
+        # Translate it to MM:MM:MM:SS:SS:SS instead
+        if '.' in mac:
+            fixed = mac.replace('.', '')
+            if len(fixed) == 12:
+                fixed = "%s:%s:%s:%s:%s:%s" % (fixed[0:2], fixed[2:4],
+                                               fixed[4:6], fixed[6:8],
+                                               fixed[8:10], fixed[10:12])
+                return fixed
+        return mac
+
     def _validate_address_pairs(self, address_pairs, fixed_ips=None):
         port_ips = []
         if fixed_ips:
