@@ -60,6 +60,7 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
 
     def test_create_port_allowed_address_pairs_v6(self):
         with self.network() as net:
+            # Single IPv6
             address_pairs = [{'ip_address': '1001::12'}]
             res = self._create_port(self.fmt, net['network']['id'],
                                     arg_list=(addr_apidef.ADDRESS_PAIRS,),
@@ -69,6 +70,25 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
             self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
                              address_pairs)
             self._delete('ports', port['port']['id'])
+
+            # IPv6 cidr
+            address_pairs = [{'ip_address': '1001::/64'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            address_pairs[0]['mac_address'] = port['port']['mac_address']
+            self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
+                             address_pairs)
+            self._delete('ports', port['port']['id'])
+
+            # Illegal IPv6 cidr
+            address_pairs = [{'ip_address': '1001::12/64'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
 
     def test_update_add_bad_address_pairs_with_cidr(self):
         with self.network() as net:
@@ -116,6 +136,7 @@ class TestAllowedAddressPairsNSXv3(test_v3_plugin.NsxV3PluginTestCaseMixin,
 
     def test_create_port_allowed_address_pairs_v6(self):
         with self.network() as net:
+            # Single IPv6 address
             address_pairs = [{'ip_address': '1001::12'}]
             res = self._create_port(self.fmt, net['network']['id'],
                                     arg_list=(addr_apidef.ADDRESS_PAIRS,),
@@ -125,6 +146,25 @@ class TestAllowedAddressPairsNSXv3(test_v3_plugin.NsxV3PluginTestCaseMixin,
             self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
                              address_pairs)
             self._delete('ports', port['port']['id'])
+
+            # IPv6 cidr
+            address_pairs = [{'ip_address': '1001::/64'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            address_pairs[0]['mac_address'] = port['port']['mac_address']
+            self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
+                             address_pairs)
+            self._delete('ports', port['port']['id'])
+
+            # Illegal IPv6 cidr
+            address_pairs = [{'ip_address': '1001::12/64'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
 
     def test_update_add_bad_address_pairs_with_cidr(self):
         with self.network() as net:

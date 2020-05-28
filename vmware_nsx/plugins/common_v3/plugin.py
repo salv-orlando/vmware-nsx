@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ipaddress
+
 import decorator
 import mock
 import netaddr
@@ -321,8 +323,19 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _validate_address_pairs(self, address_pairs):
         for pair in address_pairs:
             ip = pair.get('ip_address')
-            # Validate ipv4 cidrs (No limitation on ipv6):
-            if ':' not in ip:
+            if ':' in ip:
+                # Validate ipv6 cidrs:
+                ip_split = ip.split('/')
+                if len(ip_split) > 1 and ip_split[1] != '128':
+                    try:
+                        ipaddress.ip_network(ip)
+                    except ValueError:
+                        # This means the host bits are set
+                        err_msg = (_("Allowed address pairs Cidr %s cannot "
+                                     "have host bits set") % ip)
+                        raise n_exc.InvalidInput(error_message=err_msg)
+            else:
+                # Validate ipv4 cidrs (No limitation on ipv6):
                 if len(ip.split('/')) > 1 and ip.split('/')[1] != '32':
                     LOG.error("cidr %s is not supported in allowed address "
                               "pairs", ip)
