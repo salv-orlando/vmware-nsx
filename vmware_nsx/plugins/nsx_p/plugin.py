@@ -1332,6 +1332,38 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                             "subnets")
                 raise n_exc.InvalidInput(error_message=err_msg)
 
+    def _validate_subnet_gw_ip(self, subnet, orig_subnet=None):
+        # Make sure the gw ip is legal and belongs to the subnet
+        raw_gw_ip = subnet.get('gateway_ip')
+        if orig_subnet and raw_gw_ip == const.ATTR_NOT_SPECIFIED:
+            raw_gw_ip = orig_subnet.get('gateway_ip')
+        raw_cidr = subnet.get('cidr')
+        if orig_subnet and raw_cidr == const.ATTR_NOT_SPECIFIED:
+            raw_cidr = orig_subnet.get('cidr')
+        if (not raw_gw_ip or raw_gw_ip == const.ATTR_NOT_SPECIFIED or
+            not raw_cidr or raw_cidr == const.ATTR_NOT_SPECIFIED):
+            return
+
+        gw_ip = netaddr.IPAddress(raw_gw_ip)
+        cidr = netaddr.IPNetwork(raw_cidr)
+        if gw_ip.version != cidr.version:
+            err_msg = (_("Subnet gateway ip version %s does not match subnet "
+                         "cidr %s") % (gw_ip.version, raw_cidr))
+            raise n_exc.InvalidInput(error_message=err_msg)
+
+        if gw_ip not in cidr:
+            err_msg = (_("Subnet gateway ip %s does not belong to subnet "
+                         "cidr %s") % (raw_gw_ip, raw_cidr))
+            raise n_exc.InvalidInput(error_message=err_msg)
+
+        if gw_ip.version == const.IP_VERSION_6:
+            # NSX does not support xxxx::0 as a segment subnet gateway
+            illegal_gw = str(netaddr.IPNetwork(raw_cidr).network)
+            if illegal_gw == str(gw_ip):
+                err_msg = (_("IPv6 Subnet gateway ip %s is not "
+                             "supported") % raw_gw_ip)
+                raise n_exc.InvalidInput(error_message=err_msg)
+
     def _has_dhcp_enabled_subnet(self, context, network, ip_version=4):
         for subnet in network.subnets:
             if subnet.enable_dhcp and subnet.ip_version == ip_version:
@@ -1352,6 +1384,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         net_id = subnet['subnet']['network_id']
         network = self._get_network(context, net_id)
         self._validate_single_ipv6_subnet(context, network, subnet['subnet'])
+        self._validate_subnet_gw_ip(subnet['subnet'])
         net_az = self.get_network_az_by_net_id(context, net_id)
 
         # Allow manipulation of only 1 subnet of the same network at once
@@ -1442,6 +1475,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         updated_subnet = None
         orig_subnet = self.get_subnet(context, subnet_id)
         self._validate_subnet_host_routes(subnet, orig_subnet=orig_subnet)
+        self._validate_subnet_gw_ip(subnet_data, orig_subnet=orig_subnet)
 
         net_id = orig_subnet['network_id']
         network = self._get_network(context, net_id)

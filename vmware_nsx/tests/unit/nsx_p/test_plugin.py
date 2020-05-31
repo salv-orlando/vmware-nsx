@@ -27,6 +27,7 @@ from neutron.tests.unit.extensions import test_address_scope
 from neutron.tests.unit.extensions import test_extraroute as test_ext_route
 from neutron.tests.unit.extensions import test_l3 as test_l3_plugin
 from neutron.tests.unit.extensions import test_securitygroup
+from neutron.tests.unit import testlib_api
 
 from neutron_lib.api.definitions import external_net as extnet_apidef
 from neutron_lib.api.definitions import extra_dhcp_opt as edo_ext
@@ -1056,6 +1057,12 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
             res = self.deserialize(self.fmt, req.get_response(self.api))
             self.assertIn('NeutronError', res)
 
+    def test_requested_subnet_id_v6_slaac(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_requested_invalid_fixed_ip_address_v6_slaac(self):
+        self.skipTest("NSX subnet GW validation")
+
 
 class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                       NsxPPluginTestCaseMixin):
@@ -1126,6 +1133,51 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
 
     def test_create_subnet_ipv6_gw_values(self):
         self.skipTest("IPv6 gateway IP is assigned by the plugin")
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_create_subnet_ipv6_gw_is_nw_start_addr_canonicalize(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_create_subnet_ipv6_out_of_cidr_global(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_create_subnet_ipv6_out_of_cidr_lla(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_create_subnet_gw_outside_cidr_returns_201(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_create_subnet_ipv6_gw_validation(self):
+        # Illegal GW as first ip in range
+        gateway_ip = 'fe80::0'
+        cidr = 'fe80::/64'
+        with testlib_api.ExpectedException(
+                exc.HTTPClientError) as ctx_manager:
+            self._test_create_subnet(
+                gateway_ip=gateway_ip,
+                cidr=cidr,
+                ip_version=constants.IP_VERSION_6,
+                enable_dhcp=True,
+                ipv6_ra_mode=constants.DHCPV6_STATEFUL,
+                ipv6_address_mode=constants.DHCPV6_STATEFUL)
+            self.assertEqual(exc.HTTPClientError.code,
+                             ctx_manager.exception.code)
+
+        gateway_ip = '2080::0'
+        cidr = 'fe80::/64'
+        with testlib_api.ExpectedException(
+                exc.HTTPClientError) as ctx_manager:
+            self._test_create_subnet(
+                gateway_ip=gateway_ip,
+                cidr=cidr,
+                ip_version=constants.IP_VERSION_6,
+                enable_dhcp=True,
+                ipv6_ra_mode=constants.DHCPV6_STATEFUL,
+                ipv6_address_mode=constants.DHCPV6_STATEFUL)
+            self.assertEqual(exc.HTTPClientError.code,
+                             ctx_manager.exception.code)
 
     def test_create_ipv6_subnet_with_host_routes(self):
         # IPv6 host routes are not allowed
