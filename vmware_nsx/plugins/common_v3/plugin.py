@@ -320,13 +320,18 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 return fixed
         return mac
 
+    def _support_address_pairs_ipv4_cidr(self):
+        """Can be implemented by each plugin"""
+        return False
+
     def _validate_address_pairs(self, address_pairs):
         for pair in address_pairs:
             ip = pair.get('ip_address')
             if ':' in ip:
-                # Validate ipv6 cidrs:
+                # IPv6 address pair
                 ip_split = ip.split('/')
                 if len(ip_split) > 1 and ip_split[1] != '128':
+                    # Validate ipv6 CIDR
                     try:
                         ipaddress.ip_network(ip)
                     except ValueError:
@@ -335,11 +340,22 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                      "have host bits set") % ip)
                         raise n_exc.InvalidInput(error_message=err_msg)
             else:
-                # Validate ipv4 cidrs (No limitation on ipv6):
+                # IPv4 address pair
                 if len(ip.split('/')) > 1 and ip.split('/')[1] != '32':
-                    LOG.error("cidr %s is not supported in allowed address "
-                              "pairs", ip)
-                    raise nsx_exc.InvalidIPAddress(ip_address=ip)
+                    if self._support_address_pairs_ipv4_cidr():
+                        # validate host bits
+                        try:
+                            ipaddress.ip_network(ip)
+                        except ValueError:
+                            # This means the host bits are set
+                            err_msg = (_("Allowed address pairs Cidr %s "
+                                         "cannot have host bits set") % ip)
+                            raise n_exc.InvalidInput(error_message=err_msg)
+                    else:
+                        # IPv4 CIDR is not allowed
+                        LOG.error("Cidr %s is not supported in allowed "
+                                  "address pairs", ip)
+                        raise nsx_exc.InvalidIPAddress(ip_address=ip)
 
     def _validate_number_of_address_pairs(self, port):
         address_pairs = port.get(addr_apidef.ADDRESS_PAIRS)

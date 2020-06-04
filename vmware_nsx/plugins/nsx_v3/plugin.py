@@ -3453,3 +3453,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if tz_uuid not in ec_tzs:
             return False
         return True
+
+    def _support_address_pairs_ipv4_cidr(self):
+        return self.nsxlib.feature_supported(
+            nsxlib_consts.FEATURE_SPOOFGUARD_CIDR)
