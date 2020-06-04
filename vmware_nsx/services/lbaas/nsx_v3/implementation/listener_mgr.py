@@ -333,6 +333,9 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 vs_list = lb_service.get('virtual_server_ids')
                 if vs_list and vs_id in vs_list:
                     service_client.remove_virtual_server(lbs_id, vs_id)
+            except (nsxlib_exc.ResourceNotFound, nsx_exc.NsxResourceNotFound):
+                LOG.error('Loadbalancing service %s not found at backend' %
+                          lbs_id)
             except nsxlib_exc.ManagerError:
                 completor(success=False)
                 msg = (_('Failed to remove virtual server: %(listener)s '
@@ -351,10 +354,9 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 if persist_profile_id:
                     lb_utils.delete_persistence_profile(
                         self.core_plugin.nsxlib, persist_profile_id)
-            except nsx_exc.NsxResourceNotFound:
-                msg = (_("virtual server not found on nsx: %(vs)s") %
-                       {'vs': vs_id})
-                raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
+            except (nsxlib_exc.ResourceNotFound, nsx_exc.NsxResourceNotFound):
+                LOG.error("virtual server not found on nsx: %(vs)s" %
+                          {'vs': vs_id})
             except nsxlib_exc.ManagerError:
                 completor(success=False)
                 msg = (_('Failed to delete virtual server: %(listener)s') %
@@ -362,7 +364,7 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
             try:
                 app_client.delete(app_profile_id)
-            except nsx_exc.NsxResourceNotFound:
+            except (nsxlib_exc.ResourceNotFound, nsx_exc.NsxResourceNotFound):
                 LOG.error("application profile not found on nsx: %s",
                           app_profile_id)
             except nsxlib_exc.ManagerError as e:
