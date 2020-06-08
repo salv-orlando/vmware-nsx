@@ -137,7 +137,7 @@ class NsxPPluginTestCaseMixin(
         mock.patch("vmware_nsxlib.v3.policy.core_resources.NsxPolicyTier0Api."
                    "get_edge_cluster_path", return_value="x/1").start()
         mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                   "NsxPolicyEdgeClusterApi.get_edge_node_ids",
+                   "NsxPolicyEdgeClusterApi.get_edge_node_nsx_ids",
                    return_value=["node1"]).start()
         mock.patch("vmware_nsxlib.v3.NsxLib.get_tag_limits",
                    return_value=nsxlib_utils.TagLimits(20, 40, 15)).start()
