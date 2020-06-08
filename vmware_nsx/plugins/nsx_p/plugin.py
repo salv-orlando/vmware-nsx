@@ -77,6 +77,7 @@ from vmware_nsx.extensions import securitygrouplogging as sg_logging
 from vmware_nsx.plugins.common_v3 import plugin as nsx_plugin_common
 from vmware_nsx.plugins.common_v3 import utils as v3_utils
 from vmware_nsx.plugins.nsx_p import availability_zones as nsxp_az
+from vmware_nsx.plugins.nsx_p import utils as plugin_utils
 from vmware_nsx.services.fwaas.common import utils as fwaas_utils
 from vmware_nsx.services.fwaas.nsx_p import fwaas_callbacks_v2
 from vmware_nsx.services.lbaas import lb_const
@@ -1003,11 +1004,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         dhcp_ec_path = self.nsxpolicy.dhcp_server_config.get(
             az._policy_dhcp_server_config).get('edge_cluster_path')
         ec_id = p_utils.path_to_id(dhcp_ec_path)
-        ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
-        ec_tzs = []
-        for tn_uuid in ec_nodes:
-            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
-                tn_uuid))
+
+        try:
+            ec_tzs = plugin_utils.get_edge_cluster_tzs(
+                self.nsxpolicy, self.nsxlib, ec_id)
+        except nsx_lib_exc.ResourceNotFound as e:
+            # Do not fail neutron action init if this code fails
+            LOG.warning("Failed to get edge cluster %s transport zones: %s",
+                        ec_id, e)
+            return
+
         if net_tz not in ec_tzs:
             msg = (_('Network TZ %(tz)s does not match DHCP server '
                      'edge cluster %(ec)s') %
@@ -4174,11 +4180,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             md_ec = self.nsxlib.native_md_proxy.get(
                 mdproxy_uuid).get('edge_cluster_id')
 
-        ec_nodes = self.nsxpolicy.edge_cluster.get_edge_node_ids(md_ec)
-        ec_tzs = []
-        for tn_uuid in ec_nodes:
-            ec_tzs.extend(self.nsxlib.transport_node.get_transport_zones(
-                tn_uuid))
+        try:
+            ec_tzs = plugin_utils.get_edge_cluster_tzs(
+                self.nsxpolicy, self.nsxlib, md_ec)
+        except nsx_lib_exc.ResourceNotFound as e:
+            # Do not fail neutron action init if this code fails
+            LOG.warning("Failed to get edge cluster %s transport zones: %s",
+                        md_ec, e)
+            return True
+
         if tz_uuid not in ec_tzs:
             return False
         return True
