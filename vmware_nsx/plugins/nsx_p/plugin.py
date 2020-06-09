@@ -1128,27 +1128,29 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             dhcp_subnet_id = dhcp_subnet['id']
             dhcp_subnet_ids.append(dhcp_subnet_id)
             gw_addr = self._get_gateway_addr_from_subnet(dhcp_subnet)
-            cidr_prefix = int(dhcp_subnet['cidr'].split('/')[1])
             dhcp_server_ip = self._get_sunbet_dhcp_server_ip(
                 context, net_id, dhcp_subnet_id)
-            dns_nameservers = dhcp_subnet['dns_nameservers']
-            if not net_az:
-                net_az = self.get_network_az_by_net_id(context, net_id)
-            if (not dns_nameservers or
-                not validators.is_attr_set(dns_nameservers)):
-                # Use pre-configured dns server
-                dns_nameservers = net_az.nameservers
-            is_ipv6 = True if dhcp_subnet.get('ip_version') == 6 else False
-            server_ip = "%s/%s" % (dhcp_server_ip, cidr_prefix)
-            kwargs = {'server_address': server_ip,
-                      'dns_servers': dns_nameservers}
-            if is_ipv6:
-                network = self._get_network(context, net_id)
-                kwargs['domain_names'] = [
-                    v3_utils.get_network_dns_domain(net_az, network)]
-                dhcp_config = policy_defs.SegmentDhcpConfigV6(**kwargs)
-            else:
-                dhcp_config = policy_defs.SegmentDhcpConfigV4(**kwargs)
+            dhcp_config = None
+            if dhcp_server_ip:
+                cidr_prefix = int(dhcp_subnet['cidr'].split('/')[1])
+                dns_nameservers = dhcp_subnet['dns_nameservers']
+                if not net_az:
+                    net_az = self.get_network_az_by_net_id(context, net_id)
+                if (not dns_nameservers or
+                    not validators.is_attr_set(dns_nameservers)):
+                    # Use pre-configured dns server
+                    dns_nameservers = net_az.nameservers
+                is_ipv6 = True if dhcp_subnet.get('ip_version') == 6 else False
+                server_ip = "%s/%s" % (dhcp_server_ip, cidr_prefix)
+                kwargs = {'server_address': server_ip,
+                          'dns_servers': dns_nameservers}
+                if is_ipv6:
+                    network = self._get_network(context, net_id)
+                    kwargs['domain_names'] = [
+                        v3_utils.get_network_dns_domain(net_az, network)]
+                    dhcp_config = policy_defs.SegmentDhcpConfigV6(**kwargs)
+                else:
+                    dhcp_config = policy_defs.SegmentDhcpConfigV4(**kwargs)
 
             seg_subnet = policy_defs.Subnet(gateway_address=gw_addr,
                                             dhcp_config=dhcp_config)
