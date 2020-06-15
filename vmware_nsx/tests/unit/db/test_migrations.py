@@ -89,6 +89,7 @@ TAAS_TABLES = {
 FWAAS_TABLES = {
     'firewall_router_associations',
     'cisco_firewall_associations',
+    'firewall_rules_v2',
 }
 
 VPNAAS_TABLES = {
