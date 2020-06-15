@@ -329,7 +329,12 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if section_id:
             self.nsxlib.firewall_section.delete(section_id)
         if ns_group_id:
-            self.nsxlib.ns_group.delete(ns_group_id)
+            try:
+                self.nsxlib.ns_group.delete(ns_group_id)
+            except Exception:
+                LOG.debug("While cleaning up duplicate sections NSGroup %s "
+                          "was not found", ns_group_id)
+
         # Ensure global variables are updated
         self._ensure_default_rules()
 
@@ -3044,7 +3049,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 context = context.elevated()
             super(NsxV3Plugin, self).delete_security_group(
                 context, secgroup_db['id'])
-            self.nsxlib.ns_group.delete(ns_group['id'])
+            try:
+                self.nsxlib.ns_group.delete(ns_group['id'])
+            except Exception:
+                pass
             self.nsxlib.firewall_section.delete(firewall_section['id'])
 
             if ex.__class__ is nsx_lib_exc.ResourceNotFound:
@@ -3106,7 +3114,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             context.session, id)
         super(NsxV3Plugin, self).delete_security_group(context, id)
         self.nsxlib.firewall_section.delete(section_id)
-        self.nsxlib.ns_group.delete(nsgroup_id)
+        try:
+            self.nsxlib.ns_group.delete(nsgroup_id)
+        except Exception:
+            LOG.debug("While deleting SG %s NSGroup %s was not found",
+                      id, nsgroup_id)
 
     def create_security_group_rule(self, context, security_group_rule):
         bulk_rule = {'security_group_rules': [security_group_rule]}
