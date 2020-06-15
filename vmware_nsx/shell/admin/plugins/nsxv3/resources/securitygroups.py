@@ -220,7 +220,13 @@ def fix_security_groups(resource, event, trigger, **kwargs):
                 nsxlib.firewall_section.delete(sg['section-id'])
             except Exception:
                 pass
-            nsxlib.ns_group.delete(sg['nsx-securitygroup-id'])
+
+            try:
+                nsxlib.ns_group.delete(sg['nsx-securitygroup-id'])
+            except Exception:
+                LOG.debug("NSGroup %s does not exists for delete request.",
+                          sg['nsx-securitygroup-id'])
+
             neutron_sg.delete_security_group_section_mapping(sg_id)
             neutron_sg.delete_security_group_backend_mapping(sg_id)
             nsgroup, fw_section = (
