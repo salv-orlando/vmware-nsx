@@ -184,7 +184,8 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         """Update the segment group for fwaas rules in case fip changed"""
         try:
             group_id = '%s-%s' % (router_id, neutron_net_id)
-            self.nsxpolicy.group.get(policy_constants.DEFAULT_DOMAIN, group_id)
+            self.nsxpolicy.group.get(policy_constants.DEFAULT_DOMAIN, group_id,
+                                     silent=True)
         except Exception:
             # no relevant group needs to be updated
             return
