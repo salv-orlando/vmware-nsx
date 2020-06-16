@@ -391,7 +391,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         """Find/Create segment profiles this plugin will use"""
         # Spoofguard profile (find it or create)
         try:
-            self.nsxpolicy.spoofguard_profile.get(SPOOFGUARD_PROFILE_ID)
+            self.nsxpolicy.spoofguard_profile.get(SPOOFGUARD_PROFILE_ID,
+                                                  silent=True)
         except nsx_lib_exc.ResourceNotFound:
             try:
                 self.nsxpolicy.spoofguard_profile.create_or_overwrite(
@@ -406,7 +407,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # No Port security spoofguard profile
         # (default NSX profile. just verify it exists)
         try:
-            self.nsxpolicy.spoofguard_profile.get(NO_SPOOFGUARD_PROFILE_ID)
+            self.nsxpolicy.spoofguard_profile.get(NO_SPOOFGUARD_PROFILE_ID,
+                                                  silent=True)
         except nsx_lib_exc.ResourceNotFound:
             msg = (_("Cannot find spoofguard profile %s") %
                    NO_SPOOFGUARD_PROFILE_ID)
@@ -415,7 +417,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # Mac discovery profile (find it or create)
         try:
             self.nsxpolicy.mac_discovery_profile.get(
-                MAC_DISCOVERY_PROFILE_ID)
+                MAC_DISCOVERY_PROFILE_ID, silent=True)
         except nsx_lib_exc.ResourceNotFound:
             try:
                 self.nsxpolicy.mac_discovery_profile.create_or_overwrite(
@@ -432,7 +434,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # (default NSX profile. just verify it exists)
         try:
             self.nsxpolicy.mac_discovery_profile.get(
-                NO_MAC_DISCOVERY_PROFILE_ID)
+                NO_MAC_DISCOVERY_PROFILE_ID, silent=True)
         except nsx_lib_exc.ResourceNotFound:
             msg = (_("Cannot find MAC discovery profile %s") %
                    NO_MAC_DISCOVERY_PROFILE_ID)
@@ -441,7 +443,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # No Port security segment-security profile (find it or create)
         try:
             self.nsxpolicy.segment_security_profile.get(
-                NO_SEG_SECURITY_PROFILE_ID)
+                NO_SEG_SECURITY_PROFILE_ID, silent=True)
         except nsx_lib_exc.ResourceNotFound:
             try:
                 self.nsxpolicy.segment_security_profile.create_or_overwrite(
@@ -464,7 +466,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # (default NSX profile. just verify it exists)
         try:
             self.nsxpolicy.segment_security_profile.get(
-                SEG_SECURITY_PROFILE_ID)
+                SEG_SECURITY_PROFILE_ID, silent=True)
         except nsx_lib_exc.ResourceNotFound:
             msg = (_("Cannot find segment security profile %s") %
                    SEG_SECURITY_PROFILE_ID)
@@ -481,7 +483,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         for profile in ndra_profiles:
             try:
-                self.nsxpolicy.ipv6_ndra_profile.get(profile)
+                self.nsxpolicy.ipv6_ndra_profile.get(profile, silent=True)
             except nsx_lib_exc.ResourceNotFound:
                 try:
                     self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
