@@ -167,7 +167,7 @@ def build_persistence_profile_tags(pool_tags, listener):
     # With octavia loadbalancer name might not be among data passed
     # down to the driver
     lb_data = listener.get('loadbalancer')
-    if lb_data:
+    if lb_data and lb_data.get('name'):
         tags.append({
             'scope': lb_const.LB_LB_NAME,
             'tag': lb_data['name'][:utils.MAX_TAG_LEN]})

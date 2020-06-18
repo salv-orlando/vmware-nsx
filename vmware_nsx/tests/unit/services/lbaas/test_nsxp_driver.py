@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import mock
+
 from neutron.tests import base
 from neutron_lib import context
 from neutron_lib import exceptions as n_exc
@@ -894,6 +896,38 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               self.edge_driver.listener.create,
                               self.context, listener_dict,
                               self.completor)
+
+    def test_create_listener_lb_no_name(self, protocol='HTTP'):
+        self.reset_completor()
+        with mock.patch.object(self.core_plugin, 'get_floatingips'
+                               ) as mock_get_floatingips, \
+            mock.patch.object(self.core_plugin,
+                              'get_waf_profile_path_and_mode',
+                              return_value=(None, None)), \
+            mock.patch.object(self.vs_client, 'create_or_overwrite'
+                              ) as mock_add_virtual_server:
+            mock_get_floatingips.return_value = []
+            listener = copy.deepcopy(self.listener_dict)
+            listener['loadbalancer']['name'] = None
+            listener_id = LISTENER_ID
+
+            self.edge_driver.listener.create(self.context, listener,
+                                             self.completor)
+
+            mock_add_virtual_server.assert_called_with(
+                application_profile_id=listener_id,
+                description=listener['description'],
+                lb_service_id=LB_ID,
+                ip_address=LB_VIP,
+                tags=mock.ANY,
+                name=mock.ANY,
+                ports=[listener['protocol_port']],
+                max_concurrent_connections=None,
+                virtual_server_id=listener_id,
+                pool_id='',
+                lb_persistence_profile_id='')
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
 
     def test_update(self):
         new_listener = lb_models.Listener(LISTENER_ID, LB_TENANT_ID,
