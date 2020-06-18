@@ -104,9 +104,10 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                                  lb_const.LB_LISTENER_TYPE,
                                  listener['tenant_id'],
                                  context.project_name)
-        tags.append({
-            'scope': lb_const.LB_LB_NAME,
-            'tag': listener['loadbalancer']['name'][:utils.MAX_TAG_LEN]})
+        if listener['loadbalancer'].get('name'):
+            tags.append({
+                'scope': lb_const.LB_LB_NAME,
+                'tag': listener['loadbalancer']['name'][:utils.MAX_TAG_LEN]})
         tags.append({
             'scope': lb_const.LB_LB_TYPE,
             'tag': listener['loadbalancer_id']})
