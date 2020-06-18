@@ -1,8 +1,11 @@
 Admin Utility
 =============
 
-NSX-V and NSX-T support the nsxadmin utility. This enables and administrator to determine and rectify inconsistencies between the Neutron DB and NSX.
+The VMWare NSX plugins support the nsxadmin utility. This enables and administrator to determine and rectify inconsistencies between the Neutron DB and NSX, in addition to performing different configuration changes and migrations.
 usage: nsxadmin -r <resources> -o <operation>
+
+In order to specify config files:
+usage: nsxadmin --config-file <neutron config path> --config-file <nsx config path > -r <resources> -o <operation>
 
 NSX-V Plugin
 ------------
