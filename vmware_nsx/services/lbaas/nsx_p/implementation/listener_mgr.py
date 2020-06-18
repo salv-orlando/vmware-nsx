@@ -39,12 +39,14 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                  lb_const.LB_LISTENER_TYPE,
                                  listener.get('tenant_id'),
                                  context.project_name)
-        tags.append({
-            'scope': lb_const.LB_LB_NAME,
-            'tag': listener['loadbalancer']['name'][:utils.MAX_TAG_LEN]})
+        if listener['loadbalancer'].get('name'):
+            tags.append({
+                'scope': lb_const.LB_LB_NAME,
+                'tag': listener['loadbalancer']['name'][:utils.MAX_TAG_LEN]})
         tags.append({
             'scope': lb_const.LB_LB_TYPE,
             'tag': listener['loadbalancer_id']})
+        LOG.error("DEBUG ADIT _get_listener_tags end")
         return tags
 
     def _upload_certificate(self, listener_id, cert_href, tags,
