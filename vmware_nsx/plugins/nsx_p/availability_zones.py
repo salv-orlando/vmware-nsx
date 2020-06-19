@@ -20,6 +20,7 @@ from vmware_nsx.common import availability_zones as common_az
 from vmware_nsx.common import config
 from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.plugins.common_v3 import availability_zones as v3_az
+from vmware_nsx.plugins.nsx_p import utils
 from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3.policy import utils as p_utils
@@ -181,16 +182,15 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
             else:
                 self._native_md_proxy_uuid = None
 
-    def _get_edge_cluster_tzs(self, nsxpolicy, nsxlib, ec_uuid):
-        ec_nodes = nsxpolicy.edge_cluster.get_edge_node_ids(ec_uuid)
-        ec_tzs = []
-        for tn_uuid in ec_nodes:
-            ec_tzs.extend(nsxlib.transport_node.get_transport_zones(
-                tn_uuid))
-        return ec_tzs
-
     def _validate_tz(self, nsxpolicy, nsxlib, obj_type, obj_id, ec_uuid):
-        obj_tzs = self._get_edge_cluster_tzs(nsxpolicy, nsxlib, ec_uuid)
+        try:
+            obj_tzs = utils.get_edge_cluster_tzs(nsxpolicy, nsxlib, ec_uuid)
+        except nsx_lib_exc.ResourceNotFound as e:
+            # Do not fail plugin init if this code fails
+            LOG.warning("Failed to get edge cluster %s transport zones: %s",
+                        ec_uuid, e)
+            return
+
         if self._default_overlay_tz_uuid not in obj_tzs:
             msg = (_("%(type)s %(id)s of availability zone %(az)s with edge "
                      "cluster %(ec)s does not match the default overlay tz "
