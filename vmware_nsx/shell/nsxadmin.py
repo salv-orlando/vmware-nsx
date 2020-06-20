@@ -56,16 +56,23 @@ def _init_cfg():
     # register must come after above unregister to avoid duplicates
     cfg.CONF.register_cli_opts(resources.cli_opts)
 
-    # Init the neutron config
-    neutron_config.init(args=['--config-file', constants.NEUTRON_CONF,
-                              '--config-file', constants.NSX_INI])
+    # Make sure the default config files are used if not specified in args
+    default_config_files = [constants.NEUTRON_CONF,
+                            constants.NSX_INI]
+    config_args = sys.argv[1:]
+    if '--config-file' not in config_args:
+        # Add default config files
+        config_args = []
+        for file in default_config_files:
+            config_args.extend(['--config-file', file])
 
-    cfg.CONF(args=sys.argv[1:], project='NSX',
+    # Init the CONF and neutron config (Used by the core plugin)
+    neutron_config.init(args=config_args)
+    cfg.CONF(args=config_args, project='NSX',
              prog='Admin Utility',
              version=version.__version__,
              usage='nsxadmin -r <resources> -o <operation>',
-             default_config_files=[constants.NEUTRON_CONF,
-                                   constants.NSX_INI])
+             default_config_files=default_config_files)
 
 
 def _validate_resource_choice(resource, nsx_plugin):
