@@ -32,15 +32,15 @@ decorator>=4.4.1 # BSD
 
 # These repos are installed from git in OpenStack CI if the job
 # configures them as required-projects:
-neutron>=15.0.0.0 # Apache-2.0
-networking-l2gw>=15.0.0 # Apache-2.0
+neutron>=16.0.0.0 # Apache-2.0
+networking-l2gw>=16.0.0 # Apache-2.0
 networking-sfc>=9.0.0.0 # Apache-2.0
-neutron-fwaas>=15.0.0.0 # Apache-2.0
-neutron-vpnaas>=15.0.0.0 # Apache-2.0
-neutron-dynamic-routing>=15.0.0.0 # Apache-2.0
-vmware-nsxlib>=15.0.1 # Apache-2.0
+neutron-fwaas>=16.0.0.0 # Apache-2.0
+neutron-vpnaas>=16.0.0.0 # Apache-2.0
+neutron-dynamic-routing>=16.0.0.0 # Apache-2.0
+vmware-nsxlib>=16.0.0 # Apache-2.0
 # NOTE: we require octavia but can't depend on it for Stein
-# octavia>=5.0.0.0 # Apache-2.0
+# octavia>=6.0.0.0 # Apache-2.0
 
 # The comment below indicates this project repo is current with neutron-lib
 # and should receive neutron-lib consumption patches as they are released
