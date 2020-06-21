@@ -38,8 +38,16 @@
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'oslosphinx',
-    'reno.sphinxext',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.coverage',
+    'sphinx.ext.ifconfig',
+    'sphinx.ext.graphviz',
+    'sphinx.ext.todo',
+    'openstackdocstheme',
+    'oslo_config.sphinxext',
+    'oslo_config.sphinxconfiggen',
+    'oslo_policy.sphinxext',
+    'oslo_policy.sphinxpolicygen',
 ]
 
 # Add any paths that contain templates here, relative to this directory.

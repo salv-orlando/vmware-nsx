@@ -39,7 +39,6 @@ reno==2.5.0
 requests==2.14.2
 six==1.11.0
 SQLAlchemy==1.2.0
-sphinx==1.6.5
 stestr==1.0.0
 stevedore==1.20.0
 tenacity==5.0.2
