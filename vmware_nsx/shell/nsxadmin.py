@@ -62,7 +62,6 @@ def _init_cfg():
     config_args = sys.argv[1:]
     if '--config-file' not in config_args:
         # Add default config files
-        config_args = []
         for file in default_config_files:
             config_args.extend(['--config-file', file])
 
