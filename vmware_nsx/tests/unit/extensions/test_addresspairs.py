@@ -90,6 +90,24 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
             port = self.deserialize(self.fmt, res)
             self.assertIn('NeutronError', port)
 
+            # overlapping ips
+            address_pairs = [{'ip_address': '1001::/64'},
+                             {'ip_address': '1001::/128'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
+
+            # identical ips
+            address_pairs = [{'ip_address': '1001::'},
+                             {'ip_address': '1001::/128'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
+
     def test_update_add_bad_address_pairs_with_cidr(self):
         with self.network() as net:
             res = self._create_port(self.fmt, net['network']['id'])

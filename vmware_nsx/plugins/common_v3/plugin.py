@@ -326,6 +326,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _validate_address_pairs(self, address_pairs, fixed_ips=None):
         port_ips = []
+        pairs_ips = []
         if fixed_ips:
             # Make sure there are no duplications
             for fixed_ip in fixed_ips:
@@ -345,6 +346,14 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         err_msg = (_("Allowed address pairs Cidr %s cannot "
                                      "have host bits set") % ip)
                         raise n_exc.InvalidInput(error_message=err_msg)
+                # verify no overlaps in ipv6 addresses
+                current_set = netaddr.IPSet(port_ips + pairs_ips)
+                if netaddr.IPSet([ip]) & current_set:
+                    err_msg = (_("Allowed address pairs %s cannot overlap "
+                                 "with port ips or other address pairs") % ip)
+                    raise n_exc.InvalidInput(error_message=err_msg)
+
+                pairs_ips.append(ip)
             else:
                 # IPv4 address pair
                 if len(ip.split('/')) > 1 and ip.split('/')[1] != '32':
