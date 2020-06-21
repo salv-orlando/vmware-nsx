@@ -230,6 +230,9 @@ class NsxVAvailabilityZone(common_az.ConfiguredAvailabilityZone):
                  self.dvs_id, self.external_network, self.mgt_net_moid)
 
         # Look for each configured cluster
+        ext_net_connected = False
+        mgt_net_connected = False
+        dvs_connected = False
         for configured_cluster in cfg.CONF.nsxv.cluster_moid:
             found_cluster = False
             for cluster_info in info['clustersInfo']:
@@ -242,17 +245,8 @@ class NsxVAvailabilityZone(common_az.ConfiguredAvailabilityZone):
                     external_net_portgroup = self._validate_opt_connectivity(
                         cluster_info, 'distributedVirtualPortGroups',
                         self.external_network)
-                    if (not external_net_standard and
-                        not external_net_portgroup):
-                        raise nsx_exc.NsxInvalidConfiguration(
-                            opt_name='external_network',
-                            opt_value=self.external_network,
-                            reason=(_("Edge cluster %(ec)s in not connected "
-                                      "to external network %(val)s in AZ "
-                                      "%(az)s") % {
-                                    'ec': configured_cluster,
-                                    'val': self.external_network,
-                                    'az': self.name}))
+                    if external_net_standard or external_net_portgroup:
+                        ext_net_connected = True
 
                     # Validate mgt_net_moid
                     if self.mgt_net_moid:
@@ -262,39 +256,68 @@ class NsxVAvailabilityZone(common_az.ConfiguredAvailabilityZone):
                         mgt_net_portgroup = self._validate_opt_connectivity(
                             cluster_info, 'distributedVirtualPortGroups',
                             self.mgt_net_moid)
-                        if not mgt_net_standard and not mgt_net_portgroup:
-                            raise nsx_exc.NsxInvalidConfiguration(
-                                opt_name='mgt_net_moid',
-                                opt_value=self.mgt_net_moid,
-                                reason=(_("Edge cluster %(ec)s in not "
-                                          "connected to mgt_net_moid %(val)s "
-                                          "in AZ %(az)s") % {
-                                        'ec': configured_cluster,
-                                        'val': self.mgt_net_moid,
-                                        'az': self.name}))
+                        if mgt_net_standard or mgt_net_portgroup:
+                            mgt_net_connected = True
 
                     # Validate DVS
-                    if self.dvs_id and not self._validate_opt_connectivity(
+                    if self.dvs_id and self._validate_opt_connectivity(
                         cluster_info, 'distributedVirtualSwitches',
                         self.dvs_id):
-                        raise nsx_exc.NsxInvalidConfiguration(
-                            opt_name='dvs_id', opt_value=self.dvs_id,
-                            reason=(_("Edge cluster %(ec)s in not connected "
-                                      "to dvs_id %(val)s in AZ %(az)s") % {
-                                    'ec': configured_cluster,
-                                    'val': self.dvs_id,
-                                    'az': self.name}))
+                        dvs_connected = True
                     break
 
             # Didn't find the edge cluster
             if not found_cluster:
-                raise nsx_exc.NsxInvalidConfiguration(
-                    opt_name='vdn_scope_id', opt_value=self.vdn_scope_id,
-                    reason=(_("Edge cluster %(ec)s in not connected "
-                              "to vdn_scope_id %(val)s in AZ %(az)s") % {
+                reason = (_("Edge cluster %(ec)s is not connected "
+                            "to vdn_scope_id %(val)s in AZ %(az)s") % {
                             'ec': configured_cluster,
                             'val': self.vdn_scope_id,
-                            'az': self.name}))
+                            'az': self.name})
+                if cfg.CONF.nsxv.init_validation:
+                    raise nsx_exc.NsxInvalidConfiguration(
+                        opt_name='vdn_scope_id', opt_value=self.vdn_scope_id,
+                        reason=reason)
+                LOG.warning(reason)
+
+        if self.external_network and not ext_net_connected:
+            reason = (_("Edge cluster %(ec)s is not connected "
+                        "to external network %(val)s in AZ "
+                        "%(az)s") % {
+                        'ec': cfg.CONF.nsxv.cluster_moid,
+                        'val': self.external_network,
+                        'az': self.name})
+            if cfg.CONF.nsxv.init_validation:
+                raise nsx_exc.NsxInvalidConfiguration(
+                    opt_name='external_network',
+                    opt_value=self.external_network,
+                    reason=reason)
+            LOG.warning(reason)
+
+        if self.mgt_net_moid and not mgt_net_connected:
+            reason = (_("Edge cluster %(ec)s is not "
+                        "connected to mgt_net_moid %(val)s "
+                        "in AZ %(az)s") % {
+                        'ec': cfg.CONF.nsxv.cluster_moid,
+                        'val': self.mgt_net_moid,
+                        'az': self.name})
+            if cfg.CONF.nsxv.init_validation:
+                raise nsx_exc.NsxInvalidConfiguration(
+                    opt_name='mgt_net_moid',
+                    opt_value=self.mgt_net_moid,
+                    reason=reason)
+            LOG.warning(reason)
+
+        if self.dvs_id and not dvs_connected:
+            reason = (_("Edge cluster %(ec)s is not connected "
+                        "to dvs_id %(val)s in AZ %(az)s") % {
+                        'ec': cfg.CONF.nsxv.cluster_moid,
+                        'val': self.dvs_id,
+                        'az': self.name})
+            if cfg.CONF.nsxv.init_validation:
+                raise nsx_exc.NsxInvalidConfiguration(
+                    opt_name='dvs_id', opt_value=self.dvs_id,
+                    reason=reason)
+            LOG.warning(reason)
 
 
 class NsxVAvailabilityZones(common_az.ConfiguredAvailabilityZones):

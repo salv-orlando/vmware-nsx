@@ -855,6 +855,10 @@ nsxv_opts = [
                default='%(name)s (%(id)s)',
                help=_("(Optional) Format for the NSX name of an openstack "
                       "security group")),
+    cfg.BoolOpt('init_validation',
+                default=True,
+                help=_("Set to False to skip plugin init validation")),
+
 ]
 
 # define the configuration of each NSX-V availability zone.
