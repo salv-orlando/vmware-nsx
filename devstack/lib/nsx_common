@@ -31,7 +31,7 @@ function _nsxv_ini_set {
 
 
 function install_neutron_projects {
-    pkg_list="networking-l2gw networking-sfc neutron-fwaas neutron-dynamic-routing neutron-vpnaas vmware-nsxlib"
+    pkg_list="networking-sfc neutron-fwaas neutron-dynamic-routing neutron-vpnaas vmware-nsxlib"
     for pkg in `echo $pkg_list`
     do
         pkg_renamed=`echo $pkg | sed 's/-/_/g'`
@@ -44,6 +44,23 @@ function install_neutron_projects {
             echo "Project $pkg enabled explicitly from LIBS_FROM_GIT"
         else
             sudo -H ${PIP} install -e "git+https://opendev.org/openstack/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
+            sudo chown -R ${USER}:${USER} src/${pkg}
+        fi
+    done
+    # same for packages out of stadium
+    pkg_list="networking-l2gw"
+    for pkg in `echo $pkg_list`
+    do
+        pkg_renamed=`echo $pkg | sed 's/-/_/g'`
+        sudo rm -rf /usr/local/lib/python2.7/dist-packages/${pkg_renamed}*
+        sudo rm -rf /usr/local/lib/python3.5/dist-packages/${pkg_renamed}*
+        sudo rm -rf ./src/${pkg_renamed}*
+        if is_plugin_enabled $pkg; then
+            echo "Plugin $pkg enabled explicitly with enable_plugin"
+        elif use_library_from_git $pkg; then
+            echo "Project $pkg enabled explicitly from LIBS_FROM_GIT"
+        else
+            sudo -H ${PIP} install -e "git+https://opendev.org/x/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
             sudo chown -R ${USER}:${USER} src/${pkg}
         fi
     done
