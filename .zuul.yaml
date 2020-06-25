@@ -10,7 +10,7 @@
         - openstack-tox-pep8:
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -22,7 +22,7 @@
             timeout: 5400
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -34,7 +34,7 @@
             timeout: 5400
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -46,7 +46,7 @@
             timeout: 5400
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -61,7 +61,7 @@
         - openstack-tox-pep8:
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -73,7 +73,7 @@
             timeout: 5400
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -85,7 +85,7 @@
             timeout: 5400
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -97,7 +97,7 @@
             timeout: 5400
             required-projects:
               - openstack/neutron
-              - openstack/networking-l2gw
+              - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
               - openstack/neutron-fwaas
@@ -112,7 +112,7 @@
     timeout: 5400
     required-projects:
       - openstack/neutron
-      - openstack/networking-l2gw
+      - x/networking-l2gw
       - openstack/networking-sfc
       - x/vmware-nsxlib
       - openstack/neutron-fwaas
