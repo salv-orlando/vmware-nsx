@@ -154,7 +154,10 @@ nsxv3_resources = {
     constants.LB_ADVERTISEMENT: Resource(constants.LB_ADVERTISEMENT,
                                          [Operations.NSX_UPDATE.value]),
     constants.CLUSTER: Resource(constants.CLUSTER,
-                                [Operations.SHOW.value])
+                                [Operations.SHOW.value]),
+    constants.NSX_MIGRATE_T_P: Resource(constants.NSX_MIGRATE_T_P,
+                                        [Operations.IMPORT.value,
+                                         Operations.CLEAN_ALL.value]),
 }
 
 # Add supported NSX-V resources in this dictionary
@@ -276,6 +279,8 @@ nsxp_resources = {
                                      Operations.NSX_LIST.value]),
     constants.SYSTEM: Resource(constants.SYSTEM,
                                [Operations.SET.value]),
+    constants.NSX_MIGRATE_T_P: Resource(constants.NSX_MIGRATE_T_P,
+                                        [Operations.CLEAN_ALL.value]),
 }
 
 nsxv3_resources_names = list(nsxv3_resources.keys())

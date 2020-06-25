@@ -51,6 +51,7 @@ LB_ADVERTISEMENT = 'lb-advertisement'
 RATE_LIMIT = 'rate-limit'
 CLUSTER = 'cluster'
 ORPHANED_FIREWALL_SECTIONS = 'orphaned-firewall-sections'
+NSX_MIGRATE_T_P = 'nsx-migrate-t2p'
 
 # NSXV only Resource Constants
 EDGES = 'edges'

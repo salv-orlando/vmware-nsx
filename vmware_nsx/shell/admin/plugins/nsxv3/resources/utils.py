@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import logging
 
 from oslo_config import cfg
 
@@ -46,17 +47,29 @@ def get_nsxv3_client(nsx_username=None, nsx_password=None,
 
 def get_connected_nsxlib(nsx_username=None, nsx_password=None,
                          use_basic_auth=False,
-                         plugin_conf=None):
+                         plugin_conf=None,
+                         verbose=False):
     global _NSXLIB
 
-    # for non-default agruments, initiate new lib
+    if not verbose:
+        # Suppress logs for nsxlib init
+        logging.disable(logging.INFO)
+
+    # for non-default arguments, initiate new lib
     if nsx_username or use_basic_auth:
+        if not verbose:
+            # Return logs to normal
+            logging.disable(logging.NOTSET)
         return v3_utils.get_nsxlib_wrapper(nsx_username,
                                            nsx_password,
                                            use_basic_auth,
                                            plugin_conf)
     if _NSXLIB is None:
         _NSXLIB = v3_utils.get_nsxlib_wrapper(plugin_conf=plugin_conf)
+
+    if not verbose:
+        # Return logs to normal
+        logging.disable(logging.NOTSET)
     return _NSXLIB
 
 
@@ -117,12 +130,20 @@ class NeutronDbClient(db_base_plugin_v2.NeutronDbPluginV2):
 
 
 class NsxV3PluginWrapper(plugin.NsxV3Plugin):
-    def __init__(self):
+    def __init__(self, verbose=False):
+        if not verbose:
+            # Suppress logs for plugin init
+            logging.disable(logging.INFO)
+
         # initialize the availability zones
         config.register_nsxv3_azs(cfg.CONF, cfg.CONF.nsx_v3.availability_zones)
         super(NsxV3PluginWrapper, self).__init__()
         self.context = context.get_admin_context()
         admin_utils._init_plugin_mock_quota()
+
+        if not verbose:
+            # Return logs to normal
+            logging.disable(logging.NOTSET)
 
     def __enter__(self):
         directory.add_plugin(const.CORE, self)
@@ -130,6 +151,10 @@ class NsxV3PluginWrapper(plugin.NsxV3Plugin):
 
     def __exit__(self, exc_type, exc_value, traceback):
         directory.add_plugin(const.CORE, None)
+
+    def _cleanup_duplicates(self, ns_group_id, section_id):
+        # Do not remove DFW sections during dummy plugin initialization
+        pass
 
     def _init_fwaas_plugin(self, provider, callbacks_class, plugin_callbacks):
         fwaas_plugin_class = manager.NeutronManager.load_class_for_provider(
