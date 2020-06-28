@@ -31,16 +31,22 @@ def _translate_member_state(state):
 
 
 class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
-    def _get_info_from_fip(self, context, fip):
+    def _get_fip_object(self, context, fip):
         filters = {'floating_ip_address': [fip]}
         floating_ips = self.core_plugin.get_floatingips(context,
                                                         filters=filters)
         if floating_ips:
-            return floating_ips[0]['fixed_ip_address']
+            return floating_ips[0]
         else:
             msg = (_('Member IP %(fip)s is an external IP, and is expected to '
                      'be a floating IP') % {'fip': fip})
             raise n_exc.BadRequest(resource='lbaas-vip', msg=msg)
+
+    def _get_info_from_fip(self, context, fip):
+        return self._get_fip_object(context, fip)['fixed_ip_address']
+
+    def _get_router_from_fip(self, context, fip):
+        return self._get_fip_object(context, fip)['router_id']
 
     def _validate_member_lb_connectivity(self, context, member, completor):
         lb = member['pool'].get('loadbalancer')
@@ -70,8 +76,32 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
 
         if not service.get('connectivity_path'):
-            router_id = lb_utils.get_router_from_network(
+            # Find the router of the local subnet
+            network = lb_utils.get_network_from_subnet(
                 context, self.core_plugin, member['subnet_id'])
+            if network and network.get('router:external'):
+                # member ip should be a fip
+                try:
+                    router_id = self._get_router_from_fip(
+                        context, member['address'])
+                except n_exc.BadRequest:
+                    with excutils.save_and_reraise_exception():
+                        completor(success=False)
+            else:
+                try:
+                    router_id = lb_utils.get_router_from_network(
+                        context, self.core_plugin, member['subnet_id'])
+                except Exception:
+                    completor(success=False)
+                    msg = (_('Cannot find router attached to member '
+                             '%(mem_id)s') % {'mem_id': member['id']})
+                    raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
+                if not router_id:
+                    completor(success=False)
+                    msg = (_('Cannot find router with uplink attached to '
+                             'member %(mem_id)s') % {'mem_id': member['id']})
+                    raise n_exc.BadRequest(resource='lbaas-router', msg=msg)
+
             if not self.core_plugin.service_router_has_services(context,
                                                                 router_id):
                 self.core_plugin.create_service_router(context, router_id)
@@ -124,7 +154,11 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         else:
             network = None
         if network and network.get('router:external'):
-            fixed_ip = self._get_info_from_fip(context, member['address'])
+            try:
+                fixed_ip = self._get_info_from_fip(context, member['address'])
+            except n_exc.BadRequest:
+                with excutils.save_and_reraise_exception():
+                    completor(success=False)
         else:
             fixed_ip = member['address']
         pool_id = member['pool']['id']
@@ -149,7 +183,12 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, new_member['subnet_id'])
         if network and network.get('router:external'):
-            fixed_ip = self._get_info_from_fip(context, new_member['address'])
+            try:
+                fixed_ip = self._get_info_from_fip(
+                    context, new_member['address'])
+            except n_exc.BadRequest:
+                with excutils.save_and_reraise_exception():
+                    completor(success=False)
         else:
             fixed_ip = new_member['address']
         pool_id = old_member['pool']['id']
@@ -176,7 +215,11 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         network = lb_utils.get_network_from_subnet(
             context, self.core_plugin, member['subnet_id'])
         if network and network.get('router:external'):
-            fixed_ip = self._get_info_from_fip(context, member['address'])
+            try:
+                fixed_ip = self._get_info_from_fip(context, member['address'])
+            except n_exc.BadRequest:
+                with excutils.save_and_reraise_exception():
+                    completor(success=False)
         else:
             fixed_ip = member['address']
         pool_id = member['pool']['id']
