@@ -75,6 +75,7 @@ MIGRATE_LIMIT_LB_MONITOR = 1500
 MIGRATE_LIMIT_LB_POOL = 1500
 MIGRATE_LIMIT_LB_APP_PROFILE = 2000
 MIGRATE_LIMIT_LB_PER_PROFILE = 2000
+MIGRATE_LIMIT_CERT = 1500
 
 COMPONENT_STATUS_ALREADY_MIGRATED = 1
 COMPONENT_STATUS_OK = 2
@@ -218,6 +219,7 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
     entries = []
     for resource in resources:
         name_or_id = resource.get('display_name', resource['id'])
+        name_or_id = name_or_id.encode('utf-8')
         policy_id = resource['id']
         # Go over tags and find the neutron id
         neutron_id = None
@@ -277,13 +279,6 @@ def migrate_objects(nsxlib, data, use_admin=False, verbose=False):
     if not ensure_migration_state_ready(nsxlib, verbose=verbose):
         raise Exception("The migration server is not ready")
 
-    if verbose:
-        LOG.info("Migrating %d %s objects: %s", len(data['resource_ids']),
-                 data['type'], data)
-    else:
-        LOG.info("Migrating %d %s objects", len(data['resource_ids']),
-                 data['type'])
-
     migration_body = {"migration_data": [data]}
 
     # Update the principal identity for the policy resources
@@ -297,6 +292,13 @@ def migrate_objects(nsxlib, data, use_admin=False, verbose=False):
         user = cfg.CONF.nsx_v3.nsx_api_user[0]
     migration_body['setup_details'] = {
         'principal_identity': user}
+
+    if verbose:
+        LOG.info("Migrating %d %s objects: %s", len(data['resource_ids']),
+                 data['type'], migration_body)
+    else:
+        LOG.info("Migrating %d %s objects with principal_identity %s",
+                 len(data['resource_ids']), data['type'], user)
 
     send_migration_request(nsxlib, migration_body)
     # send the start action
@@ -958,16 +960,28 @@ def migrate_dhcp_servers(nsxlib, nsxpolicy, verbose=False):
         verbose=verbose)
     migrate_resource(nsxlib, 'DHCP_SERVER', entries,
                      MIGRATE_LIMIT_DHCP_SERVER,
-                     count_internals=True,
                      verbose=verbose)
 
 
 def migrate_lb_resources(nsxlib, nsxpolicy, verbose=False):
+    migrate_lb_certificates(nsxlib, nsxpolicy, verbose=verbose)
     migrate_lb_monitors(nsxlib, nsxpolicy, verbose=verbose)
     migrate_lb_pools(nsxlib, nsxpolicy, verbose=verbose)
     migrate_lb_profiles(nsxlib, nsxpolicy, verbose=verbose)
     migrate_lb_listeners(nsxlib, nsxpolicy, verbose=verbose)
     migrate_lb_services(nsxlib, nsxpolicy, verbose=verbose)
+
+
+def migrate_lb_certificates(nsxlib, nsxpolicy, verbose=False):
+    entries = get_resource_migration_data(
+        nsxlib.trust_management,
+        [lb_const.LB_LISTENER_TYPE],
+        'CERTIFICATE',
+        policy_resource_get=nsxpolicy.certificate.get,
+        verbose=verbose)
+    migrate_resource(nsxlib, 'CERTIFICATE', entries,
+                     MIGRATE_LIMIT_CERT,
+                     verbose=verbose)
 
 
 def _migrate_lb_resource(nsxlib, nsxpolicy, neutron_tag, api_name,
@@ -1174,7 +1188,11 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin, verbose=False):
         LOG.error("Exception occurred while making the request: %s", e)
         try:
             LOG.info("Aborting the current request")
-            send_migration_plan_action(nsxlib, 'abort')
+            try:
+                send_migration_plan_action(nsxlib, 'abort')
+            except Exception as e:
+                LOG.error("Abort migration failed: %s", e)
+
             global ROLLBACK_DATA
             if ROLLBACK_DATA:
                 LOG.info("Rolling migration back %s", ROLLBACK_DATA)
