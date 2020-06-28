@@ -1541,7 +1541,8 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                               return_value=[]),\
             mock.patch.object(self.core_plugin, 'get_floatingips',
                               return_value=[{
-                                  'fixed_ip_address': MEMBER_ADDRESS}]),\
+                                  'fixed_ip_address': MEMBER_ADDRESS,
+                                  'router_id': LB_ROUTER_ID}]),\
             mock.patch.object(self.pool_client,
                               'create_pool_member_and_add_to_pool'
                               ) as mock_update_pool_with_members:
@@ -1586,7 +1587,42 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                               return_value=[]),\
             mock.patch.object(self.core_plugin, 'get_floatingips',
                               return_value=[{
-                                  'fixed_ip_address': MEMBER_ADDRESS}]):
+                                  'fixed_ip_address': MEMBER_ADDRESS,
+                                  'router_id': LB_ROUTER_ID}]):
+            mock_get_pool_members.return_value = [self.member]
+            mock_get_network.return_value = EXT_LB_NETWORK
+            mock_get_router.return_value = LB_ROUTER_ID
+            mock_get_lb_service.return_value = {'id': LB_SERVICE_ID}
+            mock_get_pool.return_value = LB_POOL
+
+            self.assertRaises(
+                n_exc.BadRequest, self.edge_driver.member.create,
+                self.context, self.member_dict, self.completor)
+            self.assertTrue(self.last_completor_called)
+            self.assertFalse(self.last_completor_succees)
+
+    def test_create_external_vip_no_fip(self):
+        self.reset_completor()
+        lb_service = {'id': LB_SERVICE_ID}
+        with mock.patch.object(self.lbv2_driver.plugin, 'get_pool_members'
+                               ) as mock_get_pool_members, \
+            mock.patch.object(lb_utils, 'get_network_from_subnet'
+                              ) as mock_get_network, \
+            mock.patch.object(lb_utils, 'get_router_from_network'
+                              ) as mock_get_router, \
+            mock.patch.object(self.service_client, 'get_router_lb_service'
+                              ) as mock_get_lb_service, \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [lb_service]}),\
+            mock.patch.object(self.core_plugin,
+                              'service_router_has_loadbalancers',
+                              return_value=True),\
+            mock.patch.object(self.pool_client, 'get'
+                              ) as mock_get_pool, \
+            mock.patch.object(self.core_plugin, '_find_router_gw_subnets',
+                              return_value=[]),\
+            mock.patch.object(self.core_plugin, 'get_floatingips',
+                              return_value=[]):
             mock_get_pool_members.return_value = [self.member]
             mock_get_network.return_value = EXT_LB_NETWORK
             mock_get_router.return_value = LB_ROUTER_ID
