@@ -280,8 +280,6 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
             load_balancer, 'lb_cookie_persistence_profile').start()
         self.pp_generic_client = mock.patch.object(
             load_balancer, 'lb_persistence_profile').start()
-        self.tm_client = mock.patch.object(nsxpolicy,
-                                           'trust_management').start()
         self.nsxpolicy = nsxpolicy
 
     def _unpatch_lb_plugin(self, lb_plugin, manager):
@@ -754,17 +752,16 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         self._create_listener(protocol='HTTPS')
 
     def test_create_terminated_https(self):
+        #TODO(asarfaty): Add test with certificate
+        self.reset_completor()
         with mock.patch.object(self.core_plugin, 'get_floatingips'
                                ) as mock_get_floatingips, \
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
-            mock.patch.object(self.tm_client, 'create_cert'
-                              ) as mock_create_cert, \
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
-            mock_create_cert.return_value = FAKE_CERT['id']
 
             self.edge_driver.listener.create(
                 self.context,
