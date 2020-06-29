@@ -388,9 +388,13 @@ def get_configured_values(plugin, az_attribute):
     return values
 
 
+def get_neurton_tier0s(plugin):
+    return get_configured_values(plugin, '_default_tier0_router')
+
+
 def migrate_tier0s(nsxlib, nsxpolicy, plugin):
     # First prepare a list of neutron related tier0s from the config
-    neutron_t0s = get_configured_values(plugin, '_default_tier0_router')
+    neutron_t0s = get_neurton_tier0s(plugin)
     # Add tier0s used specifically in external networks
     ctx = context.get_admin_context()
     with ctx.session.begin(subtransactions=True):
@@ -852,6 +856,16 @@ def migrate_groups(nsxlib, nsxpolicy):
     migrate_resource(nsxlib, 'NS_GROUP', entries, MIGRATE_LIMIT_NS_GROUP)
 
 
+def dfw_migration_cond(resource):
+    return (resource.get('enforced_on') == 'VIF' and
+            resource.get('category') == 'Default' and
+            resource.get('section_type') == 'LAYER3' and
+            not resource.get('is_default') and
+            # Migrate only DFW sections only and no edge FW sections
+            'applied_tos' in resource and
+            resource['applied_tos'][0].get('target_type', '') == 'NSGroup')
+
+
 def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
     def get_policy_id_callback(res, policy_id):
         # In case of plugin init section: give it the id the policy plugin
@@ -861,14 +875,6 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
             return p_plugin.NSX_P_DEFAULT_SECTION
 
         return policy_id
-
-    def cond(resource):
-        return (resource.get('enforced_on') == 'VIF' and
-                resource.get('category') == 'Default' and
-                resource.get('section_type') == 'LAYER3' and
-                not resource.get('is_default') and
-                # Migrate only DFW sections only and no edge FW sections
-                resource['applied_tos'][0].get('target_type', '') == 'NSGroup')
 
     def add_metadata(entry, policy_id, resource):
         # Add category, sequence, domain, and rule ids
@@ -913,7 +919,7 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
     entries = get_resource_migration_data(
         nsxlib.firewall_section,
         ['os-neutron-secgr-id', 'os-neutron-id'],
-        'DFW_SECTION', resource_condition=cond,
+        'DFW_SECTION', resource_condition=dfw_migration_cond,
         policy_resource_get=get_policy_section,
         policy_id_callback=get_policy_id_callback,
         metadata_callback=add_metadata)
@@ -1041,6 +1047,13 @@ def migrate_lb_services(nsxlib, nsxpolicy):
                      MIGRATE_LIMIT_LB_SERVICE)
 
 
+def edge_firewall_migration_cond(resource):
+    return (resource.get('display_name') == 'Default LR Layer3 Section' and
+            resource.get('enforced_on') == 'LOGICALROUTER' and
+            resource.get('category') == 'Default' and
+            resource.get('section_type') == 'LAYER3')
+
+
 def migrate_fwaas_resources(nsxlib, nsxpolicy, migrated_routers):
     def get_policy_id_callback(res, policy_id):
         # Policy id should be the Policy tier1 id (=neutron id)
@@ -1051,10 +1064,7 @@ def migrate_fwaas_resources(nsxlib, nsxpolicy, migrated_routers):
 
     def cond(resource):
         # Migrate only Edge firewalls related to the migrated tier1s
-        return (resource.get('display_name') == 'Default LR Layer3 Section' and
-                resource.get('enforced_on') == 'LOGICALROUTER' and
-                resource.get('category') == 'Default' and
-                resource.get('section_type') == 'LAYER3' and
+        return (edge_firewall_migration_cond(resource) and
                 resource['applied_tos'][0].get(
                     'target_id', '') in migrated_routers)
 
@@ -1197,8 +1207,9 @@ def _delete_segment_profiles_bindings(nsxpolicy, segment_id):
 
 
 def post_migration_actions(nsxlib, nsxpolicy, plugin):
-    # Update created policy resources that does not match the policy plugins'
-    # expectations
+    """Update created policy resources that does not match the policy plugins'
+    expectations.
+    """
     LOG.info("Starting post-migration actions")
     ctx = context.get_admin_context()
 
@@ -1329,6 +1340,39 @@ def post_migration_actions(nsxlib, nsxpolicy, plugin):
     LOG.info("Post-migration actions done.")
 
 
+def pre_migration_checks(nsxlib, plugin):
+    """Check for unsupported configuration that will block the migration
+    """
+    # Tier0 with disabled BGP config
+    neutron_t0s = get_neurton_tier0s(plugin)
+    for tier0 in neutron_t0s:
+        bgp_conf = nsxlib.logical_router.get_bgp_config(tier0)
+        if not bgp_conf['enabled']:
+            # Verify there are no neighbors configured
+            if nsxlib.logical_router.get_bgp_neighbors(tier0)['result_count']:
+                LOG.error("Pre migration check failed: Tier0 %s has BGP "
+                          "neighbors but BGP is disabled. Please remove the "
+                          "neighbors or enable BGP and try again.", tier0)
+                return False
+
+    # Firewall section with too many rules
+    fw_sections = nsxlib.firewall_section.list()
+    for section in fw_sections:
+        if (dfw_migration_cond(section) or
+            edge_firewall_migration_cond(section)):
+            n_rules = nsxlib.firewall_section.get_rules(
+                section['id'])['result_count']
+            if n_rules >= MIGRATE_LIMIT_SECTION_AND_RULES:
+                LOG.error("Pre migration check failed: Firewall section %s "
+                          "has %s rules and cannot be migrated. Please make "
+                          "sure each section has less than %s rules and try "
+                          "again.", section['id'], n_rules,
+                          MIGRATE_LIMIT_SECTION_AND_RULES)
+                return False
+
+    return True
+
+
 @admin_utils.output_header
 def t_2_p_migration(resource, event, trigger, **kwargs):
     """Migrate NSX resources and neutron DB from NSX-T (MP) to Policy"""
@@ -1378,8 +1422,13 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
         conf_path=cfg.CONF.nsx_v3)
 
     with utils.NsxV3PluginWrapper(verbose=verbose) as plugin:
-        res = migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin)
-        if not res:
+        if not pre_migration_checks(nsxlib, plugin):
+            # Failed
+            LOG.error("T2P migration cannot run. Please fix the configuration "
+                      "and try again\n\n")
+            return
+
+        if not migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
             # Failed
             LOG.error("T2P migration failed. Aborting\n\n")
             return
