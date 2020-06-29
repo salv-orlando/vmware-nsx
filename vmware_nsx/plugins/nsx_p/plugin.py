@@ -528,6 +528,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _get_octavia_stats_getter(self):
         return listener_mgr.stats_getter
 
+    def _get_octavia_status_getter(self):
+        return loadbalancer_mgr.status_getter
+
     def _init_lb_profiles(self):
         ssl_profile_client = self.nsxpolicy.load_balancer.client_ssl_profile
         with locking.LockManager.get_lock('nsxp_lb_profiles_init'):
@@ -554,7 +557,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self.octavia_stats_collector = (
             octavia_listener.NSXOctaviaStatisticsCollector(
                 self,
-                self._get_octavia_stats_getter()))
+                self._get_octavia_stats_getter(),
+                self._get_octavia_status_getter()))
 
     def _init_octavia(self):
         octavia_objects = self._get_octavia_objects()

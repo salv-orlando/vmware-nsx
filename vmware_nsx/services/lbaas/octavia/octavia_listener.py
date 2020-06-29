@@ -300,6 +300,10 @@ class NSXOctaviaListenerEndpoint(object):
         kw = {'statistics': statistics}
         self.client.cast({}, 'update_listener_statistics', **kw)
 
+    def update_loadbalancer_status(self, status):
+        kw = {'status': status}
+        self.client.cast({}, 'update_loadbalancer_status', **kw)
+
     @log_helpers.log_method_call
     def loadbalancer_create(self, ctxt, loadbalancer):
         ctx = neutron_context.Context(None, loadbalancer['project_id'])
@@ -625,9 +629,11 @@ class NSXOctaviaListenerEndpoint(object):
 
 
 class NSXOctaviaStatisticsCollector(object):
-    def __init__(self, core_plugin, listener_stats_getter):
+    def __init__(self, core_plugin, listener_stats_getter,
+                 loadbalancer_status_getter=None):
         self.core_plugin = core_plugin
         self.listener_stats_getter = listener_stats_getter
+        self.loadbalancer_status_getter = loadbalancer_status_getter
         if cfg.CONF.octavia_stats_interval:
             eventlet.spawn_n(self.thread_runner,
                              cfg.CONF.octavia_stats_interval)
@@ -646,8 +652,12 @@ class NSXOctaviaStatisticsCollector(object):
 
         listeners_stats = self.listener_stats_getter(
             context, self.core_plugin)
-        if not listeners_stats:
+        if listeners_stats:
             # Avoid sending empty stats
-            return
-        stats = {'listeners': listeners_stats}
-        endpoint.update_listener_statistics(stats)
+            stats = {'listeners': listeners_stats}
+            endpoint.update_listener_statistics(stats)
+
+        if self.loadbalancer_status_getter:
+            loadbalancer_status = self.loadbalancer_status_getter(
+                context, self.core_plugin)
+            endpoint.update_loadbalancer_status(loadbalancer_status)
