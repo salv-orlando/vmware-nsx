@@ -597,7 +597,7 @@ T2P migration
 
 - Migrate NSX resources and neutron DB from NSX-T (MP) to Policy::
 
-    nsxadmin -r nsx-migrate-t2p -o import (--verbose)
+    nsxadmin -r nsx-migrate-t2p -o import --property logfile=<> (--verbose)
 
 - Delete DB tables related to the MP plugin after migration::
 
