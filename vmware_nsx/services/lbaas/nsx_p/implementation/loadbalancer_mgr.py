@@ -102,7 +102,15 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 else:
                     tier1_srv = self.core_plugin.nsxpolicy.tier1
                     connectivity_path = tier1_srv.get_path(router_id)
-                with p_utils.get_lb_rtr_lock(router_id):
+                if connectivity_path:
+                    with p_utils.get_lb_rtr_lock(router_id):
+                        service_client.create_or_overwrite(
+                            lb_name, lb_service_id=lb['id'],
+                            description=lb['description'],
+                            tags=tags, size=lb_size,
+                            connectivity_path=connectivity_path)
+                else:
+                    # no lock
                     service_client.create_or_overwrite(
                         lb_name, lb_service_id=lb['id'],
                         description=lb['description'],
