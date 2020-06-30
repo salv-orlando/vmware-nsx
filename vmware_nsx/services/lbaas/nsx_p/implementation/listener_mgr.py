@@ -49,25 +49,33 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         return tags
 
     def _upload_certificate(self, listener_id, cert_href, tags,
-                            certificate=None):
+                            certificate):
         nsxpolicy = self.core_plugin.nsxpolicy
         cert_client = nsxpolicy.certificate
         ssl_client = nsxpolicy.load_balancer.client_ssl_profile
-        passphrase = certificate.get('passphrase')
-        if not passphrase:
-            passphrase = core_resources.IGNORE
-        cert_client.create_or_overwrite(
-            cert_href, certificate_id=listener_id,
-            pem_encoded=certificate.get('certificate'),
-            private_key=certificate.get('private_key'),
-            passphrase=passphrase,
-            tags=tags)
+
+        # check if this certificate was already uploaded
+        cert_ids = cert_client.find_cert_with_pem(
+            certificate.get('certificate'))
+        if cert_ids:
+            nsx_cert_id = cert_ids[0]
+        else:
+            # Create it with a random id as this might not be the first one
+            passphrase = certificate.get('passphrase')
+            if not passphrase:
+                passphrase = core_resources.IGNORE
+            nsx_cert_id = cert_client.create_or_overwrite(
+                cert_href,
+                pem_encoded=certificate.get('certificate'),
+                private_key=certificate.get('private_key'),
+                passphrase=passphrase,
+                tags=tags)
 
         return {
             'client_ssl_profile_binding': {
                 'ssl_profile_path': ssl_client.get_path(
                     self.core_plugin.client_ssl_profile),
-                'default_certificate_path': cert_client.get_path(listener_id)
+                'default_certificate_path': cert_client.get_path(nsx_cert_id)
             }
         }
 
@@ -236,14 +244,13 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         app_client = self._get_nsxlib_app_profile(nsxlib_lb, old_listener)
 
         vs_name = None
-        tags = None
         self._validate_default_pool(new_listener, completor)
 
         if new_listener['name'] != old_listener['name']:
             vs_name = utils.get_name_and_uuid(
                 new_listener['name'] or 'listener',
                 new_listener['id'])
-            tags = self._get_listener_tags(context, new_listener)
+        tags = self._get_listener_tags(context, new_listener)
 
         try:
             app_profile_id = new_listener['id']
@@ -304,19 +311,20 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             LOG.error("Failed to delete application profile %s from the "
                       "NSX: %s", app_profile_id, e)
 
-        # Delete imported NSX cert if there is any
-        if lb_common.get_listener_cert_ref(listener):
-            cert_client = self.core_plugin.nsxpolicy.certificate
+        # Delete imported NSX certificates if there is any
+        cert_client = self.core_plugin.nsxpolicy.certificate
+        cert_tags = [{'scope': lb_const.LB_LISTENER_TYPE,
+                      'tag': listener['id']}]
+        results = self.core_plugin.nsxpolicy.search_by_tags(
+            cert_tags, cert_client.entry_def.resource_type())
+        for res_obj in results['results']:
             try:
-                cert_client.delete(listener['id'])
-            except nsxlib_exc.ResourceNotFound:
-                LOG.error("Certificate not found on nsx: %s", listener['id'])
-
+                cert_client.delete(res_obj['id'])
             except nsxlib_exc.ManagerError:
-                completor(success=False)
-                msg = (_('Failed to delete certificate: %(crt)s') %
-                       {'crt': listener['id']})
-                raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
+                msg = (_('Failed to delete certificate: %(crt)s for '
+                         'listener %(list)s') %
+                       {'crt': res_obj['id'], 'list': listener['id']})
+                LOG.error(msg)
 
         completor(success=True)
 
