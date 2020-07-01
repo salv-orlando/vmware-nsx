@@ -91,11 +91,14 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             lb_vip_address = floating_ips[0]['floating_ip_address']
         else:
             lb_vip_address = listener['loadbalancer']['vip_address']
+        lb_service = lb_utils.get_lb_nsx_lb_service(
+            self.core_plugin.nsxpolicy, listener['loadbalancer_id'])
+
         kwargs = {'virtual_server_id': listener['id'],
                   'ip_address': lb_vip_address,
                   'ports': [listener['protocol_port']],
                   'application_profile_id': listener['id'],
-                  'lb_service_id': listener['loadbalancer_id'],
+                  'lb_service_id': lb_service['id'],
                   'description': listener.get('description')}
         if vs_name:
             kwargs['name'] = vs_name
