@@ -541,7 +541,7 @@ def migrate_md_proxies(nsxlib, nsxpolicy, plugin):
         resource_condition=cond,
         policy_resource_get=nsxpolicy.md_proxy.get)
     migrate_resource(nsxlib, 'METADATA_PROXY', entries,
-                     MIGRATE_LIMIT_MD_PROXY)
+                     MIGRATE_LIMIT_MD_PROXY, use_admin=True)
 
 
 def migrate_networks(nsxlib, nsxpolicy, public_switches):
@@ -685,14 +685,13 @@ def migrate_routers_config(nsxlib, nsxpolicy, plugin, migrated_routers):
                              'value': policy_id})
 
         # Add locale-service id as <routerid>-0
-        if resource.get('edge_cluster_id'):
-            policy_id = None
-            for tag in resource.get('tags', []):
-                if tag['scope'] == 'os-neutron-router-id':
-                    policy_id = tag['tag']
-            if policy_id:
-                metadata.append({'key': 'localeServiceId',
-                                 'value': "%s-0" % policy_id})
+        policy_id = None
+        for tag in resource.get('tags', []):
+            if tag['scope'] == 'os-neutron-router-id':
+                policy_id = tag['tag']
+        if policy_id:
+            metadata.append({'key': 'localeServiceId',
+                             'value': "%s-0" % policy_id})
 
         entry['metadata'] = metadata
 
@@ -1206,7 +1205,7 @@ def _delete_segment_profiles_bindings(nsxpolicy, segment_id):
         LOG.debug("Removed profiles mappings from segment %s", segment_id)
 
 
-def post_migration_actions(nsxlib, nsxpolicy, plugin):
+def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
     """Update created policy resources that does not match the policy plugins'
     expectations.
     """
@@ -1277,7 +1276,8 @@ def post_migration_actions(nsxlib, nsxpolicy, plugin):
         except Exception:
             # Create it
             mp_obj = nsxlib.native_dhcp_profile.get(mp_dhcp)
-            nsxpolicy.dhcp_server_config.create_or_overwrite(
+            # This should be created with the admin principal identity
+            nsxpolicy_admin.dhcp_server_config.create_or_overwrite(
                 mp_obj['display_name'],
                 config_id=mp_dhcp,
                 description=mp_obj.get('description', ''),
@@ -1420,6 +1420,13 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
     nsxlib = utils.get_connected_nsxlib(verbose=verbose)
     nsxpolicy = p_utils.get_connected_nsxpolicy(
         conf_path=cfg.CONF.nsx_v3)
+    # Also create a policy manager with admin user to manipulate admin-defined
+    # resources which should not have neutron principal identity
+    nsxpolicy_admin = p_utils.get_connected_nsxpolicy(
+        conf_path=cfg.CONF.nsx_v3,
+        use_basic_auth=True,
+        nsx_username=cfg.CONF.nsx_v3.nsx_api_user,
+        nsx_password=cfg.CONF.nsx_v3.nsx_api_password)
 
     with utils.NsxV3PluginWrapper(verbose=verbose) as plugin:
         if not pre_migration_checks(nsxlib, plugin):
@@ -1433,7 +1440,7 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
             LOG.error("T2P migration failed. Aborting\n\n")
             return
 
-        post_migration_actions(nsxlib, nsxpolicy, plugin)
+        post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin)
 
     LOG.info("T2P migration completed successfully\n\n")
 
