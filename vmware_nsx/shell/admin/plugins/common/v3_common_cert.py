@@ -56,7 +56,8 @@ def get_certificate_manager(plugin_conf, **kwargs):
     LOG.info("Certificate storage is %s", storage_driver_type)
     if storage_driver_type == 'nsx-db':
         storage_driver = cert_utils.DbCertificateStorageDriver(
-            context.get_admin_context())
+            context.get_admin_context(),
+            plugin_conf.nsx_client_cert_pk_password)
     elif storage_driver_type == 'none':
         storage_driver = cert_utils.DummyCertificateStorageDriver()
     # TODO(annak) - add support for barbican storage driver
