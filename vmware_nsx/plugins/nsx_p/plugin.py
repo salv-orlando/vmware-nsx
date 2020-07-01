@@ -3117,7 +3117,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     self.nsxpolicy.tier1.remove_segment_interface(
                         router_id, segment_id)
 
-                if not self._core_plugin.service_router_has_services(
+                if not self.service_router_has_services(
                     context.elevated(), router_id):
                     self.delete_service_router(router_id)
 
