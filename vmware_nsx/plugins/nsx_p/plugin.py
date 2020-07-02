@@ -1231,6 +1231,23 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Delete the neutron DHCP port (and its bindings)
             self._delete_subnet_dhcp_port(context, net_id)
 
+    def _get_segment_dhcp_server_config(self, segment_id, az):
+        """Return the dhcp server config id the segment should be using
+
+        Usually it the AZ one, but in case of migrated segments,
+        the id of the dhcp server config is the same as the segment id
+        """
+        dhcp_server_config = az._policy_dhcp_server_config
+        try:
+            seg = self.nsxpolicy.segment.get(segment_id, silent=True)
+        except Exception:
+            pass
+        else:
+            if seg.get('dhcp_config_path'):
+                dhcp_server_config = p_utils.path_to_id(
+                    seg.get['dhcp_config_path'])
+        return dhcp_server_config
+
     def _update_nsx_net_dhcp(self, context, network, az, subnet=None):
         """Update the DHCP config on a network
         Update the segment DHCP config, as well as the dhcp bindings on the
@@ -1243,10 +1260,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         filters = {'network_id': [net_id]}
         ports = self.get_ports(context, filters=filters)
-
+        dhcp_server_config = self._get_segment_dhcp_server_config(
+            segment_id, az)
         self.nsxpolicy.segment.update(
             segment_id=segment_id,
-            dhcp_server_config_id=az._policy_dhcp_server_config,
+            dhcp_server_config_id=dhcp_server_config,
             subnets=seg_subnets)
 
         # Update DHCP bindings for all the ports.
