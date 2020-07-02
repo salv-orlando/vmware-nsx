@@ -17,7 +17,6 @@ import base64
 import hashlib
 
 from cryptography import fernet
-from oslo_config import cfg
 from oslo_log import log as logging
 
 from vmware_nsx.db import db as nsx_db
@@ -55,12 +54,11 @@ def symmetric_decrypt(secret, ciphertext):
 
 class DbCertificateStorageDriver(object):
     """Storage for certificate and private key in neutron DB"""
-    def __init__(self, context):
+    def __init__(self, context, cert_pk_password=None):
         global _SECRET
         self._context = context
-        if cfg.CONF.nsx_v3.nsx_client_cert_pk_password and not _SECRET:
-            _SECRET = generate_secret_from_password(
-                    cfg.CONF.nsx_v3.nsx_client_cert_pk_password)
+        if cert_pk_password and not _SECRET:
+            _SECRET = generate_secret_from_password(cert_pk_password)
 
     def store_cert(self, purpose, certificate, private_key):
         # encrypt private key
