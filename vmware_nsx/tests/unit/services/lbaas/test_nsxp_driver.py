@@ -718,6 +718,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
@@ -759,6 +762,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
@@ -794,6 +800,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
@@ -851,6 +860,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               return_value=(None, None)), \
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server,\
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.vs_client, 'get', return_value={}),\
             mock.patch.object(self.edge_driver.listener, '_get_pool_tags'),\
             mock.patch.object(self.pp_cookie_client, 'create_or_overwrite'
@@ -901,6 +913,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
@@ -936,6 +951,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         with mock.patch.object(self.core_plugin,
                                'get_waf_profile_path_and_mode',
                                return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.core_plugin, 'get_floatingips'
                               ) as mock_get_floatingips:
             mock_get_floatingips.return_value = []
@@ -958,6 +976,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         with mock.patch.object(self.core_plugin,
                                'get_waf_profile_path_and_mode',
                                return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.core_plugin, 'get_floatingips'
                               ) as mock_get_floatingips:
             mock_get_floatingips.return_value = []
@@ -982,6 +1003,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin,
                               'get_waf_profile_path_and_mode',
                               return_value=(None, None)), \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.edge_driver.listener, '_get_pool_tags'),\
             mock.patch.object(self.vs_client, 'get', return_value={}),\
             mock.patch.object(self.vs_client, 'update',
@@ -1031,6 +1055,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               ) as mock_create_pp, \
             mock.patch.object(self.pp_generic_client, 'delete'
                               ) as mock_delete_pp, \
+            mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
+                              return_value={'results': [
+                                  {'id': LB_SERVICE_ID}]}),\
             mock.patch.object(self.core_plugin, 'get_floatingips'
                               ) as mock_get_floatingips, \
             mock.patch.object(self.edge_driver.listener,
