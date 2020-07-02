@@ -1247,7 +1247,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         else:
             if seg.get('dhcp_config_path'):
                 dhcp_server_config = p_utils.path_to_id(
-                    seg.get['dhcp_config_path'])
+                    seg['dhcp_config_path'])
         return dhcp_server_config
 
     def _update_nsx_net_dhcp(self, context, network, az, subnet=None):
