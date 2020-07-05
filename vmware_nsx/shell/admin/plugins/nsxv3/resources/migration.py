@@ -1343,6 +1343,21 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
 def pre_migration_checks(nsxlib, plugin):
     """Check for unsupported configuration that will block the migration
     """
+
+    # Cannot migrate with unsupported services
+    service_plugins = cfg.CONF.service_plugins
+    for srv_plugin in service_plugins:
+        if 'vpnaas' in srv_plugin:
+            LOG.error("Pre migration check failed: VPNaaS is not supported. "
+                      "Please delete its configuration and disable it, before "
+                      "running migration again.")
+            return False
+        if 'l2gw' in srv_plugin:
+            LOG.error("Pre migration check failed: L2GW is not supported. "
+                      "Please delete its configuration and disable it, before "
+                      "running migration again.")
+            return False
+
     # Tier0 with disabled BGP config
     neutron_t0s = get_neurton_tier0s(plugin)
     for tier0 in neutron_t0s:
