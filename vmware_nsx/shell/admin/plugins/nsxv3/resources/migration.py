@@ -1307,7 +1307,7 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
                 # Update backend subnet
                 segment = nsxpolicy.segment.get(seg_id)
                 subnets = segment.get('subnets', [])
-                if subnets and len(subnets) == 1:
+                if subnets and len(subnets) == 1 and subnet['gateway_ip']:
                     cidr_prefix = int(subnet['cidr'].split('/')[1])
                     gw = "%s/%s" % (subnet['gateway_ip'], cidr_prefix)
                     subnets[0]['gateway_address'] = gw
