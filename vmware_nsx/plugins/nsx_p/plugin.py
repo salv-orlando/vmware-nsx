@@ -1195,10 +1195,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         segment_id = self._get_network_nsx_segment_id(context, net_id)
 
         seg_subnets = self._get_segment_subnets(context, net_id, net_az=az)
+        dhcp_config = self._get_segment_dhcp_server_config(segment_id, az)
         # Update dhcp server config on the segment
         self.nsxpolicy.segment.update(
             segment_id=segment_id,
-            dhcp_server_config_id=az._policy_dhcp_server_config,
+            dhcp_server_config_id=dhcp_config,
             subnets=seg_subnets)
 
     def _get_net_dhcp_subnets(self, context, net_id):
