@@ -1221,6 +1221,8 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
     def test_create_dhcpv6_subnet(self):
         with mock.patch("vmware_nsxlib.v3.policy.core_resources."
                         "NsxPolicySegmentApi.update") as seg_update,\
+            mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                       "NsxPolicySegmentApi.get", return_value={}),\
             self.subnet(ip_version=constants.IP_VERSION_6, cidr='fe80::/64',
                         enable_dhcp=True) as subnet:
             self.assertEqual(True, subnet['subnet']['enable_dhcp'])
@@ -1238,7 +1240,9 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                          enable_dhcp=False) as subnet:
             data = {'subnet': {'enable_dhcp': True}}
             with mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                            "NsxPolicySegmentApi.update") as seg_update:
+                            "NsxPolicySegmentApi.update") as seg_update,\
+                mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                           "NsxPolicySegmentApi.get", return_value={}):
                 req = self.new_update_request('subnets', data,
                                               subnet['subnet']['id'])
                 res = self.deserialize('json', req.get_response(self.api))
