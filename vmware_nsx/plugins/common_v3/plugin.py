@@ -188,6 +188,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                                  webob.exc.HTTPBadRequest,
                                  nsx_exc.NsxPluginTemporaryError:
                                  webob.exc.HTTPServiceUnavailable,
+                                 nsx_lib_exc.ServiceUnavailable:
+                                 webob.exc.HTTPServiceUnavailable,
                                  nsx_lib_exc.TooManyRequests:
                                  webob.exc.HTTPServiceUnavailable
                                  })
