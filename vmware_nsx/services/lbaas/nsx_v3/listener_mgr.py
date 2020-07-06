@@ -14,6 +14,7 @@
 #    under the License.
 
 from neutron_lib import exceptions as n_exc
+from oslo_config import cfg
 from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
@@ -116,9 +117,13 @@ class EdgeListenerManager(base_mgr.Nsxv3LoadbalancerBaseManager):
                                           listener.id)
         tags = self._get_listener_tags(context, listener)
 
+        app_profile_kwargs = {}
         if (listener.protocol == lb_const.LB_PROTOCOL_HTTP or
                 listener.protocol == lb_const.LB_PROTOCOL_TERMINATED_HTTPS):
             profile_type = lb_const.LB_HTTP_PROFILE
+            if cfg.CONF.nsx_v3.lbaas_inject_xff_header:
+                app_profile_kwargs['x_forwarded_for'] = 'INSERT'
+
         elif (listener.protocol == lb_const.LB_PROTOCOL_TCP or
               listener.protocol == lb_const.LB_PROTOCOL_HTTPS):
             profile_type = lb_const.LB_TCP_PROFILE
@@ -130,7 +135,8 @@ class EdgeListenerManager(base_mgr.Nsxv3LoadbalancerBaseManager):
             raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
         try:
             app_profile = app_client.create(
-                display_name=vs_name, resource_type=profile_type, tags=tags)
+                display_name=vs_name, resource_type=profile_type, tags=tags,
+                **app_profile_kwargs)
             app_profile_id = app_profile['id']
             kwargs = self._get_virtual_server_kwargs(
                 context, listener, vs_name, tags, app_profile_id, certificate)

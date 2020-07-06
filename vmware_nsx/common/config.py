@@ -449,6 +449,11 @@ nsx_v3_opts = [
                 help=_("List of transit networks used by NSX tier0 routers. "
                        "Neutron subnets will not be allowed to use those "
                        "cidrs")),
+    cfg.BoolOpt('lbaas_inject_xff_header',
+                default=False,
+                help=_("(Optional) When True, LBaaS L7 listener will be "
+                       "configured to inject X-Forwarded-For to the "
+                       "requests")),
 ]
 
 DEFAULT_STATUS_CHECK_INTERVAL = 2000
