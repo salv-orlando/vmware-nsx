@@ -657,7 +657,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def _tier0_validator(self, tier0_uuid):
         # Fail if the tier0 uuid was not found on the NSX
-        self.nsxpolicy.tier0.get(tier0_uuid)
+        try:
+            self.nsxpolicy.tier0.get(tier0_uuid)
+        except Exception:
+            msg = (_("Cannot create external network as Tier0 %s was not "
+                     "found") % tier0_uuid)
+            raise n_exc.InvalidInput(error_message=msg)
 
     def _get_nsx_net_tz_id(self, nsx_net):
         return nsx_net['transport_zone_path'].split('/')[-1]
