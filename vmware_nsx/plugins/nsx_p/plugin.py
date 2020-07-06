@@ -23,6 +23,7 @@ from oslo_log import log
 from oslo_utils import excutils
 from oslo_utils import uuidutils
 
+from neutron.common import ipv6_utils
 from neutron.db import agents_db
 from neutron.db import l3_db
 from neutron.db.models import l3 as l3_db_models
@@ -1239,7 +1240,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 subnets=seg_subnets)
             self._delete_subnet_dhcp_port(context, net_id, subnet_id=subnet_id)
         else:
-            # Remove dhcp server config completly from the segment
+            # Remove dhcp server config completely from the segment
             seg_subnets = self._get_segment_subnets(
                 context, net_id, deleted_dhcp_subnets=net_dhcp_subnets)
             self.nsxpolicy.segment.update(
@@ -1487,7 +1488,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Ensure that subnet is not deleted if attached to router.
             self._subnet_check_ip_allocations_internal_router_ports(
                 context, subnet_id)
+            # Ensure that subnet is not deleted if it has ports, before
+            # changing backend configuration
             subnet = self.get_subnet(context, subnet_id)
+            is_auto_addr_subnet = ipv6_utils.is_auto_address_subnet(subnet)
+            if not is_auto_addr_subnet:
+                # for SLAAC auto allocation subnets ports can still exist
+                self._ensure_no_user_ports_on_subnet(context, subnet_id)
             if self._subnet_with_native_dhcp(subnet):
                 lock = 'nsxp_network_' + subnet['network_id']
                 with locking.LockManager.get_lock(lock):
