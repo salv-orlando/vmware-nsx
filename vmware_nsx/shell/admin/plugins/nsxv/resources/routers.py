@@ -224,6 +224,43 @@ def migrate_distributed_routers_dhcp(resource, event, trigger, **kwargs):
                                 _update_vdr_fw_config(nsxv, binding['edge_id'])
 
 
+@admin_utils.output_header
+def update_edge_firewalls(resource, event, trigger, **kwargs):
+    context = n_context.get_admin_context()
+    updated_routers = []
+    with utils.NsxVPluginWrapper() as plugin:
+        shared_dr = plugin._router_managers.get_tenant_router_driver(
+            context, 'shared')
+        routers = plugin.get_routers(context)
+        for router in routers:
+            if router['id'] in updated_routers:
+                continue
+            if router.get('distributed', False):
+                # Distributes firewall - Update plr and tlr
+                router_db = plugin._get_router(context, router['id'])
+                plugin._update_subnets_and_dnat_firewall(context, router_db)
+                plr_id = plugin.edge_manager.get_plr_by_tlr_id(
+                    context, router['id'])
+                if plr_id:
+                    plugin._update_subnets_and_dnat_firewall(
+                        context, router, router_id=plr_id)
+                updated_routers.append(router['id'])
+            elif router.get('router_type') == 'shared':
+                # Shared router
+                router_ids = shared_dr.edge_manager.get_routers_on_same_edge(
+                    context, router['id'])
+                shared_dr._update_subnets_and_dnat_firewall_on_routers(
+                    context, router['id'], router_ids)
+                updated_routers.extend(router_ids)
+            else:
+                # Exclusive router
+                router_db = plugin._get_router(context, router['id'])
+                plugin._update_subnets_and_dnat_firewall(context, router_db)
+                updated_routers.append(router['id'])
+
+    LOG.info("Updated edge firewall rules for routers: %s", updated_routers)
+
+
 def _update_vdr_fw_config(nsxv, edge_id):
     fw_config = nsxv.get_firewall(edge_id)[1]
 
@@ -373,6 +410,10 @@ registry.subscribe(migrate_distributed_routers_dhcp,
 registry.subscribe(redistribute_routers,
                    constants.ROUTERS,
                    shell.Operations.NSX_REDISTRIBURE.value)
+
+registry.subscribe(update_edge_firewalls,
+                   constants.ROUTERS,
+                   shell.Operations.NSX_UPDATE_FW.value)
 
 registry.subscribe(list_orphaned_vnics,
                    constants.ORPHANED_VNICS,
