@@ -40,6 +40,7 @@ class EdgeFirewallDriver(object):
     def __init__(self):
         super(EdgeFirewallDriver, self).__init__()
         self._icmp_echo_application_ids = None
+        self._icmpv6_multicast_application_ids = None
 
     def _convert_firewall_action(self, action):
         if action == FWAAS_ALLOW:
@@ -428,6 +429,20 @@ class EdgeFirewallDriver(object):
             raise nsx_exc.NsxResourceNotFound(
                         res_name='ICMP Echo', res_id='')
         return self._icmp_echo_application_ids
+
+    def get_icmpv6_multicast_application_ids(self):
+        # check cached list first
+        # (if backend version changes, neutron should be restarted)
+        if self._icmpv6_multicast_application_ids:
+            return self._icmpv6_multicast_application_ids
+
+        self._icmpv6_multicast_application_ids = self.get_application_ids(
+                ['IPv6-ICMP Version 2 Multicast Listener',
+                 'IPv6-ICMP Multicast Listener Query'])
+        if not self._icmpv6_multicast_application_ids:
+            raise nsx_exc.NsxResourceNotFound(
+                        res_name='ICMPv6 Multicast', res_id='')
+        return self._icmpv6_multicast_application_ids
 
     def get_application_ids(self, application_names):
         results = self.vcns.list_applications()

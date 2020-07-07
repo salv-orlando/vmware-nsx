@@ -331,6 +331,9 @@ class RouterSharedDriver(router_driver.RouterBaseDriver):
         if self.plugin.metadata_proxy_handler:
             fw_rules += nsx_v_md_proxy.get_router_fw_rules()
 
+        # Add ipv6 icmp multicast rule (blocked in Vsphere 7 & up)
+        fw_rules.extend(self.plugin._get_firewall_icmpv6_rules())
+
         # TODO(asarfaty): Add fwaas rules when fwaas supports shared routers
         fw = {'firewall_rule_list': fw_rules}
         edge_utils.update_firewall(self.nsx_v, context, target_router_id,

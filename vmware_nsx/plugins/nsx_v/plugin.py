@@ -4255,6 +4255,16 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
         self.update_router_firewall(context, router_id, router_db)
 
+    def _get_firewall_icmpv6_rules(self):
+        # Add ipv6 icmp multicast rule (blocked in Vsphere 7 & up)
+        application_ids = self.nsx_v.get_icmpv6_multicast_application_ids()
+        rules = [{
+            'name': 'IPV6-ICMP-multicast',
+            'action': 'allow',
+            'enabled': True,
+            'application': {'applicationId': application_ids}}]
+        return rules
+
     def update_router_firewall(self, context, router_id, router_db):
         """Recreate all rules in the router edge firewall
 
@@ -4279,6 +4289,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                                                  subnets=subnets)
         if subnet_rules:
             fw_rules.extend(subnet_rules)
+
+        # Add ipv6 icmp multicast rule (blocked in Vsphere 7 & up)
+        fw_rules.extend(self._get_firewall_icmpv6_rules())
 
         # If metadata service is enabled, block access to inter-edge network
         if self.metadata_proxy_handler and not distributed:

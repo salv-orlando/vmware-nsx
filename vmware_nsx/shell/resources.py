@@ -56,6 +56,7 @@ class Operations(enum.Enum):
     NSX_ENABLE_STANDBY_RELOCATION = 'nsx-enable-standby-relocation'
     NSX_UPDATE_IP = 'nsx-update-ip'
     NSX_UPDATE_TAGS = 'nsx-update-tags'
+    NSX_UPDATE_FW = 'nsx-update-fw'
     NSX_RECREATE = 'nsx-recreate'
     NSX_REDISTRIBURE = 'nsx-redistribute'
     NSX_REORDER = 'nsx-reorder'
@@ -230,7 +231,8 @@ nsxv_resources = {
     constants.ROUTERS: Resource(constants.ROUTERS,
                                 [Operations.NSX_RECREATE.value,
                                  Operations.NSX_REDISTRIBURE.value,
-                                 Operations.MIGRATE_VDR_DHCP.value]),
+                                 Operations.MIGRATE_VDR_DHCP.value,
+                                 Operations.NSX_UPDATE_FW.value]),
     constants.ORPHANED_VNICS: Resource(constants.ORPHANED_VNICS,
                                        [Operations.NSX_LIST.value,
                                         Operations.NSX_CLEAN.value]),
