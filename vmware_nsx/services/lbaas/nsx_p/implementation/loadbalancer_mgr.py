@@ -276,20 +276,11 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             return {}
 
         # get the loadbalancer status from the LB service
-        lb_status = lb_const.ONLINE
         lb_status_results = service_status.get('results')
+        lb_status = lb_const.ONLINE
         if lb_status_results:
             result = lb_status_results[0]
-            if result.get('service_status'):
-                # Use backend service_status
-                lb_status = self._nsx_status_to_lb_status(
-                    result['service_status'])
-            elif result.get('alarm'):
-                # No status, but has alarms -> ERROR
-                lb_status = lb_const.OFFLINE
-            else:
-                # Unknown - assume it is ok
-                lb_status = lb_const.ONLINE
+            lb_status = _get_octavia_lb_status(result)
 
         statuses = {lb_const.LOADBALANCERS: [{'id': id, 'status': lb_status}],
                     lb_const.LISTENERS: [],
@@ -300,21 +291,92 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # to add the listeners statuses from the virtual servers statuses
         return statuses
 
-    def _nsx_status_to_lb_status(self, nsx_status):
-        if not nsx_status:
-            # default fallback
-            return lb_const.ONLINE
 
-        # Statuses that are considered ONLINE:
-        if nsx_status.upper() in ['UP', 'UNKNOWN', 'PARTIALLY_UP',
-                                  'NO_STANDBY']:
-            return lb_const.ONLINE
-        # Statuses that are considered OFFLINE:
-        if nsx_status.upper() in ['PRIMARY_DOWN', 'DETACHED', 'DOWN', 'ERROR']:
-            return lb_const.OFFLINE
-        if nsx_status.upper() == 'DISABLED':
-            return lb_const.DISABLED
-
+def _nsx_status_to_lb_status(nsx_status):
+    if not nsx_status:
         # default fallback
-        LOG.debug("NSX LB status %s - interpreted as ONLINE", nsx_status)
         return lb_const.ONLINE
+
+    # Statuses that are considered ONLINE:
+    if nsx_status.upper() in ['UP', 'UNKNOWN', 'PARTIALLY_UP',
+                              'NO_STANDBY']:
+        return lb_const.ONLINE
+    # Statuses that are considered OFFLINE:
+    if nsx_status.upper() in ['PRIMARY_DOWN', 'DETACHED', 'DOWN', 'ERROR']:
+        return lb_const.OFFLINE
+    if nsx_status.upper() == 'DISABLED':
+        return lb_const.DISABLED
+
+    # default fallback
+    LOG.debug("NSX LB status %s - interpreted as ONLINE", nsx_status)
+    return lb_const.ONLINE
+
+
+def _get_octavia_lb_status(result):
+    if result.get('service_status'):
+        # Use backend service_status
+        lb_status = _nsx_status_to_lb_status(
+            result['service_status'])
+    elif result.get('alarm'):
+        # No status, but has alarms -> ERROR
+        lb_status = lb_const.OFFLINE
+    else:
+        # Unknown - assume it is ok
+        lb_status = lb_const.ONLINE
+    return lb_status
+
+
+def status_getter(context, core_plugin):
+    nsxlib_lb = core_plugin.nsxpolicy.load_balancer
+    lb_client = nsxlib_lb.lb_service
+    lbs = lb_client.list()
+    lb_statuses = []
+    lsn_statuses = []
+    pool_statuses = []
+    member_statuses = []
+    for lb in lbs:
+        try:
+            service_status = lb_client.get_status(lb['id'])
+            if not isinstance(service_status, dict):
+                service_status = {}
+        except nsxlib_exc.ManagerError:
+            LOG.warning("LB service %(lbs)s is not found",
+                        {'lbs': id})
+            service_status = {}
+        lb_status_results = service_status.get('results')
+        if lb_status_results:
+            result = lb_status_results[0]
+            lb_operating_status = _get_octavia_lb_status(result)
+            for vs_status in result.get('virtual_servers', []):
+                vs_id = lib_p_utils.path_to_id(
+                    vs_status['virtual_server_path'])
+                lsn_statuses.append({
+                    'id': vs_id,
+                    'operating_status': _nsx_status_to_lb_status(
+                        vs_status['status'])})
+            for pool_status in result.get('pools', []):
+                pool_id = lib_p_utils.path_to_id(pool_status['pool_path'])
+                pool_statuses.append({
+                    'id': pool_id,
+                    'operating_status': _nsx_status_to_lb_status(
+                        pool_status['status'])})
+                for member in pool_status.get('members', []):
+                    member_statuses.append({
+                        'pool_id': pool_id,
+                        'member_ip': member.get('ip_address'),
+                        'operating_status': _nsx_status_to_lb_status(
+                            member['status'])})
+
+        else:
+            lb_operating_status = lb_const.OFFLINE
+
+        for tag in lb['tags']:
+            if tag['scope'] == 'loadbalancer_id':
+                lb_statuses.append(
+                    {'id': tag['tag'],
+                     'operating_status': lb_operating_status})
+
+    return {lb_const.LOADBALANCERS: lb_statuses,
+            lb_const.LISTENERS: lsn_statuses,
+            lb_const.POOLS: pool_statuses,
+            lb_const.MEMBERS: member_statuses}
