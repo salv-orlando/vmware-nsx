@@ -1378,10 +1378,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _validate_subnet_gw_ip(self, subnet, orig_subnet=None):
         # Make sure the gw ip is legal and belongs to the subnet
         raw_gw_ip = subnet.get('gateway_ip')
-        if orig_subnet and raw_gw_ip == const.ATTR_NOT_SPECIFIED:
+        if (orig_subnet and
+            (not raw_gw_ip or raw_gw_ip == const.ATTR_NOT_SPECIFIED)):
             raw_gw_ip = orig_subnet.get('gateway_ip')
         raw_cidr = subnet.get('cidr')
-        if orig_subnet and raw_cidr == const.ATTR_NOT_SPECIFIED:
+        if (orig_subnet and
+            (not raw_cidr or raw_cidr == const.ATTR_NOT_SPECIFIED)):
             raw_cidr = orig_subnet.get('cidr')
         if (not raw_gw_ip or raw_gw_ip == const.ATTR_NOT_SPECIFIED or
             not raw_cidr or raw_cidr == const.ATTR_NOT_SPECIFIED):
