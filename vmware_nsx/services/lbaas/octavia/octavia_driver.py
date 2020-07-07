@@ -545,10 +545,26 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
 class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
     target = messaging.Target(namespace="control", version='1.0')
 
+    def __init__(self, status_socket=driver_lib.DEFAULT_STATUS_SOCKET,
+                 stats_socket=driver_lib.DEFAULT_STATS_SOCKET, **kwargs):
+        super(NSXOctaviaDriverEndpoint, self).__init__(
+            status_socket, stats_socket, **kwargs)
+        self.repositories = repositories.Repositories()
+
     @log_helpers.log_method_call
     def update_loadbalancer_status(self, ctxt, status):
         # refresh the driver lib session
         self.db_session = db_apis.get_session()
+        for member in status.get('members', []):
+            if member.get('id'):
+                pass
+            elif member.get('member_ip') and member.get('pool_id'):
+                db_member = self.repositories.member.get(
+                    self.db_session,
+                    pool_id=member['pool_id'],
+                    ip_address=member['member_ip'])
+                if db_member:
+                    member['id'] = db_member.id
         try:
             return super(NSXOctaviaDriverEndpoint,
                          self).update_loadbalancer_status(status)
