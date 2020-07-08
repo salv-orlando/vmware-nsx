@@ -201,12 +201,16 @@ def wait_on_overall_migration_status_to_pause(nsxlib):
 
 
 def printable_resource_name(resource):
-    name_or_id = resource.get('display_name', resource['id'])
-    try:
-        name_or_id = str(name_or_id)
-    except UnicodeEncodeError:
-        name_or_id = name_or_id.encode('ascii', 'ignore')
-    return name_or_id
+    name = resource.get('display_name')
+    if name:
+        try:
+            name = str(name)
+        except UnicodeEncodeError:
+            name = name.encode('ascii', 'ignore')
+    res_id = resource.get('id')
+    if name == res_id:
+        return name
+    return "%s (%s)" % (name, resource.get('id'))
 
 
 def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
@@ -225,7 +229,7 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
         resources = resources.get('results', [])
     entries = []
     for resource in resources:
-        name_or_id = printable_resource_name(resource)
+        name_and_id = printable_resource_name(resource)
         policy_id = resource['id']
         # Go over tags and find the neutron id
         neutron_id = None
@@ -238,19 +242,19 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
                 neutron_id = tag['tag']
         if not skip_policy_path_check and found_policy_path:
             LOG.debug("Skipping %s %s as it is already a policy "
-                      "resource", printable_name, name_or_id)
+                      "resource", printable_name, name_and_id)
             continue
         if neutron_id_tags:
             if not neutron_id:
                 # Not a neutron resource
                 LOG.debug("Skipping %s %s as it is not a neutron resource",
-                          printable_name, name_or_id)
+                          printable_name, name_and_id)
                 continue
             policy_id = neutron_id
         if resource_condition:
             if not resource_condition(resource):
                 LOG.debug("Skipping %s %s as it does not match the neutron "
-                          "condition", printable_name, name_or_id)
+                          "condition", printable_name, name_and_id)
                 continue
         if policy_id_callback:
             # Callback to change the policy id
@@ -263,10 +267,10 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
                 pass
             else:
                 LOG.debug("Skipping %s %s as it already exists on the "
-                          "policy backend", printable_name, name_or_id)
+                          "policy backend", printable_name, name_and_id)
                 continue
-        LOG.debug("Adding data for %s manager-id %s, policy-id %s",
-                  printable_name, resource['id'], policy_id)
+        LOG.debug("Adding data for %s %s, policy-id %s",
+                  printable_name, name_and_id, policy_id)
         entry = {'manager_id': resource['id']}
         if policy_id:
             entry['policy_id'] = policy_id
@@ -384,7 +388,11 @@ def migrate_resource(nsxlib, resource_type, entries,
 def get_configured_values(plugin, az_attribute):
     values = []
     for az in plugin.get_azs_list():
-        values.append(getattr(az, az_attribute))
+        az_values = getattr(az, az_attribute)
+        if isinstance(az_values, list):
+            values.extend(az_values)
+        else:
+            values.append(az_values)
     return values
 
 
