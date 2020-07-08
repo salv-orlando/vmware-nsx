@@ -455,6 +455,17 @@ def migrate_switch_profiles(nsxlib, nsxpolicy, plugin):
 
     # Include switch profiles that are in the nsx.ini
     conf_profiles = get_configured_values(plugin, 'switching_profiles')
+
+    # Add other switch profiles that might be used by neutron ports in the past
+    port_profiles = set()
+    ports = nsxlib.logical_port.list()['results']
+    for port in ports:
+        # Check that it is a neutron port
+        if not is_neutron_resource(port):
+            continue
+        for prof in port.get('switching_profile_ids', []):
+            port_profiles.add(prof['value'])
+
     # Black list neuron & system profiles that should not be migrated
     names_black_list = [v3_plugin_utils.NSX_V3_DHCP_PROFILE_NAME,
                         'ServiceInsertion_MacManagement_Profile']
@@ -464,6 +475,7 @@ def migrate_switch_profiles(nsxlib, nsxpolicy, plugin):
             return (resource.get('resource_type') == resource_type and
                     resource.get('display_name') not in names_black_list and
                     (resource.get('id') in conf_profiles or
+                     resource.get('id') in port_profiles or
                      resource.get('_system_owned', True) or
                      is_neutron_resource(resource)))
         return cond
@@ -539,6 +551,18 @@ def migrate_switch_profiles(nsxlib, nsxpolicy, plugin):
 
 def migrate_md_proxies(nsxlib, nsxpolicy, plugin):
     neutron_md = get_configured_values(plugin, '_native_md_proxy_uuid')
+
+    # Add other mdproxies that might be used by neutron networks in the past
+    ports = nsxlib.logical_port.list()['results']
+    for port in ports:
+        # Check that it is a neutron port
+        if not is_neutron_resource(port):
+            continue
+        if (port.get('attachment') and
+            port['attachment'].get('attachment_type') == 'METADATA_PROXY'):
+            mdproxy_id = port['attachment'].get('id')
+            if mdproxy_id not in neutron_md:
+                neutron_md.append(port['attachment'].get('id'))
 
     def cond(resource):
         return resource.get('id') in neutron_md
