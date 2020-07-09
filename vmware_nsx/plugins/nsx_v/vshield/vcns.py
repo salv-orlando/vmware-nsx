@@ -993,7 +993,7 @@ class Vcns(object):
                 # Versions prior to 6.2.0 do not support the above API
                 LOG.error("Unable to get NSX version. Exception: %s", e)
                 # Minimum supported version is 6.1
-                self._nsx_version = '6.1'
+                return '6.1'
         return self._nsx_version
 
     def get_tuning_configuration(self):
