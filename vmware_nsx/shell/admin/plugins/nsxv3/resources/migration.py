@@ -576,7 +576,7 @@ def migrate_md_proxies(nsxlib, nsxpolicy, plugin):
                      MIGRATE_LIMIT_MD_PROXY, use_admin=True)
 
 
-def migrate_networks(nsxlib, nsxpolicy, public_switches):
+def migrate_networks(nsxlib, nsxpolicy, plugin, public_switches):
 
     # Get a list of nsx-net provider networks to migrate
     # Those networks have no tags, and should keep the same id in policy
@@ -606,12 +606,36 @@ def migrate_networks(nsxlib, nsxpolicy, public_switches):
             if tag['scope'] == 'os-neutron-net-id':
                 return tag['tag']
 
+    def add_metadata(entry, policy_id, resource):
+        # Add dhcp-v4 static bindings
+        network_id = None
+        for tag in resource.get('tags', []):
+            # Use the neutron ID
+            if tag['scope'] == 'os-neutron-net-id':
+                network_id = tag['tag']
+                break
+        if not network_id:
+            return
+        metadata = []
+        ctx = context.get_admin_context()
+        port_filters = {'network_id': [network_id]}
+        network_ports = plugin.get_ports(ctx, filters=port_filters)
+        for port in network_ports:
+            bindings = db.get_nsx_dhcp_bindings(ctx.session, port['id'])
+            if bindings:
+                # Should be only 1
+                metadata.append({
+                    'key': 'v4-static-binding%s' % bindings[0].nsx_binding_id,
+                    'value': port['id'] + '-ipv4'})
+        entry['metadata'] = metadata
+
     entries = get_resource_migration_data(
         nsxlib.logical_switch, [],
         'LOGICAL_SWITCH',
         resource_condition=cond,
         policy_resource_get=nsxpolicy.segment.get,
-        policy_id_callback=get_policy_id)
+        policy_id_callback=get_policy_id,
+        metadata_callback=add_metadata)
     migrate_resource(nsxlib, 'LOGICAL_SWITCH', entries,
                      MIGRATE_LIMIT_LOGICAL_SWITCH)
 
@@ -1159,7 +1183,7 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         migrate_groups(nsxlib, nsxpolicy)
         migrate_dhcp_servers(nsxlib, nsxpolicy)
         mp_routers = migrate_routers(nsxlib, nsxpolicy)
-        migrate_networks(nsxlib, nsxpolicy, public_switches)
+        migrate_networks(nsxlib, nsxpolicy, plugin, public_switches)
         migrate_ports(nsxlib, nsxpolicy, plugin)
         migrate_routers_config(nsxlib, nsxpolicy, plugin, mp_routers)
         migrate_tier0_config(nsxlib, nsxpolicy, tier0s)
