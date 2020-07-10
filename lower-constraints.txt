@@ -36,7 +36,7 @@ prettytable==0.7.2
 psycopg2==2.7
 PyMySQL==0.7.6
 pylint==1.7.1
-python-openstackclient==4.0.0
+python-openstackclient==5.3.0
 reno==2.5.0
 requests==2.14.2
 six==1.11.0

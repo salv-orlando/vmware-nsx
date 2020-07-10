@@ -87,6 +87,10 @@ class NsxCreateSecurityGroup(security_group.CreateSecurityGroup):
         attrs = {}
         attrs['name'] = parsed_args.name
         attrs['description'] = self._get_description(parsed_args)
+        if parsed_args.stateful:
+            attrs['stateful'] = True
+        if parsed_args.stateless:
+            attrs['stateful'] = False
         if parsed_args.project is not None:
             identity_client = self.app.client_manager.identity
             project_id = identity_common.find_project(
@@ -136,6 +140,10 @@ class NsxSetSecurityGroup(security_group.SetSecurityGroup):
             attrs['name'] = parsed_args.name
         if parsed_args.description is not None:
             attrs['description'] = parsed_args.description
+        if parsed_args.stateful:
+            attrs['stateful'] = True
+        if parsed_args.stateless:
+            attrs['stateful'] = False
 
         # add the plugin attributes
         attrs = _get_plugin_attrs(attrs, parsed_args, self.app.client_manager)
