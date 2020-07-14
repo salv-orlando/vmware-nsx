@@ -133,7 +133,8 @@ def get_client_cert_provider(conf_path=cfg.CONF.nsx_v3):
 
 
 def get_nsxlib_wrapper(nsx_username=None, nsx_password=None, basic_auth=False,
-                       plugin_conf=None, allow_overwrite_header=False):
+                       plugin_conf=None, allow_overwrite_header=False,
+                       retriable_exceptions=None):
     if not plugin_conf:
         plugin_conf = cfg.CONF.nsx_v3
 
@@ -142,6 +143,9 @@ def get_nsxlib_wrapper(nsx_username=None, nsx_password=None, basic_auth=False,
         # if basic auth requested, dont use cert file even if provided
         client_cert_provider = get_client_cert_provider(conf_path=plugin_conf)
 
+    exception_config = config.ExceptionConfig()
+    if retriable_exceptions:
+        exception_config.retriables = retriable_exceptions
     nsxlib_config = config.NsxLibConfig(
         username=nsx_username or plugin_conf.nsx_api_user,
         password=nsx_password or plugin_conf.nsx_api_password,
@@ -161,12 +165,14 @@ def get_nsxlib_wrapper(nsx_username=None, nsx_password=None, basic_auth=False,
         plugin_ver=n_version.version_info.release_string(),
         dns_nameservers=cfg.CONF.nsx_v3.nameservers,
         dns_domain=cfg.CONF.nsx_v3.dns_domain,
-        allow_overwrite_header=allow_overwrite_header)
+        allow_overwrite_header=allow_overwrite_header,
+        exception_config=exception_config)
     return v3.NsxLib(nsxlib_config)
 
 
 def get_nsxpolicy_wrapper(nsx_username=None, nsx_password=None,
-                          basic_auth=False, conf_path=None):
+                          basic_auth=False, conf_path=None,
+                          retriable_exceptions=None):
     if not conf_path:
         conf_path = cfg.CONF.nsx_p
     client_cert_provider = None
@@ -174,6 +180,10 @@ def get_nsxpolicy_wrapper(nsx_username=None, nsx_password=None,
         # if basic auth requested, dont use cert file even if provided
         client_cert_provider = get_client_cert_provider(
             conf_path=conf_path)
+
+    exception_config = config.ExceptionConfig()
+    if retriable_exceptions:
+        exception_config.retriables = retriable_exceptions
 
     nsxlib_config = config.NsxLibConfig(
         username=nsx_username or conf_path.nsx_api_user,
@@ -194,6 +204,7 @@ def get_nsxpolicy_wrapper(nsx_username=None, nsx_password=None,
         plugin_ver=n_version.version_info.release_string(),
         dns_nameservers=conf_path.nameservers,
         dns_domain=conf_path.dns_domain,
+        exception_config=exception_config,
         allow_passthrough=(conf_path.allow_passthrough
                            if hasattr(conf_path, 'allow_passthrough')
                            else False),
