@@ -42,6 +42,7 @@ def get_nsxp_client(nsx_username=None, nsx_password=None,
 
 def get_connected_nsxpolicy(nsx_username=None, nsx_password=None,
                             use_basic_auth=False, conf_path=None,
+                            retriable_exceptions=None,
                             verbose=False):
     global _NSXPOLICY
 
@@ -54,12 +55,14 @@ def get_connected_nsxpolicy(nsx_username=None, nsx_password=None,
         if not verbose:
             # Return logs to normal
             logging.disable(logging.NOTSET)
-        return v3_utils.get_nsxpolicy_wrapper(nsx_username,
-                                              nsx_password,
-                                              use_basic_auth,
-                                              conf_path=conf_path)
+        return v3_utils.get_nsxpolicy_wrapper(
+            nsx_username, nsx_password, use_basic_auth,
+            conf_path=conf_path,
+            retriable_exceptions=retriable_exceptions)
     if _NSXPOLICY is None:
-        _NSXPOLICY = v3_utils.get_nsxpolicy_wrapper(conf_path=conf_path)
+        _NSXPOLICY = v3_utils.get_nsxpolicy_wrapper(
+            conf_path=conf_path,
+            retriable_exceptions=retriable_exceptions)
     if not verbose:
         # Return logs to normal
         logging.disable(logging.NOTSET)

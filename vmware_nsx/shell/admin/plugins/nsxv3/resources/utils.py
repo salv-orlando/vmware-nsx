@@ -49,6 +49,7 @@ def get_connected_nsxlib(nsx_username=None, nsx_password=None,
                          use_basic_auth=False,
                          plugin_conf=None,
                          allow_overwrite_header=False,
+                         retriable_exceptions=None,
                          verbose=False):
     global _NSXLIB
 
@@ -64,11 +65,14 @@ def get_connected_nsxlib(nsx_username=None, nsx_password=None,
         return v3_utils.get_nsxlib_wrapper(
             nsx_username, nsx_password, use_basic_auth,
             plugin_conf=plugin_conf,
+            retriable_exceptions=retriable_exceptions,
             allow_overwrite_header=allow_overwrite_header)
+
     if _NSXLIB is None:
         _NSXLIB = v3_utils.get_nsxlib_wrapper(
             plugin_conf=plugin_conf,
-            allow_overwrite_header=allow_overwrite_header)
+            allow_overwrite_header=allow_overwrite_header,
+            retriable_exceptions=retriable_exceptions)
 
     if not verbose:
         # Return logs to normal
