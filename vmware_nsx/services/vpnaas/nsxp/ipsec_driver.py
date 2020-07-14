@@ -671,7 +671,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
 
         # Make sure this tier1 has service router
         router_id = vpnservice['router_id']
-        if not self._core_plugin.verify_sr_at_backend(router_id):
+        if not self._core_plugin.verify_sr_at_backend(context, router_id):
             self._core_plugin.create_service_router(context, router_id)
 
         # create the NSX vpn service

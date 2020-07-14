@@ -48,6 +48,7 @@ def get_nsxv3_client(nsx_username=None, nsx_password=None,
 def get_connected_nsxlib(nsx_username=None, nsx_password=None,
                          use_basic_auth=False,
                          plugin_conf=None,
+                         allow_overwrite_header=False,
                          verbose=False):
     global _NSXLIB
 
@@ -60,12 +61,14 @@ def get_connected_nsxlib(nsx_username=None, nsx_password=None,
         if not verbose:
             # Return logs to normal
             logging.disable(logging.NOTSET)
-        return v3_utils.get_nsxlib_wrapper(nsx_username,
-                                           nsx_password,
-                                           use_basic_auth,
-                                           plugin_conf)
+        return v3_utils.get_nsxlib_wrapper(
+            nsx_username, nsx_password, use_basic_auth,
+            plugin_conf=plugin_conf,
+            allow_overwrite_header=allow_overwrite_header)
     if _NSXLIB is None:
-        _NSXLIB = v3_utils.get_nsxlib_wrapper(plugin_conf=plugin_conf)
+        _NSXLIB = v3_utils.get_nsxlib_wrapper(
+            plugin_conf=plugin_conf,
+            allow_overwrite_header=allow_overwrite_header)
 
     if not verbose:
         # Return logs to normal

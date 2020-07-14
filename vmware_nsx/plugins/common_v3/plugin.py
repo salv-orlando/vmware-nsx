@@ -2918,6 +2918,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                               "as default %(e)s",
                               {'id': secgroup_db['id'], 'e': e})
 
+    def verify_sr_at_backend(self, context, router_id):
+        """Should be implemented by each plugin"""
+        pass
+
 
 class TagsCallbacks(object):
 
