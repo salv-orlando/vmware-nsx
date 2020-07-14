@@ -42,6 +42,7 @@ from vmware_nsx.shell import resources as shell
 from vmware_nsxlib.v3 import core_resources as nsx_resources
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import load_balancer as nsxlib_lb
+from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import core_resources as policy_resources
 from vmware_nsxlib.v3.policy import utils as policy_utils
@@ -62,8 +63,8 @@ STATUS_ALLOW_MIGRATION_REQ = set([
 MIGRATE_LIMIT_NO_LIMIT = 0
 MIGRATE_LIMIT_TIER0 = 1
 MIGRATE_LIMIT_TIER0_PORTS = 1000
-MIGRATE_LIMIT_TIER1 = 500
-MIGRATE_LIMIT_TIER1_PORTS = 5
+MIGRATE_LIMIT_TIER1 = 1000
+MIGRATE_LIMIT_TIER1_PORTS = 1000
 MIGRATE_LIMIT_NAT = 1500
 MIGRATE_LIMIT_DHCP_SERVER = 1500
 MIGRATE_LIMIT_MD_PROXY = 1500
@@ -86,6 +87,8 @@ COMPONENT_STATUS_OK = 2
 ROLLBACK_DATA = []
 EDGE_FW_SEQ = 1
 DFW_SEQ = 1
+
+SERVICE_UP_RETRIES = 30
 
 
 def start_migration_process(nsxlib):
@@ -116,7 +119,7 @@ def send_migration_plan_action(nsxlib, action):
 
 def get_migration_status(nsxlib, silent=False):
     return nsxlib.client.get("migration/status-summary",
-                             silent=silent)
+                             silent=silent, with_retries=False)
 
 
 def change_migration_service_status(start=True, nsxlib=None):
@@ -140,27 +143,33 @@ def change_migration_service_status(start=True, nsxlib=None):
 
     if start and nsxlib:
         LOG.info("Waiting for the service to be up...")
+        start_time = time.time()
 
         @tenacity.retry(reraise=True,
                         retry=tenacity.retry_if_exception_type(Exception),
                         wait=tenacity.wait_exponential(multiplier=0.5, max=2),
-                        stop=tenacity.stop_after_attempt(
-                            cfg.CONF.nsx_v3.retries))
+                        stop=tenacity.stop_after_attempt(SERVICE_UP_RETRIES))
         def get_migration_status_with_retry(nsxlib):
             get_migration_status(nsxlib, silent=True)
 
-        get_migration_status_with_retry(nsxlib)
-        LOG.info("The service is up")
+        try:
+            get_migration_status_with_retry(nsxlib)
+        except Exception:
+            raise Exception("The migration service did not get up after %s "
+                            "retries" % SERVICE_UP_RETRIES)
+
+        elapsed_time = time.time() - start_time
+        LOG.info("The service is up (waited %s seconds)", elapsed_time)
 
 
 def ensure_migration_state_ready(nsxlib, with_abort=False):
     try:
         status = get_migration_status(nsxlib, silent=True)
-    except nsxlib_exc.CannotConnectToServer as e:
-        LOG.debug("Failed to get migration status: %s", e)
+    except Exception as e:
         if with_abort:
             change_migration_service_status(start=True, nsxlib=nsxlib)
             return ensure_migration_state_ready(nsxlib)
+        LOG.debug("Failed to get migration status: %s", e)
         return False
 
     if status["overall_migration_status"] not in STATUS_ALLOW_MIGRATION_REQ:
@@ -220,12 +229,16 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
                                 printable_name=None, policy_resource_get=None,
                                 policy_id_callback=None,
                                 metadata_callback=None,
-                                skip_policy_path_check=False):
+                                skip_policy_path_check=False,
+                                nsxlib_list_args=None):
     if not printable_name:
         printable_name = resource_type
     LOG.debug("Getting data for MP %s", printable_name)
 
-    resources = nsxlib_resource.list()
+    if nsxlib_list_args:
+        resources = nsxlib_resource.list(**nsxlib_list_args)
+    else:
+        resources = nsxlib_resource.list()
     if not isinstance(resources, list):
         # the nsxlib resources list return inconsistent type of result
         resources = resources.get('results', [])
@@ -422,7 +435,8 @@ def migrate_tier0s(nsxlib, nsxpolicy, plugin):
     entries = get_resource_migration_data(
         nsxlib.logical_router, None,
         'TIER0', resource_condition=cond,
-        policy_resource_get=nsxpolicy.tier0.get)
+        policy_resource_get=nsxpolicy.tier0.get,
+        nsxlib_list_args={'router_type': nsx_constants.ROUTER_TYPE_TIER0})
     migrate_resource(nsxlib, 'TIER0', entries, MIGRATE_LIMIT_TIER0,
                      use_admin=True)
     migrated_tier0s = [entry['manager_id'] for entry in entries]
@@ -664,7 +678,8 @@ def migrate_routers(nsxlib, nsxpolicy):
         nsxlib.logical_router,
         ['os-neutron-router-id'],
         'TIER1',
-        policy_resource_get=nsxpolicy.tier1.get)
+        policy_resource_get=nsxpolicy.tier1.get,
+        nsxlib_list_args={'router_type': nsx_constants.ROUTER_TYPE_TIER1})
     migrate_resource(nsxlib, 'TIER1', entries, MIGRATE_LIMIT_TIER1)
     migrated_routers = [entry['manager_id'] for entry in entries]
     return migrated_routers
@@ -736,13 +751,15 @@ def migrate_routers_config(nsxlib, nsxpolicy, plugin, migrated_routers):
         policy_id_callback=get_policy_id,
         resource_condition=cond,
         metadata_callback=add_metadata,
-        skip_policy_path_check=True)
+        skip_policy_path_check=True,
+        nsxlib_list_args={'router_type': nsx_constants.ROUTER_TYPE_TIER1})
     migrate_resource(nsxlib, 'TIER1_LOGICAL_ROUTER_PORT', entries,
                      MIGRATE_LIMIT_TIER1_PORTS)
 
     # Migrate NAT rules per neutron tier1
     entries = []
-    tier1s = nsxlib.logical_router.list()['results']
+    tier1s = nsxlib.logical_router.list(
+        router_type=nsx_constants.ROUTER_TYPE_TIER1)['results']
     ctx = context.get_admin_context()
     for tier1 in tier1s:
         # skip routers that were not migrated in this script call
@@ -854,7 +871,8 @@ def migrate_tier0_config(nsxlib, nsxpolicy, tier0s):
         'TIER0_LOGICAL_ROUTER_CONFIG',
         policy_id_callback=get_policy_id,
         resource_condition=cond,
-        skip_policy_path_check=True)
+        skip_policy_path_check=True,
+        nsxlib_list_args={'router_type': nsx_constants.ROUTER_TYPE_TIER0})
     migrate_resource(nsxlib, 'TIER0_LOGICAL_ROUTER_CONFIG', entries,
                      MIGRATE_LIMIT_TIER0, use_admin=True)
 
@@ -1089,8 +1107,7 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         return False
 
     # Initialize the migration process
-    if not ensure_migration_state_ready(
-            nsxlib, with_abort=True):
+    if not ensure_migration_state_ready(nsxlib, with_abort=True):
         return False
 
     try:
@@ -1450,10 +1467,10 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
                       "in the configuration")
             return
 
-    nsxlib = utils.get_connected_nsxlib(
-        verbose=verbose, allow_overwrite_header=True)
-    nsxpolicy = p_utils.get_connected_nsxpolicy(
-        conf_path=cfg.CONF.nsx_v3)
+    nsxlib = utils.get_connected_nsxlib(verbose=verbose,
+                                        allow_overwrite_header=True)
+    nsxpolicy = p_utils.get_connected_nsxpolicy(conf_path=cfg.CONF.nsx_v3)
+
     # Also create a policy manager with admin user to manipulate admin-defined
     # resources which should not have neutron principal identity
     nsxpolicy_admin = p_utils.get_connected_nsxpolicy(
@@ -1466,18 +1483,27 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
         # Make sure FWaaS was initialized
         plugin.init_fwaas_for_admin_utils()
 
+        start_time = time.time()
         if not pre_migration_checks(nsxlib, plugin):
             # Failed
             LOG.error("T2P migration cannot run. Please fix the configuration "
                       "and try again\n\n")
             return
+        elapsed_time = time.time() - start_time
+        LOG.debug("Pre-migration took %s seconds", elapsed_time)
 
+        start_time = time.time()
         if not migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
             # Failed
             LOG.error("T2P migration failed. Aborting\n\n")
             return
+        elapsed_time = time.time() - start_time
+        LOG.debug("Migration took %s seconds", elapsed_time)
 
+        start_time = time.time()
         post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin)
+        elapsed_time = time.time() - start_time
+        LOG.debug("Post-migration took %s seconds", elapsed_time)
 
     LOG.info("T2P migration completed successfully\n\n")
 

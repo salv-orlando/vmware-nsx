@@ -65,6 +65,7 @@ def get_connected_nsxlib(nsx_username=None, nsx_password=None,
             nsx_username, nsx_password, use_basic_auth,
             plugin_conf=plugin_conf,
             allow_overwrite_header=allow_overwrite_header)
+
     if _NSXLIB is None:
         _NSXLIB = v3_utils.get_nsxlib_wrapper(
             plugin_conf=plugin_conf,
