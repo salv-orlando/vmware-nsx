@@ -2468,8 +2468,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 return True
         return False
 
-    def verify_sr_at_backend(self, router_id):
+    def verify_sr_at_backend(self, context, router_id):
         """Check if the backend Tier1 has a service router or not"""
+        # Note - this method gets the context so it will have the same
+        # signature as the v3 plugin method
         if self.nsxpolicy.tier1.get_edge_cluster_path(router_id):
             return True
 
@@ -2598,7 +2600,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         new_enable_snat = router.enable_snat
         newaddr, newmask, _newnexthop = self._get_external_attachment_info(
             context, router)
-        sr_currently_exists = self.verify_sr_at_backend(router_id)
+        sr_currently_exists = self.verify_sr_at_backend(context, router_id)
         fw_exist = self._router_has_edge_fw_rules(context, router)
         vpn_exist = self.service_router_has_vpnaas(context, router_id)
         lb_exist = False
@@ -3041,7 +3043,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                             prefix_len=prefix_len))
 
                 # Service router is mandatory for VLAN interfaces
-                if not self.verify_sr_at_backend(router_id):
+                if not self.verify_sr_at_backend(context, router_id):
                     self.create_service_router(
                         context, router_id, router=router_db,
                         update_firewall=False)

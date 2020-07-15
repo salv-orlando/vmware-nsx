@@ -18,6 +18,7 @@ import logging
 import paramiko
 import tenacity
 
+from neutron_fwaas.db.firewall.v2 import firewall_db_v2
 from neutron_lib.callbacks import registry
 from neutron_lib import context
 from oslo_config import cfg
@@ -29,6 +30,7 @@ from vmware_nsx.plugins.nsx_p import plugin as p_plugin
 from vmware_nsx.plugins.nsx_v3 import cert_utils
 from vmware_nsx.plugins.nsx_v3 import plugin as v3_plugin
 from vmware_nsx.plugins.nsx_v3 import utils as v3_plugin_utils
+from vmware_nsx.services.fwaas.nsx_p import fwaas_callbacks_v2
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils
 from vmware_nsx.shell.admin.plugins.common import constants
@@ -1078,62 +1080,6 @@ def migrate_lb_services(nsxlib, nsxpolicy):
                      MIGRATE_LIMIT_LB_SERVICE)
 
 
-def edge_firewall_migration_cond(resource):
-    return (resource.get('display_name') == 'Default LR Layer3 Section' and
-            resource.get('enforced_on') == 'LOGICALROUTER' and
-            resource.get('category') == 'Default' and
-            resource.get('section_type') == 'LAYER3')
-
-
-def migrate_fwaas_resources(nsxlib, nsxpolicy, migrated_routers):
-    def get_policy_id_callback(res, policy_id):
-        # Policy id should be the Policy tier1 id (=neutron id)
-        ctx = context.get_admin_context()
-        nsx_id = res['applied_tos'][0]['target_id']
-        return db.get_neutron_from_nsx_router_id(
-            ctx.session, nsx_id)
-
-    def cond(resource):
-        # Migrate only Edge firewalls related to the migrated tier1s
-        return (edge_firewall_migration_cond(resource) and
-                resource['applied_tos'][0].get(
-                    'target_id', '') in migrated_routers)
-
-    def add_metadata(entry, policy_id, resource):
-        # Add category, sequence and rule ids
-        global EDGE_FW_SEQ
-        metadata = [{'key': 'category',
-                     'value': policy_constants.CATEGORY_LOCAL_GW},
-                    {'key': 'sequence', 'value': str(EDGE_FW_SEQ)}]
-        EDGE_FW_SEQ = EDGE_FW_SEQ + 1
-
-        # Add the rules
-        rules = nsxlib.firewall_section.get_rules(resource['id'])['results']
-        linked_ids = []
-        seq = 1
-        for rule in rules:
-            linked_ids.append({'key': rule['id'], 'value': str(seq)})
-            # The id of the policy rule will be random
-            seq = seq + 1
-        entry['metadata'] = metadata
-        entry['linked_ids'] = linked_ids
-
-    def get_policy_section(sec_id, silent=False):
-        return nsxpolicy.gateway_policy.get(
-            policy_constants.DEFAULT_DOMAIN, sec_id, silent=silent)
-
-    entries = get_resource_migration_data(
-        nsxlib.firewall_section, None,
-        'EDGE_FIREWALL_SECTION', resource_condition=cond,
-        policy_resource_get=get_policy_section,
-        policy_id_callback=get_policy_id_callback,
-        metadata_callback=add_metadata)
-    # Edge firewall migration is not supported yet
-    migrate_resource(nsxlib, 'EDGE_FIREWALL_SECTION', entries,
-                     MIGRATE_LIMIT_SECTION_AND_RULES,
-                     count_internals=True)
-
-
 def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
     """Create policy resources for all MP resources used by neutron"""
 
@@ -1168,7 +1114,6 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         # Migrate firewall sections last as those take the longest to rollback
         # in case of error
         migrate_dfw_sections(nsxlib, nsxpolicy, plugin)
-        migrate_fwaas_resources(nsxlib, nsxpolicy, mp_routers)
 
         # Finalize the migration (cause policy realization)
         end_migration_process(nsxlib)
@@ -1347,29 +1292,70 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
                 LOG.debug("Updated gateway of network %s", net['id'])
                 break
 
-    # Update tags on DFW sections
+    # -- Migrate edge firewall sections:
+    # The MP plugin uses the default MP edge firewall section, while the policy
+    # plugin uses a non default one, so regular migration cannot be used.
+    # Instead, create new edge firewall sections, and remove rules from the MP
+    # default sections
+
+    # This is a hack to use the v3 plugin with the policy fwaas driver
+    class MigrationNsxpFwaasCallbacks(fwaas_callbacks_v2.NsxpFwaasCallbacksV2):
+        def __init__(self, with_rpc):
+            super(MigrationNsxpFwaasCallbacks, self).__init__(with_rpc)
+            # Make sure fwaas is considered as enabled
+            self.fwaas_enabled = True
+
+        def _get_port_firewall_group_id(self, context, port_id):
+            # Override this api because directory.get_plugin does not work from
+            # admin utils context.
+            driver_db = firewall_db_v2.FirewallPluginDb()
+            return driver_db.get_fwg_attached_to_port(context, port_id)
+
+    fwaas_callbacks = MigrationNsxpFwaasCallbacks(False)
+    plugin.nsxpolicy = nsxpolicy
     routers = plugin.get_routers(ctx)
+    nsx_router_sections = []
     for rtr in routers:
-        try:
-            # Check if the edge firewall section exists
-            nsxpolicy.gateway_policy.get(
-                policy_constants.DEFAULT_DOMAIN, map_id=rtr['id'],
-                silent=True)
-        except nsxlib_exc.ResourceNotFound:
-            pass
-        else:
-            # Update section tags
-            tags = nsxpolicy.build_v3_tags_payload(
-                rtr, resource_type='os-neutron-router-id',
-                project_name=ctx.tenant_name)
-            nsxpolicy.gateway_policy.update(
-                policy_constants.DEFAULT_DOMAIN,
-                map_id=rtr['id'],
-                tags=tags)
-            LOG.debug("Updated tags of gateway policy for router %s",
-                      rtr['id'])
+        nsx_router_id = db.get_nsx_router_id(ctx.session, rtr['id'])
+        nsx_rtr = nsxlib.logical_router.get(nsx_router_id)
+        for sec in nsx_rtr.get('firewall_sections', []):
+            section_id = sec['target_id']
+            section = nsxlib.firewall_section.get(section_id)
+            if section['display_name'] != 'Default LR Layer3 Section':
+                continue
+            rules = nsxlib.firewall_section.get_rules(section_id)['results']
+            if len(rules) <= 1:
+                continue
+            # Non default rules exist. need to migrate this section
+            router_db = plugin._get_router(ctx, rtr['id'])
+            ports = plugin._get_router_interfaces(ctx, rtr['id'])
+            fwaas_callbacks.update_router_firewall(
+                ctx, rtr['id'], router_db, ports)
+            LOG.debug("Created GW policy for router %s", rtr['id'])
+
+            # delete rule from the default mp section at the end of the loop
+            # so the new section will have time to realize
+            nsx_router_sections.append({'id': section_id,
+                                        'default_rule': rules[-1],
+                                        'router_id': rtr['id']})
+
+    # Remove old rules from the default sections
+    for section in nsx_router_sections:
+        # make sure the policy section was already realized
+        nsxpolicy.gateway_policy.wait_until_realized(
+            policy_constants.DEFAULT_DOMAIN, section['router_id'])
+        nsxlib.firewall_section.update(
+            section['id'], rules=[section['default_rule']])
+        LOG.debug("Deleted MP edge FW section %s rules", section['id'])
 
     LOG.info("Post-migration actions done.")
+
+
+def edge_firewall_migration_cond(resource):
+    return (resource.get('display_name') == 'Default LR Layer3 Section' and
+            resource.get('enforced_on') == 'LOGICALROUTER' and
+            resource.get('category') == 'Default' and
+            resource.get('section_type') == 'LAYER3')
 
 
 def pre_migration_checks(nsxlib, plugin):
@@ -1464,7 +1450,8 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
                       "in the configuration")
             return
 
-    nsxlib = utils.get_connected_nsxlib(verbose=verbose)
+    nsxlib = utils.get_connected_nsxlib(
+        verbose=verbose, allow_overwrite_header=True)
     nsxpolicy = p_utils.get_connected_nsxpolicy(
         conf_path=cfg.CONF.nsx_v3)
     # Also create a policy manager with admin user to manipulate admin-defined
@@ -1476,6 +1463,9 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
         nsx_password=cfg.CONF.nsx_v3.nsx_api_password)
 
     with utils.NsxV3PluginWrapper(verbose=verbose) as plugin:
+        # Make sure FWaaS was initialized
+        plugin.init_fwaas_for_admin_utils()
+
         if not pre_migration_checks(nsxlib, plugin):
             # Failed
             LOG.error("T2P migration cannot run. Please fix the configuration "
