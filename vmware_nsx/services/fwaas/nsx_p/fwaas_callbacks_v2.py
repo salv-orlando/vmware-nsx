@@ -378,7 +378,7 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         self._set_rules_order(fw_rules)
 
         # Update the backend router firewall
-        sr_exists_on_backend = plugin.verify_sr_at_backend(router_id)
+        sr_exists_on_backend = plugin.verify_sr_at_backend(context, router_id)
         if called_from_fw:
             # FW action required
             if router_with_fw:
