@@ -40,9 +40,6 @@ class TestAllowedAddressPairsNSXv2(test_v3_plugin.NsxV3PluginTestCaseMixin,
     def test_create_port_security_false_allowed_address_pairs(self):
         self.skipTest('TBD')
 
-    def test_create_overlap_with_fixed_ip(self):
-        self.skipTest('Not supported')
-
 
 class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
                                   ext_pairs.TestAllowedAddressPairs):
@@ -84,24 +81,6 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
 
             # Illegal IPv6 cidr
             address_pairs = [{'ip_address': '1001::12/64'}]
-            res = self._create_port(self.fmt, net['network']['id'],
-                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
-                                    allowed_address_pairs=address_pairs)
-            port = self.deserialize(self.fmt, res)
-            self.assertIn('NeutronError', port)
-
-            # overlapping ips
-            address_pairs = [{'ip_address': '1001::/64'},
-                             {'ip_address': '1001::/128'}]
-            res = self._create_port(self.fmt, net['network']['id'],
-                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
-                                    allowed_address_pairs=address_pairs)
-            port = self.deserialize(self.fmt, res)
-            self.assertIn('NeutronError', port)
-
-            # identical ips
-            address_pairs = [{'ip_address': '1001::'},
-                             {'ip_address': '1001::/128'}]
             res = self._create_port(self.fmt, net['network']['id'],
                                     arg_list=(addr_apidef.ADDRESS_PAIRS,),
                                     allowed_address_pairs=address_pairs)
@@ -200,9 +179,6 @@ class TestAllowedAddressPairsNSXv3(test_v3_plugin.NsxV3PluginTestCaseMixin,
 
     def test_create_port_security_false_allowed_address_pairs(self):
         self.skipTest('TBD')
-
-    def test_create_overlap_with_fixed_ip(self):
-        self.skipTest('Not supported')
 
 
 class TestAllowedAddressPairsNSXv(test_nsx_v_plugin.NsxVPluginV2TestCase,

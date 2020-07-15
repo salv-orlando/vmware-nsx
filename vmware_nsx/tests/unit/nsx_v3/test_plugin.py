@@ -54,7 +54,6 @@ from oslo_utils import uuidutils
 from webob import exc
 
 from vmware_nsx.api_client import exception as api_exc
-from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import utils
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.plugins.nsx_v3 import plugin as nsx_plugin
@@ -1128,46 +1127,6 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                 count += 1
             data['port']['allowed_address_pairs'] = address_pairs
             self.assertRaises(n_exc.InvalidInput,
-                              self.plugin.create_port, self.ctx, data)
-
-    def test_fail_create_allowed_address_pairs_dup(self):
-        with self.network() as network, self.subnet(
-                network=network, cidr="1.1.1.0/24",
-                enable_dhcp=True) as s1:
-            data = {
-                'port': {
-                    'network_id': network['network']['id'],
-                    'tenant_id': self._tenant_id,
-                    'name': 'pair_port',
-                    'admin_state_up': True,
-                    'device_id': 'fake_device',
-                    'device_owner': 'fake_owner',
-                    'fixed_ips': [{'subnet_id': s1['subnet']['id'],
-                                   'ip_address': '1.1.1.30'}]
-                }
-            }
-            data['port']['allowed_address_pairs'] = [
-                {'ip_address': '1.1.1.30'}]
-            self.assertRaises(n_exc.InvalidInput,
-                              self.plugin.create_port, self.ctx, data)
-
-    def test_fail_create_allowed_address_pairs_illegal_ip(self):
-        with self.network() as network, self.subnet(
-                network=network, enable_dhcp=True) as s1:
-            data = {
-                'port': {
-                    'network_id': network['network']['id'],
-                    'tenant_id': self._tenant_id,
-                    'name': 'pair_port',
-                    'admin_state_up': True,
-                    'device_id': 'fake_device',
-                    'device_owner': 'fake_owner',
-                    'fixed_ips': [{'subnet_id': s1['subnet']['id']}]
-                }
-            }
-            data['port']['allowed_address_pairs'] = [
-                {'ip_address': '127.0.0.0'}]
-            self.assertRaises(nsx_exc.InvalidIPAddress,
                               self.plugin.create_port, self.ctx, data)
 
     def test_fail_update_lb_port_with_fixed_ip(self):

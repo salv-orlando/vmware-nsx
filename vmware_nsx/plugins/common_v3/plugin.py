@@ -325,14 +325,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         """Can be implemented by each plugin"""
         return False
 
-    def _validate_address_pairs(self, address_pairs, fixed_ips=None):
-        port_ips = []
-        pairs_ips = []
-        if fixed_ips:
-            # Make sure there are no duplications
-            for fixed_ip in fixed_ips:
-                port_ips.append(fixed_ip['ip_address'])
-
+    def _validate_address_pairs(self, address_pairs):
         for pair in address_pairs:
             ip = pair.get('ip_address')
             if ':' in ip:
@@ -347,14 +340,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         err_msg = (_("Allowed address pairs Cidr %s cannot "
                                      "have host bits set") % ip)
                         raise n_exc.InvalidInput(error_message=err_msg)
-                # verify no overlaps in ipv6 addresses
-                current_set = netaddr.IPSet(port_ips + pairs_ips)
-                if netaddr.IPSet([ip]) & current_set:
-                    err_msg = (_("Allowed address pairs %s cannot overlap "
-                                 "with port ips or other address pairs") % ip)
-                    raise n_exc.InvalidInput(error_message=err_msg)
-
-                pairs_ips.append(ip)
             else:
                 # IPv4 address pair
                 if len(ip.split('/')) > 1 and ip.split('/')[1] != '32':
@@ -372,10 +357,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         LOG.error("Cidr %s is not supported in allowed "
                                   "address pairs", ip)
                         raise nsx_exc.InvalidIPAddress(ip_address=ip)
-            if ip in port_ips:
-                err_msg = (_("Port cannot have duplicate values %s as part of "
-                             "port manual bindings") % ip)
-                raise n_exc.InvalidInput(error_message=err_msg)
             if ip in ['127.0.0.0', '0.0.0.0', '::']:
                 LOG.error("IP %s is not supported in allowed address "
                           "pairs", ip)
@@ -409,8 +390,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             if not port_security:
                 raise addr_exc.AddressPairAndPortSecurityRequired()
             else:
-                self._validate_address_pairs(
-                    address_pairs, fixed_ips=port_data.get('fixed_ips'))
+                self._validate_address_pairs(address_pairs)
                 self._validate_number_of_address_pairs(port_data)
                 self._process_create_allowed_address_pairs(context, port_data,
                                                            address_pairs)
@@ -492,9 +472,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
         if delete_addr_pairs or has_addr_pairs:
             self._validate_address_pairs(
-                updated_port[addr_apidef.ADDRESS_PAIRS],
-                fixed_ips=(updated_port.get('fixed_ips') or
-                           port_data.get('fixed_ips')))
+                updated_port[addr_apidef.ADDRESS_PAIRS])
             # delete address pairs and read them in
             self._delete_allowed_address_pairs(context, id)
             self._process_create_allowed_address_pairs(
