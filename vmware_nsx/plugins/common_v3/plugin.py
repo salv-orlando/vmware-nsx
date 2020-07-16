@@ -32,7 +32,6 @@ from neutron.db import agents_db
 from neutron.db import agentschedulers_db
 from neutron.db import allowedaddresspairs_db as addr_pair_db
 from neutron.db.availability_zone import router as router_az_db
-from neutron.db import db_base_plugin_v2
 from neutron.db import dns_db
 from neutron.db import external_net_db
 from neutron.db import extradhcpopt_db
@@ -2456,8 +2455,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def _has_active_port(self, context, network_id):
         ports_in_use = context.session.query(models_v2.Port).filter_by(
             network_id=network_id).all()
-        return not all([p.device_owner in
-                        db_base_plugin_v2.AUTO_DELETE_PORT_OWNERS
+        return not all([p.device_owner == constants.DEVICE_OWNER_DHCP
                         for p in ports_in_use]) if ports_in_use else False
 
     def _delete_network_disable_dhcp(self, context, network_id):
