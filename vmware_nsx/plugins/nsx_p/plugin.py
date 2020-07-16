@@ -3972,7 +3972,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Update the policy with all the rules.
             self.nsxpolicy.comm_map.update_with_entries(
                 NSX_P_GLOBAL_DOMAIN_ID, sg_id, entries=backend_rules,
-                category=category)
+                category=category, use_child_rules=False)
 
         self._run_under_transaction(_do_update_rules)
 
