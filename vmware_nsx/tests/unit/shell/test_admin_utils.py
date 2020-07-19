@@ -21,7 +21,6 @@ from oslo_config import cfg
 from oslo_log import _options
 from oslo_log import log as logging
 from oslo_utils import uuidutils
-import six
 
 from neutron.common import config as neutron_config
 from neutron.db import servicetype_db  # noqa
@@ -52,8 +51,7 @@ NSX_INI_PATH = vmware.get_fake_conf('nsx.ini.test')
 BASE_CONF_PATH = vmware.get_fake_conf('neutron.conf.test')
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractTestAdminUtils(base.BaseTestCase):
+class AbstractTestAdminUtils(base.BaseTestCase, metaclass=abc.ABCMeta):
 
     def setUp(self):
         cfg.CONF.unregister_opts(_options.common_cli_opts)

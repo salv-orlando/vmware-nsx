@@ -33,8 +33,6 @@ from oslo_serialization import jsonutils
 from oslo_utils import excutils
 from oslo_utils import timeutils
 from oslo_utils import uuidutils
-import six
-from six import moves
 from sqlalchemy import exc as db_base_exc
 from sqlalchemy.orm import exc as sa_exc
 
@@ -254,7 +252,7 @@ class EdgeManager(object):
                                    availability_zone=None):
         router_ids = [(vcns_const.BACKUP_ROUTER_PREFIX +
                        _uuid())[:vcns_const.EDGE_NAME_LEN]
-                      for i in moves.range(num)]
+                      for i in range(num)]
 
         for router_id in router_ids:
             nsxv_db.add_nsxv_router_binding(
@@ -1061,12 +1059,12 @@ class EdgeManager(object):
         works at NSXv version 6.2.3 or higher.
         """
         for binding in static_bindings:
-            if 'dhcpOptions' not in six.iterkeys(binding):
+            if 'dhcpOptions' not in iter(binding):
                 binding['dhcpOptions'] = {}
-            if 'option121' not in six.iterkeys(binding['dhcpOptions']):
+            if 'option121' not in iter(binding['dhcpOptions']):
                 binding['dhcpOptions']['option121'] = {'staticRoutes': []}
             binding_opt121 = binding['dhcpOptions']['option121']
-            if 'staticRoutes' not in six.iterkeys(binding_opt121):
+            if 'staticRoutes' not in iter(binding_opt121):
                 binding_opt121['staticRoutes'] = []
             binding_opt121['staticRoutes'].append({
                 'destinationSubnet': dest_cidr,
@@ -1079,7 +1077,7 @@ class EdgeManager(object):
         We can add the MTU via dhcp option26.
         This func can only works at NSXv version 6.2.3 or higher.
         """
-        if 'dhcpOptions' not in six.iterkeys(static_binding):
+        if 'dhcpOptions' not in iter(static_binding):
             static_binding['dhcpOptions'] = {}
         static_binding['dhcpOptions']['option26'] = mtu
         return static_binding

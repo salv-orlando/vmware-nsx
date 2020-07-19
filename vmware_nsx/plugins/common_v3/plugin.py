@@ -26,8 +26,6 @@ from oslo_utils import excutils
 from sqlalchemy import exc as sql_exc
 import webob.exc
 
-from six import moves
-
 from neutron.db import agents_db
 from neutron.db import agentschedulers_db
 from neutron.db import allowedaddresspairs_db as addr_pair_db
@@ -969,11 +967,11 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if vlan_ranges:
             vlan_ids = set()
             for vlan_min, vlan_max in vlan_ranges:
-                vlan_ids |= set(moves.range(vlan_min, vlan_max + 1))
+                vlan_ids |= set(range(vlan_min, vlan_max + 1))
         else:
             vlan_min = constants.MIN_VLAN_TAG
             vlan_max = constants.MAX_VLAN_TAG
-            vlan_ids = set(moves.range(vlan_min, vlan_max + 1))
+            vlan_ids = set(range(vlan_min, vlan_max + 1))
         used_ids_in_range = [binding.vlan_id for binding in bindings
                              if binding.vlan_id in vlan_ids]
         not_allowed_in_range = set(used_ids_in_range + restricted_vlans)

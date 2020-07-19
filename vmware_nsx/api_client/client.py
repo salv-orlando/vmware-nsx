@@ -14,10 +14,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
-
+from http import client as httplib
 
 from oslo_log import log as logging
-from six.moves import http_client as httplib
 
 from vmware_nsx.api_client import base
 from vmware_nsx.api_client import eventlet_client

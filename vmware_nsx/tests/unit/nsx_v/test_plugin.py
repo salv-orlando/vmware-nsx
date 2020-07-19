@@ -63,7 +63,6 @@ from neutron_lib.services.qos import constants as qos_consts
 from neutron_lib.utils import helpers
 from oslo_config import cfg
 from oslo_utils import uuidutils
-import six
 from testtools import matchers
 import webob.exc
 
@@ -4414,7 +4413,7 @@ class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
         data = {'tenant_id': 'whatever'}
         data['name'] = 'router1'
         data['distributed'] = dist_input
-        for k, v in six.iteritems(kwargs):
+        for k, v in kwargs.items():
             data[k] = v
         router_req = self.new_create_request(
             'routers', {'router': data}, self.fmt)

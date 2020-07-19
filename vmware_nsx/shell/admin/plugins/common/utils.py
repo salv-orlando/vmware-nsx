@@ -16,7 +16,6 @@ import sys
 from unittest import mock
 
 from neutron import quota
-import six
 from vmware_nsx._i18n import _
 from vmware_nsx.db import db
 from vmware_nsx.shell import resources as nsxadmin
@@ -83,7 +82,7 @@ def query_yes_no(question, default="yes"):
 
     while True:
         sys.stdout.write(question + prompt)
-        choice = six.moves.input().lower()
+        choice = input().lower()
         if default is not None and choice == '':
             return valid[default]
         elif choice in valid:

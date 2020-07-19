@@ -15,12 +15,11 @@
 # under the License.
 
 import abc
+from http import client as httplib
 import time
 
 from oslo_config import cfg
 from oslo_log import log as logging
-import six
-from six.moves import http_client as httplib
 
 from vmware_nsx import api_client
 
@@ -31,8 +30,7 @@ DEFAULT_CONCURRENT_CONNECTIONS = 3
 DEFAULT_CONNECT_TIMEOUT = 5
 
 
-@six.add_metaclass(abc.ABCMeta)
-class ApiClientBase(object):
+class ApiClientBase(object, metaclass=abc.ABCMeta):
     """An abstract baseclass for all API client implementations."""
 
     def _create_connection(self, host, port, is_ssl):

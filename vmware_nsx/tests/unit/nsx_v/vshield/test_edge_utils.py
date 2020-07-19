@@ -20,7 +20,6 @@ from neutron_lib import context
 from neutron_lib import exceptions as n_exc
 from oslo_config import cfg
 from oslo_utils import uuidutils
-from six import moves
 
 from vmware_nsx.common import config as conf
 from vmware_nsx.common import exceptions as nsx_exc
@@ -388,7 +387,7 @@ class EdgeManagerTestCase(EdgeUtilsTestCaseMixin):
                  'appliance_size': size,
                  'edge_type': edge_type,
                  'availability_zone': availability_zone.name}
-                for i in moves.range(num)]
+                for i in range(num)]
 
     def _create_available_router_bindings(
         self, num, size=nsxv_constants.LARGE,

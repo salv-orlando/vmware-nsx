@@ -15,7 +15,7 @@
 # under the License.
 #
 
-from six.moves import http_client as httplib
+from http import client as httplib
 
 from vmware_nsx._i18n import _
 

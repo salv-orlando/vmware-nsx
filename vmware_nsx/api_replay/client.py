@@ -14,8 +14,6 @@ import copy
 import logging
 import socket
 
-import six
-
 from keystoneauth1 import identity
 from keystoneauth1 import session
 from neutronclient.common import exceptions as n_exc
@@ -394,7 +392,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         total_num = len(routers_routes)
         LOG.info("Migrating %s routers routes", total_num)
         for count, (router_id, routes) in enumerate(
-            six.iteritems(routers_routes), 1):
+            routers_routes.items(), 1):
             try:
                 self.dest_neutron.update_router(router_id,
                     {'router': {'routes': routes}})

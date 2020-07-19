@@ -15,11 +15,8 @@
 
 import abc
 
-import six
 
-
-@six.add_metaclass(abc.ABCMeta)
-class ExtensionDriver(object):
+class ExtensionDriver(object, metaclass=abc.ABCMeta):
     """Define stable abstract interface for extension drivers.
     An extension driver extends the core resources implemented by the
     plugin with additional attributes. Methods that process create

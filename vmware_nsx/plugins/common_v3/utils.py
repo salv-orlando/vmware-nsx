@@ -15,7 +15,6 @@
 import os
 import random
 import re
-from six import string_types
 
 from oslo_config import cfg
 from oslo_context import context as context_utils
@@ -234,7 +233,7 @@ def get_network_dns_domain(az, network):
     dns_domain = None
     if network.get('dns_domain'):
         net_dns = network['dns_domain']
-        if isinstance(net_dns, string_types):
+        if isinstance(net_dns, str):
             dns_domain = net_dns
         elif hasattr(net_dns, "dns_domain"):
             dns_domain = net_dns.dns_domain

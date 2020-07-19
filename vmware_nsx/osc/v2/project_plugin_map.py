@@ -13,8 +13,6 @@
 
 """Project Plugin mapping action implementations"""
 
-import six
-
 from openstack import exceptions as os_exceptions
 from openstack import resource
 from openstackclient.i18n import _
@@ -89,7 +87,7 @@ class CreateProjectPluginMap(command.ShowOne):
         except os_exceptions.HttpException as exc:
             msg = _("Error while executing command: %s") % exc.message
             if exc.details:
-                msg += ", " + six.text_type(exc.details)
+                msg += ", " + str(exc.details)
             raise osc_exceptions.CommandError(msg)
         display_columns, columns = _get_columns(obj)
         data = utils.get_item_properties(obj, columns, formatters={})

@@ -13,8 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import six
-
 from neutron.db.models import servicetype as st_db
 from neutron.db import models_v2
 from neutron_lib.db import constants as db_const
@@ -101,10 +99,7 @@ class MemberV2(model_base.BASEV2, model_base.HasId, model_base.HasProject):
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [
@@ -146,10 +141,7 @@ class HealthMonitorV2(model_base.BASEV2, model_base.HasId,
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [
@@ -221,10 +213,7 @@ class LoadBalancer(model_base.BASEV2, model_base.HasId, model_base.HasProject):
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [
@@ -302,10 +291,7 @@ class PoolV2(model_base.BASEV2, model_base.HasId, model_base.HasProject):
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [
@@ -388,10 +374,7 @@ class L7Rule(model_base.BASEV2, model_base.HasId, model_base.HasProject):
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [
@@ -448,10 +431,7 @@ class L7Policy(model_base.BASEV2, model_base.HasId, model_base.HasProject):
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [
@@ -530,10 +510,7 @@ class Listener(model_base.BASEV2, model_base.HasId, model_base.HasProject):
             ret = {}
             for attr in attributes:
                 value = getattr(sa_model, attr)
-                if six.PY2 and isinstance(value, six.text_type):
-                    ret[attr.encode('utf8')] = value.encode('utf8')
-                else:
-                    ret[attr] = value
+                ret[attr] = value
             return ret
 
         ret_dict = to_dict(self, [

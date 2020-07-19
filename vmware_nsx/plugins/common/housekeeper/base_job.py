@@ -17,13 +17,11 @@ import abc
 
 from neutron_lib.plugins import directory
 from oslo_log import log
-import six
 
 LOG = log.getLogger(__name__)
 
 
-@six.add_metaclass(abc.ABCMeta)
-class BaseJob(object):
+class BaseJob(object, metaclass=abc.ABCMeta):
 
     _core_plugin = None
 

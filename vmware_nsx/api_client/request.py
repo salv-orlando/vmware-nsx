@@ -17,15 +17,14 @@
 
 import abc
 import copy
+from http import client as httplib
 import socket
 import time
+import urllib
 
 import eventlet
 from oslo_log import log as logging
 from oslo_utils import excutils
-import six
-from six.moves import http_client as httplib
-from six.moves import urllib
 
 from vmware_nsx._i18n import _
 from vmware_nsx import api_client
@@ -40,8 +39,7 @@ DEFAULT_MAXIMUM_REQUEST_ID = 4294967295
 DOWNLOAD_TIMEOUT = 180
 
 
-@six.add_metaclass(abc.ABCMeta)
-class ApiRequest(object):
+class ApiRequest(object, metaclass=abc.ABCMeta):
     '''An abstract baseclass for all ApiRequest implementations.
 
     This defines the interface and property structure for both eventlet and

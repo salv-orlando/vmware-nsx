@@ -19,7 +19,6 @@ import xml.etree.ElementTree as et
 from oslo_context import context as context_utils
 from oslo_serialization import jsonutils
 import requests
-import six
 
 from vmware_nsx.plugins.nsx_v.vshield.common import exceptions
 
@@ -38,7 +37,7 @@ def _xmldump(obj):
     config = ""
     attr = ""
     if isinstance(obj, dict):
-        for key, value in six.iteritems(obj):
+        for key, value in obj.items():
             if key.startswith('__'):
                 # Skip the key and evaluate it's value.
                 a, x = _xmldump(value)
@@ -88,9 +87,8 @@ class VcnsApiHelper(object):
 
     def __init__(self, address, user, password, format='json', ca_file=None,
                  insecure=True, timeout=None):
-        # pylint: disable=deprecated-method
-        encode_fn = base64.encodestring if six.PY2 else base64.encodebytes
-        self.authToken = encode_fn(six.b("%s:%s" % (user, password)))
+        self.authToken = base64.encodebytes(
+            bytes("%s:%s" % (user, password), 'utf-8'))
         self.user = user
         self.passwd = password
         self.address = address

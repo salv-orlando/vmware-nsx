@@ -16,8 +16,6 @@
 
 import abc
 
-import six
-
 from oslo_log import log as logging
 
 from neutron.ipam import driver as ipam_base
@@ -33,8 +31,7 @@ from vmware_nsx.extensions import projectpluginmap
 LOG = logging.getLogger(__name__)
 
 
-@six.add_metaclass(abc.ABCMeta)
-class NsxIpamBase(object):
+class NsxIpamBase(object, metaclass=abc.ABCMeta):
     @classmethod
     def get_core_plugin(cls):
         return directory.get_plugin()

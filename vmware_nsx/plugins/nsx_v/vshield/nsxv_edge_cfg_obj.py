@@ -16,13 +16,11 @@
 import abc
 
 from oslo_serialization import jsonutils
-import six
 
 from vmware_nsx.plugins.nsx_v.vshield import vcns
 
 
-@six.add_metaclass(abc.ABCMeta)
-class NsxvEdgeCfgObj(object):
+class NsxvEdgeCfgObj(object, metaclass=abc.ABCMeta):
 
     def __init__(self):
         return

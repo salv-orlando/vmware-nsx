@@ -17,7 +17,6 @@ from neutron import version
 from neutron_lib import exceptions as exception
 from oslo_log import log
 from oslo_serialization import jsonutils
-import six
 
 from vmware_nsx._i18n import _
 from vmware_nsx.api_client import exception as api_exc
@@ -84,7 +83,7 @@ def format_exception(etype, e, exception_locals):
     """
     msg = [_("Error. %(type)s exception: %(exc)s.") %
            {'type': etype, 'exc': e}]
-    lcls = dict((k, v) for k, v in six.iteritems(exception_locals)
+    lcls = dict((k, v) for k, v in exception_locals.items()
                 if k != 'request')
     msg.append(_("locals=[%s]") % str(lcls))
     return ' '.join(msg)

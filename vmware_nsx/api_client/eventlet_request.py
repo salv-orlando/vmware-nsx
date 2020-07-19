@@ -14,12 +14,12 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from http import client as httplib
+import urllib
 
 import eventlet
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
-from six.moves import http_client as httplib
-from six.moves import urllib
 
 from vmware_nsx._i18n import _
 from vmware_nsx.api_client import request

@@ -14,8 +14,6 @@
 
 import abc
 
-import six
-
 from neutron.db import l3_db
 from neutron.db import models_v2
 from neutron_lib.callbacks import events
@@ -28,8 +26,7 @@ from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
 from vmware_nsx.plugins.nsx_v.vshield import edge_utils
 
 
-@six.add_metaclass(abc.ABCMeta)
-class RouterAbstractDriver(object):
+class RouterAbstractDriver(object, metaclass=abc.ABCMeta):
     """Abstract router driver that expose API for nsxv plugin."""
 
     @abc.abstractmethod
