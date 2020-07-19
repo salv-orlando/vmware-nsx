@@ -161,7 +161,8 @@ nsxv3_resources = {
                                 [Operations.SHOW.value]),
     constants.NSX_MIGRATE_T_P: Resource(constants.NSX_MIGRATE_T_P,
                                         [Operations.IMPORT.value,
-                                         Operations.CLEAN_ALL.value]),
+                                         Operations.CLEAN_ALL.value,
+                                         Operations.VALIDATE.value]),
 }
 
 # Add supported NSX-V resources in this dictionary
