@@ -1355,8 +1355,10 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
     # Remove old rules from the default sections
     for section in nsx_router_sections:
         # make sure the policy section was already realized
-        nsxpolicy.gateway_policy.wait_until_realized(
-            policy_constants.DEFAULT_DOMAIN, section['router_id'])
+        # with runtime_status=SUCESS
+        nsxpolicy.gateway_policy.wait_until_state_sucessful(
+            policy_constants.DEFAULT_DOMAIN, section['router_id'],
+            max_attempts=600, with_refresh=True)
         nsxlib.firewall_section.update(
             section['id'], rules=[section['default_rule']])
         LOG.debug("Deleted MP edge FW section %s rules", section['id'])
