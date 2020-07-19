@@ -1101,11 +1101,6 @@ def migrate_lb_services(nsxlib, nsxpolicy):
 def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
     """Create policy resources for all MP resources used by neutron"""
 
-    nsx_version = nsxlib.get_version()
-    if not nsx_utils.is_nsx_version_3_1_0(nsx_version):
-        LOG.error("Migration not supported for NSX %s", nsx_version)
-        return False
-
     # Initialize the migration process
     if not ensure_migration_state_ready(nsxlib, with_abort=True):
         return False
@@ -1376,8 +1371,12 @@ def edge_firewall_migration_cond(resource):
 
 
 def pre_migration_checks(nsxlib, plugin):
-    """Check for unsupported configuration that will block the migration
-    """
+    """Check for unsupported configuration that will fail the migration"""
+    nsx_version = nsxlib.get_version()
+    if not nsx_utils.is_nsx_version_3_1_0(nsx_version):
+        LOG.error("Pre migration check failed: Migration not supported for "
+                  "NSX %s", nsx_version)
+        return False
 
     # Cannot migrate with unsupported services
     service_plugins = cfg.CONF.service_plugins
@@ -1420,11 +1419,31 @@ def pre_migration_checks(nsxlib, plugin):
                           MIGRATE_LIMIT_SECTION_AND_RULES)
                 return False
 
+    # DHCP relay is unsupported
+    if plugin._availability_zones_data.dhcp_relay_configured():
+        LOG.error("Pre migration check failed: DHCP relay configuration "
+                  "cannot be migrated. Please remove it from the plugin "
+                  "configuration and from all NSX logical router ports and "
+                  "try again.")
+        return False
+
     return True
 
 
 @admin_utils.output_header
-def t_2_p_migration(resource, event, trigger, **kwargs):
+def MP2Policy_pre_migration_check(resource, event, trigger, **kwargs):
+    """Verify if the current configuration can be migrated to Policy"""
+    nsxlib = utils.get_connected_nsxlib()
+    with utils.NsxV3PluginWrapper() as plugin:
+        if not pre_migration_checks(nsxlib, plugin):
+            # Failed
+            LOG.error("T2P migration cannot run. Please fix the configuration "
+                      "and try again\n\n")
+            exit(1)
+
+
+@admin_utils.output_header
+def MP2Policy_migration(resource, event, trigger, **kwargs):
     """Migrate NSX resources and neutron DB from NSX-T (MP) to Policy"""
 
     verbose = kwargs.get('verbose', False)
@@ -1452,20 +1471,21 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
             'nsx_api_managers',
             [cfg.CONF.nsx_v3.nsx_api_managers[0]],
             'nsx_v3')
-        if (len(cfg.CONF.nsx_v3.nsx_api_user) and
-            len(cfg.CONF.nsx_v3.nsx_api_password)):
-            cfg.CONF.set_override(
-                'nsx_api_user',
-                [cfg.CONF.nsx_v3.nsx_api_user[0]],
-                'nsx_v3')
-            cfg.CONF.set_override(
-                'nsx_api_password',
-                [cfg.CONF.nsx_v3.nsx_api_password[0]],
-                'nsx_v3')
-        else:
-            LOG.error("Please provide nsx_api_user and nsx_api_password "
-                      "in the configuration")
-            return
+    # Make sure user & password are set in the config
+    if (len(cfg.CONF.nsx_v3.nsx_api_user) and
+        len(cfg.CONF.nsx_v3.nsx_api_password)):
+        cfg.CONF.set_override(
+            'nsx_api_user',
+            [cfg.CONF.nsx_v3.nsx_api_user[0]],
+            'nsx_v3')
+        cfg.CONF.set_override(
+            'nsx_api_password',
+            [cfg.CONF.nsx_v3.nsx_api_password[0]],
+            'nsx_v3')
+    else:
+        LOG.error("Please provide nsx_api_user and nsx_api_password "
+                  "in the configuration")
+        exit(1)
 
     retriables = [nsxlib_exc.APITransactionAborted,
                   nsxlib_exc.ServerBusy]
@@ -1492,7 +1512,7 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
             # Failed
             LOG.error("T2P migration cannot run. Please fix the configuration "
                       "and try again\n\n")
-            return
+            exit(1)
         elapsed_time = time.time() - start_time
         LOG.debug("Pre-migration took %s seconds", elapsed_time)
 
@@ -1500,7 +1520,7 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
         if not migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
             # Failed
             LOG.error("T2P migration failed. Aborting\n\n")
-            return
+            exit(1)
         elapsed_time = time.time() - start_time
         LOG.debug("Migration took %s seconds", elapsed_time)
 
@@ -1513,7 +1533,7 @@ def t_2_p_migration(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
-def cleanup_db_mappings(resource, event, trigger, **kwargs):
+def MP2Policy_cleanup_db_mappings(resource, event, trigger, **kwargs):
     """Delete all entries from nsx-t mapping tables in DB"""
     confirm = admin_utils.query_yes_no(
         "Are you sure you want to delete all MP plugin mapping DB tables?",
@@ -1543,10 +1563,14 @@ def cleanup_db_mappings(resource, event, trigger, **kwargs):
     LOG.info("Deleted all MP plugin mapping DB tables.")
 
 
-registry.subscribe(t_2_p_migration,
+registry.subscribe(MP2Policy_migration,
                    constants.NSX_MIGRATE_T_P,
                    shell.Operations.IMPORT.value)
 
-registry.subscribe(cleanup_db_mappings,
+registry.subscribe(MP2Policy_pre_migration_check,
+                   constants.NSX_MIGRATE_T_P,
+                   shell.Operations.VALIDATE.value)
+
+registry.subscribe(MP2Policy_cleanup_db_mappings,
                    constants.NSX_MIGRATE_T_P,
                    shell.Operations.CLEAN_ALL.value)
