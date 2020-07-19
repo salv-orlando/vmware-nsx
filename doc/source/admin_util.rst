@@ -595,6 +595,10 @@ Config
 T2P migration
 ~~~~~~~~~~~~~
 
+- Verify the current configuration can be migrated to Policy::
+
+    nsxadmin -r nsx-migrate-t2p -o validate
+
 - Migrate NSX resources and neutron DB from NSX-T (MP) to Policy::
 
     nsxadmin -r nsx-migrate-t2p -o import --property logfile=<> (--verbose)

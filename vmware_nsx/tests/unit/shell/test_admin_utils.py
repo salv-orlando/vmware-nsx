@@ -42,6 +42,7 @@ from vmware_nsx.tests import unit as vmware
 from vmware_nsx.tests.unit.nsx_p import test_plugin as test_p_plugin
 from vmware_nsx.tests.unit.nsx_v import test_plugin as test_v_plugin
 from vmware_nsx.tests.unit.nsx_v3 import test_plugin as test_v3_plugin
+from vmware_nsxlib.v3 import client as v3_client
 from vmware_nsxlib.v3 import core_resources
 from vmware_nsxlib.v3 import resources as nsx_v3_resources
 from vmware_nsxlib.v3 import security as nsx_v3_security
@@ -306,8 +307,8 @@ class TestNsxv3AdminUtils(AbstractTestAdminUtils,
         for cls in (nsx_v3_resources.LogicalPort,
                     nsx_v3_resources.LogicalDhcpServer,
                     core_resources.NsxLibLogicalRouter,
-                    core_resources.NsxLibSwitchingProfile):
-
+                    core_resources.NsxLibSwitchingProfile,
+                    v3_client.RESTClient):
             self._patch_object(cls, 'list', return_value={'results': []})
             self._patch_object(cls, 'get',
                                return_value={'id': uuidutils.generate_uuid()})
@@ -321,6 +322,19 @@ class TestNsxv3AdminUtils(AbstractTestAdminUtils,
                            return_value={'members': [{
                                 'target_type': 'LogicalPort',
                                 'target_id': 'port_id'}]})
+
+        # Mocks for MP2P migration
+        mock.patch("vmware_nsxlib.v3.NsxLib.get_version",
+                   return_value='3.1.0').start()
+        mock.patch("vmware_nsx.shell.admin.plugins.nsxv3.resources.migration."
+                   "ensure_migration_state_ready", return_value=True).start()
+        mock.patch("vmware_nsx.shell.admin.plugins.nsxv3.resources.migration."
+                   "change_migration_service_status").start()
+
+        cfg.CONF.set_override('nsx_api_managers', ['1.1.1.1'], 'nsx_v3')
+        cfg.CONF.set_override('nsx_api_user', ['admin'], 'nsx_v3')
+        cfg.CONF.set_override('nsx_api_password', ['dummy'], 'nsx_v3')
+
         super(TestNsxv3AdminUtils, self)._init_mock_plugin()
 
         self._plugin = nsxv3_utils.NsxV3PluginWrapper()
