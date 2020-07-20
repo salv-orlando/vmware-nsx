@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
 import time
 
 import logging
@@ -1442,6 +1443,57 @@ def MP2Policy_pre_migration_check(resource, event, trigger, **kwargs):
             exit(1)
 
 
+def _get_nsxlib_from_config(verbose):
+    """Update the current config and return a working nsxlib
+    or exit with error
+    """
+
+    if (not len(cfg.CONF.nsx_v3.nsx_api_user) or
+        not len(cfg.CONF.nsx_v3.nsx_api_password)):
+        LOG.error("T2P migration cannot run. Please provide nsx_api_user and "
+                  "nsx_api_password in the configuration.")
+        exit(1)
+
+    # Initialize the nsxlib objects, using just one of the managers because
+    # the migration will be enabled only on one
+    nsx_api_managers = copy.copy(cfg.CONF.nsx_v3.nsx_api_managers)
+    nsx_api_user = copy.copy(cfg.CONF.nsx_v3.nsx_api_user)
+    nsx_api_password = copy.copy(cfg.CONF.nsx_v3.nsx_api_password)
+
+    for ind in range(len(nsx_api_managers)):
+        # update the config to use this one manager only
+        cfg.CONF.set_override(
+            'nsx_api_managers', [nsx_api_managers[ind]], 'nsx_v3')
+        if len(nsx_api_user) > ind:
+            cfg.CONF.set_override(
+                'nsx_api_user', [nsx_api_user[ind]], 'nsx_v3')
+        else:
+            cfg.CONF.set_override(
+                'nsx_api_user', [nsx_api_user[0]], 'nsx_v3')
+        if len(nsx_api_password) > ind:
+            cfg.CONF.set_override(
+                'nsx_api_password', [nsx_api_password[ind]], 'nsx_v3')
+        else:
+            cfg.CONF.set_override(
+                'nsx_api_password', [nsx_api_password[0]], 'nsx_v3')
+            utils.reset_global_nsxlib()
+        nsxlib = utils.get_connected_nsxlib(verbose=verbose,
+                                            allow_overwrite_header=True)
+        try:
+            # test connectivity
+            nsxlib.get_version()
+        except Exception:
+            LOG.warning("Failed to connect to NSX manager %s",
+                        nsx_api_managers[ind])
+        else:
+            # Found a working manager
+            return nsxlib
+
+    LOG.error("T2P migration failed. Cannot connect to NSX with managers %s",
+              nsx_api_managers)
+    exit(1)
+
+
 @admin_utils.output_header
 def MP2Policy_migration(resource, event, trigger, **kwargs):
     """Migrate NSX resources and neutron DB from NSX-T (MP) to Policy"""
@@ -1464,40 +1516,22 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
             f_handler.setFormatter(f_formatter)
             LOG.addHandler(f_handler)
 
-    # Initialize the nsxlib objects, using just one of the managers because
-    # the migration will be enabled only on one
-    if len(cfg.CONF.nsx_v3.nsx_api_managers) > 1:
-        cfg.CONF.set_override(
-            'nsx_api_managers',
-            [cfg.CONF.nsx_v3.nsx_api_managers[0]],
-            'nsx_v3')
-    # Make sure user & password are set in the config
-    if (len(cfg.CONF.nsx_v3.nsx_api_user) and
-        len(cfg.CONF.nsx_v3.nsx_api_password)):
-        cfg.CONF.set_override(
-            'nsx_api_user',
-            [cfg.CONF.nsx_v3.nsx_api_user[0]],
-            'nsx_v3')
-        cfg.CONF.set_override(
-            'nsx_api_password',
-            [cfg.CONF.nsx_v3.nsx_api_password[0]],
-            'nsx_v3')
+    nsxlib = _get_nsxlib_from_config(verbose)
+    nsxpolicy = p_utils.get_connected_nsxpolicy(
+        conf_path=cfg.CONF.nsx_v3, verbose=verbose)
+
+    if cfg.CONF.nsx_v3.nsx_use_client_auth:
+        # Also create a policy manager with admin user to manipulate
+        # admin-defined resources which should not have neutron principal
+        # identity
+        nsxpolicy_admin = p_utils.get_connected_nsxpolicy(
+            conf_path=cfg.CONF.nsx_v3,
+            use_basic_auth=True,
+            nsx_username=cfg.CONF.nsx_v3.nsx_api_user,
+            nsx_password=cfg.CONF.nsx_v3.nsx_api_password,
+            verbose=verbose)
     else:
-        LOG.error("Please provide nsx_api_user and nsx_api_password "
-                  "in the configuration")
-        exit(1)
-
-    nsxlib = utils.get_connected_nsxlib(verbose=verbose,
-                                        allow_overwrite_header=True)
-    nsxpolicy = p_utils.get_connected_nsxpolicy(conf_path=cfg.CONF.nsx_v3)
-
-    # Also create a policy manager with admin user to manipulate admin-defined
-    # resources which should not have neutron principal identity
-    nsxpolicy_admin = p_utils.get_connected_nsxpolicy(
-        conf_path=cfg.CONF.nsx_v3,
-        use_basic_auth=True,
-        nsx_username=cfg.CONF.nsx_v3.nsx_api_user,
-        nsx_password=cfg.CONF.nsx_v3.nsx_api_password)
+        nsxpolicy_admin = nsxpolicy
 
     with utils.NsxV3PluginWrapper(verbose=verbose) as plugin:
         # Make sure FWaaS was initialized
