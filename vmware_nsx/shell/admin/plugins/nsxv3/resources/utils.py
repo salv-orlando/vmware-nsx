@@ -45,6 +45,11 @@ def get_nsxv3_client(nsx_username=None, nsx_password=None,
                                 plugin_conf).client
 
 
+def reset_global_nsxlib():
+    global _NSXLIB
+    _NSXLIB = None
+
+
 def get_connected_nsxlib(nsx_username=None, nsx_password=None,
                          use_basic_auth=False,
                          plugin_conf=None,
