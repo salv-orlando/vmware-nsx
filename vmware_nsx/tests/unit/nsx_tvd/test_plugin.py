@@ -204,7 +204,7 @@ class TestPluginWithDefaultPlugin(NsxTVDPluginTestCase):
         self._test_plugin_initialized()
 
         # no unsupported extensions for the nsx_t plugin
-        self.assertItemsEqual(
+        self.assertCountEqual(
             ['router_type', 'router_size'],
             self.core_plugin._unsupported_fields[self.plugin_type]['router'])
         self.assertEqual(
@@ -408,7 +408,7 @@ class TestPluginWithDvs(TestPluginWithDefaultPlugin):
         self._test_plugin_initialized()
 
         # no unsupported extensions for the dvs plugin
-        self.assertItemsEqual(
+        self.assertCountEqual(
             ['mac_learning_enabled', 'provider_security_groups'],
             self.core_plugin._unsupported_fields[self.plugin_type]['port'])
 

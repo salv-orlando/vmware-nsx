@@ -1448,7 +1448,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                 name=mock.ANY,
                 tags=mock.ANY)
         # Compare tags - kw args are the last item of a mock call tuple
-        self.assertItemsEqual(mock_create_pp.mock_calls[0][-1]['tags'],
+        self.assertCountEqual(mock_create_pp.mock_calls[0][-1]['tags'],
             [{'scope': 'os-lbaas-lb-id', 'tag': 'xxx-xxx'},
                 {'scope': 'os-lbaas-lb-name', 'tag': 'lb1'},
                 {'scope': 'os-lbaas-listener-id', 'tag': 'listener-x'}])
@@ -1469,7 +1469,7 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
                 name=mock.ANY,
                 tags=mock.ANY)
         # Compare tags - kw args are the last item of a mock call tuple
-        self.assertItemsEqual(mock_update_pp.mock_calls[0][-1]['tags'],
+        self.assertCountEqual(mock_update_pp.mock_calls[0][-1]['tags'],
             [{'scope': 'os-lbaas-lb-id', 'tag': 'xxx-xxx'},
              {'scope': 'os-lbaas-lb-name', 'tag': 'lb1'},
              {'scope': 'os-lbaas-listener-id', 'tag': 'listener-x'}])
