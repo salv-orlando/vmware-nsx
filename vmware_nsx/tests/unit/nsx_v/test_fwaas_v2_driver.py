@@ -67,6 +67,8 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
                           return_value=self.port).start()
         mock.patch.object(self.plugin, '_get_subnet_fw_rules',
                           return_value=[]).start()
+        mock.patch.object(self.plugin, '_get_firewall_icmpv6_rules',
+                          return_value=[]).start()
         mock.patch.object(self.plugin, '_get_dnat_fw_rule',
                           return_value=[]).start()
         mock.patch.object(self.plugin, '_get_allocation_pools_fw_rule',

@@ -1466,9 +1466,13 @@ class FakeVcns(object):
         return {'policies': policies}
 
     def list_applications(self):
-        applications = [{'name': 'ICMP Echo', 'objectID': 'application-333'},
+        applications = [{'name': 'ICMP Echo', 'objectId': 'application-333'},
                         {'name': 'IPv6-ICMP Echo',
-                            'objectID': 'application-1001'}]
+                            'objectId': 'application-1001'},
+                        {'name': 'IPv6-ICMP Version 2 Multicast Listener',
+                            'objectId': 'application-3'},
+                        {'name': 'IPv6-ICMP Multicast Listener Query',
+                            'objectId': 'application-4'}]
 
         return applications
 

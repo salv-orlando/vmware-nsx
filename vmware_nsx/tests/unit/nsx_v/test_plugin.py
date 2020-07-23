@@ -2509,6 +2509,11 @@ class L3NatTest(test_l3_plugin.L3BaseForIntTests, NsxVPluginV2TestCase):
 
 class L3NatTestCaseBase(test_l3_plugin.L3NatTestCaseMixin):
 
+    def setUp(self, **kwargs):
+        super(L3NatTestCaseBase, self).setUp(**kwargs)
+        mock.patch.object(self.plugin, '_get_firewall_icmpv6_rules',
+                          return_value=[]).start()
+
     def test_create_floatingip_with_specific_ip(self):
         with self.subnet(cidr='10.0.0.0/24',
                          enable_dhcp=False) as s:

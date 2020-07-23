@@ -186,6 +186,10 @@ Routers
 
     nsxadmin -r routers -o migrate-vdr-dhcp
 
+- Recreate the rules in the edge firewall of all routers
+
+    nsxadmin -r routers -o nsx-update-fw
+
 Networks
 ~~~~~~~~
 
