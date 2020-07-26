@@ -645,7 +645,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             subnet_ids = (fixed_ip['subnet_id']
                           for fixed_ip in port_data['fixed_ips'])
 
-            return (self._get_subnet(context.elevated(), subnet_id)
+            return (self._get_subnet_object(context.elevated(), subnet_id)
                     for subnet_id in subnet_ids)
         return []
 

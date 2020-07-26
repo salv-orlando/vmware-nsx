@@ -999,7 +999,10 @@ class EdgeManager(object):
             # Query the subnet to get gateway and DNS
             try:
                 subnet_id = fixed_ip['subnet_id']
-                subnet = self.nsxv_plugin._get_subnet(context, subnet_id)
+                subnet_obj = self.nsxv_plugin._get_subnet_object(
+                    context, subnet_id)
+                subnet = self.nsxv_plugin._make_subnet_dict(
+                    subnet_obj, fields=None, context=context)
             except n_exc.SubnetNotFound:
                 LOG.debug("No related subnet for port %s", port['id'])
                 continue
@@ -1037,7 +1040,7 @@ class EdgeManager(object):
 
             self.handle_meta_static_route(
                 context, subnet_id, [static_config])
-            for host_route in subnet['routes']:
+            for host_route in subnet['host_routes']:
                 self.add_host_route_on_static_bindings(
                     [static_config],
                     host_route['destination'],

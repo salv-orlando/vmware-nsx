@@ -1424,10 +1424,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             return
 
         # check only dhcp enabled subnets
-        subnets = (subnet for subnet in subnets if subnet['enable_dhcp'])
+        subnets = (subnet for subnet in subnets if subnet.enable_dhcp)
         if not subnets:
             return
-        subnet_ids = (subnet['id'] for subnet in subnets)
+        subnet_ids = (subnet.id for subnet in subnets)
 
         # check if the subnet is attached to a router
         interfaces = self._get_network_interface_ports(
@@ -2636,7 +2636,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             subnet_id = interface_info['subnet_id']
             self._confirm_router_interface_not_in_use(
                 context, router_id, subnet_id)
-            subnet = self._get_subnet(context, subnet_id)
+            subnet_obj = self._get_subnet_object(context, subnet_id)
+            subnet = self._make_subnet_dict(subnet_obj, fields=None,
+                                            context=context)
             network_id = subnet['network_id']
             ports = self._get_router_interface_ports_by_network(
                 context, router_id, network_id)
@@ -2659,7 +2661,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             nsx_net_id, _nsx_port_id = nsx_db.get_nsx_switch_and_port_id(
                 context.session, port_id)
             if not subnet:
-                subnet = self._get_subnet(context, subnet_id)
+                subnet_obj = self._get_subnet_object(context, subnet_id)
+                subnet = self._make_subnet_dict(subnet_obj, fields=None,
+                                                context=context)
             ports, address_groups = self._get_ports_and_address_groups(
                 context, router_id, network_id,
                 exclude_sub_ids=[subnet_id])

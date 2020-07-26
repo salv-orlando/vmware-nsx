@@ -2225,7 +2225,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
     def _get_port_subnet_mask(self, context, port):
         if len(port['fixed_ips']) > 0 and 'subnet_id' in port['fixed_ips'][0]:
             subnet_id = port['fixed_ips'][0]['subnet_id']
-            subnet = self._get_subnet(context, subnet_id)
+            subnet = self._get_subnet_object(context, subnet_id)
             return str(netaddr.IPNetwork(subnet.cidr).netmask)
 
     def _get_port_fixed_ip_addr(self, port):
@@ -2829,7 +2829,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             super(NsxVPluginV2, self).delete_subnet(context, subnet_id)
 
     def delete_subnet(self, context, id):
-        subnet = self._get_subnet(context, id)
+        subnet = self._get_subnet_object(context, id)
         filters = {'fixed_ips': {'subnet_id': [id]}}
         ports = self.get_ports(context, filters=filters)
 
@@ -2839,7 +2839,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         # subnet's edge and send update dhcp interface rest call before
         # deleting subnet's corresponding dhcp interface rest call and lead to
         # overlap response from backend.
-        network_id = subnet['network_id']
+        network_id = subnet.network_id
         self._validate_internal_network(context, network_id)
 
         with locking.LockManager.get_lock(network_id):
@@ -2848,7 +2848,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 with db_api.CONTEXT_WRITER.using(context):
                     self.base_delete_subnet(context, id)
 
-                if subnet['enable_dhcp']:
+                if subnet.enable_dhcp:
                     # There is only DHCP port available
                     if len(ports) == 1:
                         port = ports.pop()
@@ -3034,10 +3034,11 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
     def _safe_update_subnet(self, context, id, subnet):
         s = subnet['subnet']
-        orig = self._get_subnet(context, id)
+        subnet_obj = self._get_subnet_object(context, id)
+        orig = self._make_subnet_dict(subnet_obj, fields=None, context=context)
         gateway_ip = orig['gateway_ip']
         enable_dhcp = orig['enable_dhcp']
-        orig_host_routes = orig['routes']
+        orig_host_routes = orig['host_routes']
         self._validate_external_subnet(context, orig['network_id'])
         self._validate_host_routes_input(subnet,
                                          orig_enable_dhcp=enable_dhcp,
@@ -4125,12 +4126,12 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             port_id = interface_info.get('port_id')
             if not port_id:
                 subnet_id = interface_info['subnet_id']
-                subnet = self._get_subnet(context, subnet_id)
+                subnet = self._get_subnet_object(context, subnet_id)
                 rport_qry = context.session.query(models_v2.Port)
                 ports = rport_qry.filter_by(
                     device_id=router_id,
                     device_owner=l3_db.DEVICE_OWNER_ROUTER_INTF,
-                    network_id=subnet['network_id'])
+                    network_id=subnet.network_id)
                 for p in ports:
                     if p['fixed_ips'][0]['subnet_id'] == subnet_id:
                         port_id = p['id']

@@ -63,7 +63,7 @@ class NsxIpamBase(object, metaclass=abc.ABCMeta):
     @classmethod
     def _fetch_subnet(cls, context, id):
         p = cls.get_core_plugin()
-        return p._get_subnet(context, id)
+        return p._get_subnet_object(context, id)
 
     @classmethod
     def _fetch_network(cls, context, id):

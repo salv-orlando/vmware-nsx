@@ -18,6 +18,7 @@ from unittest import mock
 from oslo_config import cfg
 from oslo_utils import uuidutils
 
+from neutron.objects import subnet as subnet_obj
 from neutron_lib import context
 from neutron_lib import exceptions as n_exc
 from neutron_lib.plugins import directory
@@ -138,9 +139,15 @@ class NsxTVDPluginTestCase(v_tests.NsxVPluginV2TestCase,
         func_to_call = getattr(self.core_plugin, method_name)
         obj_id = _uuid()
         net_id = _uuid()
+        if obj_name == 'subnet':
+            mock_name = '_get_subnet_object'
+            ret_val = subnet_obj.Subnet(network_id=net_id)
+        else:
+            mock_name = '_get_%s' % obj_name
+            ret_val = {field_name: net_id}
         with mock.patch.object(self.sub_plugin, method_name) as sub_func,\
-            mock.patch.object(self.core_plugin, '_get_%s' % obj_name,
-                              return_value={field_name: net_id}),\
+            mock.patch.object(self.core_plugin, mock_name,
+                              return_value=ret_val),\
             mock.patch.object(self.core_plugin, '_get_network',
                               return_value={'tenant_id': self.project_id}):
             func_to_call(self.context, obj_id)
@@ -161,9 +168,15 @@ class NsxTVDPluginTestCase(v_tests.NsxVPluginV2TestCase,
         func_to_call = getattr(self.core_plugin, method_name)
         obj_id = _uuid()
         net_id = _uuid()
+        if obj_name == 'subnet':
+            mock_name = '_get_subnet_object'
+            ret_val = subnet_obj.Subnet(network_id=net_id)
+        else:
+            mock_name = '_get_%s' % obj_name
+            ret_val = {field_name: net_id}
         with mock.patch.object(self.sub_plugin, method_name) as sub_func,\
-            mock.patch.object(self.core_plugin, '_get_%s' % obj_name,
-                              return_value={field_name: net_id}),\
+            mock.patch.object(self.core_plugin, mock_name,
+                              return_value=ret_val),\
             mock.patch.object(self.core_plugin, '_get_network',
                               return_value={'tenant_id': self.project_id}):
             func_to_call(self.context, obj_id, {obj_name: {}})
@@ -184,9 +197,15 @@ class NsxTVDPluginTestCase(v_tests.NsxVPluginV2TestCase,
         func_to_call = getattr(self.core_plugin, method_name)
         obj_id = _uuid()
         net_id = _uuid()
+        if obj_name == 'subnet':
+            mock_name = '_get_subnet_object'
+            ret_val = subnet_obj.Subnet(network_id=net_id)
+        else:
+            mock_name = '_get_%s' % obj_name
+            ret_val = {field_name: net_id}
         with mock.patch.object(self.sub_plugin, method_name) as sub_func,\
-            mock.patch.object(self.core_plugin, '_get_%s' % obj_name,
-                              return_value={field_name: net_id}),\
+            mock.patch.object(self.core_plugin, mock_name,
+                              return_value=ret_val),\
             mock.patch.object(self.core_plugin, '_get_network',
                               return_value={'tenant_id': self.project_id}):
             func_to_call(self.context, obj_id)

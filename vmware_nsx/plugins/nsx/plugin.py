@@ -525,8 +525,8 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 [db_utils.resource_fields(port, fields) for port in ports])
 
     def _get_subnet_plugin_by_id(self, context, subnet_id):
-        db_subnet = self._get_subnet(context, subnet_id)
-        return self._get_plugin_from_net_id(context, db_subnet['network_id'])
+        db_subnet = self._get_subnet_object(context, subnet_id)
+        return self._get_plugin_from_net_id(context, db_subnet.network_id)
 
     def get_subnet(self, context, id, fields=None):
         p = self._get_subnet_plugin_by_id(context, id)
@@ -615,8 +615,8 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             net_id = self._get_port(
                 context, interface_info['port_id'])['network_id']
         elif is_sub:
-            net_id = self._get_subnet(
-                context, interface_info['subnet_id'])['network_id']
+            net_id = self._get_subnet_object(
+                context, interface_info['subnet_id']).network_id
         net_plugin = self._get_plugin_from_net_id(context, net_id)
         if net_plugin.plugin_type() != router_plugin.plugin_type():
             err_msg = (_('Router interface should belong to the %s plugin '
