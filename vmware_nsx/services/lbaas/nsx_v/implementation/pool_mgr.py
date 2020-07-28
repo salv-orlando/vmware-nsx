@@ -80,6 +80,8 @@ class EdgePoolManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                 # This action also set this pool as the default pool of the
                 # listener, so the application profile may need to be updated
                 if pool['session_persistence']:
+                    if not pool['listener'].get('default_pool'):
+                        pool['listener']['default_pool'] = pool
                     listener_mgr.update_app_profile(
                         self.vcns, context, pool['listener'], edge_id)
 
