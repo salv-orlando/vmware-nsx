@@ -123,54 +123,6 @@ base_opts = [
                         " 1")),
 ]
 
-sync_opts = [
-    cfg.IntOpt('state_sync_interval', default=10,
-               deprecated_group='NVP_SYNC',
-               help=_("Interval in seconds between runs of the status "
-                      "synchronization task. The plugin will aim at "
-                      "resynchronizing operational status for all resources "
-                      "in this interval, and it should be therefore large "
-                      "enough to ensure the task is feasible. Otherwise the "
-                      "plugin will be constantly synchronizing resource "
-                      "status, ie: a new task is started as soon as the "
-                      "previous is completed. If this value is set to 0, the "
-                      "state synchronization thread for this Neutron instance "
-                      "will be disabled.")),
-    cfg.IntOpt('max_random_sync_delay', default=0,
-               deprecated_group='NVP_SYNC',
-               help=_("Random additional delay between two runs of the state "
-                      "synchronization task. An additional wait time between "
-                      "0 and max_random_sync_delay seconds will be added on "
-                      "top of state_sync_interval.")),
-    cfg.IntOpt('min_sync_req_delay', default=1,
-               deprecated_group='NVP_SYNC',
-               help=_("Minimum delay, in seconds, between two status "
-                      "synchronization requests for NSX. Depending on chunk "
-                      "size, controller load, and other factors, state "
-                      "synchronization requests might be pretty heavy. This "
-                      "means the controller might take time to respond, and "
-                      "its load might be quite increased by them. This "
-                      "parameter allows to specify a minimum interval between "
-                      "two subsequent requests. The value for this parameter "
-                      "must never exceed state_sync_interval. If this does, "
-                      "an error will be raised at startup.")),
-    cfg.IntOpt('min_chunk_size', default=500,
-               deprecated_group='NVP_SYNC',
-               help=_("Minimum number of resources to be retrieved from NSX "
-                      "in a single status synchronization request. The actual "
-                      "size of the chunk will increase if the number of "
-                      "resources is such that using the minimum chunk size "
-                      "will cause the interval between two requests to be "
-                      "less than min_sync_req_delay")),
-    cfg.BoolOpt('always_read_status', default=False,
-                deprecated_group='NVP_SYNC',
-                help=_("Enable this option to allow punctual state "
-                       "synchronization on show operations. In this way, show "
-                       "operations will always fetch the operational status "
-                       "of the resource from the NSX backend, and this might "
-                       "have a considerable impact on overall performance."))
-]
-
 connection_opts = [
     cfg.StrOpt('nsx_user',
                default='admin',
@@ -1038,7 +990,6 @@ cfg.CONF.register_opts(nsx_v3_opts, group="nsx_v3")
 cfg.CONF.register_opts(nsxv_opts, group="nsxv")
 cfg.CONF.register_opts(nsx_tvd_opts, group="nsx_tvd")
 cfg.CONF.register_opts(base_opts, group="NSX")
-cfg.CONF.register_opts(sync_opts, group="NSX_SYNC")
 
 # register l3_ha config opts. This is due to commit
 # a7c633dc8e8a67e65e558ecbdf9ea8efc5468251

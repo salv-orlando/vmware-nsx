@@ -25,7 +25,6 @@ def list_opts():
                  vmware_nsx.common.config.connection_opts,
                  vmware_nsx.common.config.nsx_common_opts)),
             ('NSX', vmware_nsx.common.config.base_opts),
-            ('NSX_SYNC', vmware_nsx.common.config.sync_opts),
             ('nsxv', vmware_nsx.common.config.nsxv_opts),
             ('nsx_v3', vmware_nsx.common.config.nsx_v3_opts),
             ('dvs', vmware_nsx.dvs.dvs_utils.dvs_opts),
