@@ -581,6 +581,25 @@ def migrate_md_proxies(nsxlib, nsxpolicy, plugin):
             if mdproxy_id not in neutron_md:
                 neutron_md.append(port['attachment'].get('id'))
 
+    # make sure to migrate all certificates used by those MD proxies
+    certificates = []
+    for md_id in neutron_md:
+        md_resource = nsxlib.native_md_proxy.get(md_id)
+        certificates.extend(md_resource.get('metadata_server_ca_ids', []))
+
+    if certificates:
+        def cert_cond(resource):
+            return resource.get('id') in certificates
+
+        entries = get_resource_migration_data(
+            nsxlib.trust_management, None,
+            'CERTIFICATE',
+            resource_condition=cert_cond,
+            policy_resource_get=nsxpolicy.certificate.get)
+        migrate_resource(nsxlib, 'CERTIFICATE', entries,
+                         MIGRATE_LIMIT_CERT)
+
+    # Now migrate the MD proxies
     def cond(resource):
         return resource.get('id') in neutron_md
 
