@@ -343,7 +343,8 @@ def migrate_objects(nsxlib, data, use_admin=False):
         raise e
     else:
         global ROLLBACK_DATA
-        ROLLBACK_DATA.append(data)
+        # rollback should be done in the reverse order
+        ROLLBACK_DATA = [data] + ROLLBACK_DATA
 
     return True
 
