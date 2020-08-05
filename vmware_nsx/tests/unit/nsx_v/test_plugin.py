@@ -3583,6 +3583,9 @@ class TestExclusiveRouterTestCase(L3NatTest, L3NatTestCaseBase,
     def test_router_add_interface_ipv6_subnet(self):
         self.skipTest('Not supported')
 
+    def test_update_router_interface_port_ipv6_subnet_ext_ra(self):
+        self.skipTest('Not supported')
+
     def test_router_add_gateway_multiple_subnets_ipv6(self):
         self.skipTest('not supported')
 
@@ -4244,6 +4247,9 @@ class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
         self.skipTest('not supported')
 
     def test_router_add_interface_ipv6_subnet(self):
+        self.skipTest('Not supported')
+
+    def test_update_router_interface_port_ipv6_subnet_ext_ra(self):
         self.skipTest('Not supported')
 
     def test_router_add_interface_dup_subnet2_returns_400(self):
