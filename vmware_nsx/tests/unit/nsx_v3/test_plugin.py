@@ -2199,8 +2199,10 @@ class TestL3NatTestCase(L3NatTest,
     def test_router_delete_dhcpv6_stateless_subnet_inuse_returns_409(self):
         self.skipTest('DHCPv6 not supported')
 
-    @common_v3.with_disable_dhcp
     def test_router_add_interface_ipv6_subnet(self):
+        self.skipTest('DHCPv6 not supported')
+
+    def test_update_router_interface_port_ipv6_subnet_ext_ra(self):
         self.skipTest('DHCPv6 not supported')
 
     @common_v3.with_disable_dhcp
