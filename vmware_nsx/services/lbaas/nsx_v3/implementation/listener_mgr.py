@@ -414,7 +414,8 @@ def stats_getter(context, core_plugin, ignore_list=None):
         lb_service_id = lb_binding.get('lb_service_id')
         try:
             # get the NSX statistics for this LB service
-            rsp = lb_service_client.get_stats(lb_service_id)
+            # Since this is called periodically, silencing it at the logs
+            rsp = lb_service_client.get_stats(lb_service_id, silent=True)
             if rsp and 'virtual_servers' in rsp:
                 # Go over each virtual server in the response
                 for vs in rsp['virtual_servers']:
