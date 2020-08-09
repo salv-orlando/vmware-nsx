@@ -452,10 +452,9 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
             sg_rule[sg_prefix.LOCAL_IP_PREFIX] = None
 
     def _log_get_ports(self, ports, filters):
-        if len(ports) > 0:
-            LOG.debug("Getting %(num)s port%(plural)s with %(filters)s",
+        if len(ports) > 1:
+            LOG.debug("Getting %(num)s ports with %(filters)s",
                       {'num': len(ports),
-                       'plural': 's' if len(ports) > 1 else '',
                        'filters': ('filters ' + str(filters) if filters
                                    else 'no filters')})
 
