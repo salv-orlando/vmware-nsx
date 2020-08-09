@@ -37,14 +37,14 @@ class LockManager(object):
         if cfg.CONF.locking_coordinator_url:
             lck = LockManager._get_lock_distributed(name)
             LOG.debug('Lock %s taken with stack trace %s', name,
-                      traceback.extract_stack())
+                      traceback.extract_stack(limit=5))
             return lck
         else:
             # Ensure that external=True
             kwargs['external'] = True
             lck = LockManager._get_lock_local(name, **kwargs)
             LOG.debug('Lock %s taken with stack trace %s', name,
-                      traceback.extract_stack())
+                      traceback.extract_stack(limit=5))
             return lck
 
     @staticmethod
