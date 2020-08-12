@@ -241,8 +241,9 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
     else:
         resources = nsxlib_resource.list()
     if not isinstance(resources, list):
-        # the nsxlib resources list return inconsistent type of result
+        # The nsxlib resources list return inconsistent type of result
         resources = resources.get('results', [])
+    policy_ids = []
     entries = []
     for resource in resources:
         name_and_id = printable_resource_name(resource)
@@ -285,6 +286,18 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
                 LOG.debug("Skipping %s %s as it already exists on the "
                           "policy backend", printable_name, name_and_id)
                 continue
+
+        # Make sure not to migrate multiple resources to the same policy-id
+        if policy_id:
+            if policy_id in policy_ids:
+                msg = (_("Cannot migrate %s %s to policy-id %s: Another %s "
+                         "has the same designated policy-id. One of those is "
+                         "probably a neutron orphaned. Please delete it and "
+                         "try migration again.") % (printable_name,
+                         name_and_id, policy_id, printable_name))
+                raise Exception(msg)
+            policy_ids.append(policy_id)
+
         LOG.debug("Adding data for %s %s, policy-id %s",
                   printable_name, name_and_id, policy_id)
         entry = {'manager_id': resource['id']}
