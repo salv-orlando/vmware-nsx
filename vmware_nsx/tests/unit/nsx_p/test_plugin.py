@@ -101,7 +101,7 @@ class NsxPPluginTestCaseMixin(
                                              'display_name': 'test'}]}
         mock.patch(
             "vmware_nsxlib.v3.policy.NsxPolicyLib.get_version",
-            return_value=nsx_constants.NSX_VERSION_3_0_0).start()
+            return_value=nsx_constants.NSX_VERSION_3_1_0).start()
         mock.patch(
             "vmware_nsxlib.v3.client.RESTClient.get").start()
         mock.patch(

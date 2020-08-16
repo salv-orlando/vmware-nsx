@@ -362,7 +362,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _validate_number_of_address_pairs(self, port):
         address_pairs = port.get(addr_apidef.ADDRESS_PAIRS)
-        num_allowed_on_backend = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES
+        if not address_pairs:
+            return
+        num_allowed_on_backend_v4 = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES_v4
+        num_allowed_on_backend_v6 = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES_v6
         # Counting existing ports to take into account. If no fixed ips
         # are defined - we set it to 3 in order to reserve 2 fixed and another
         # for DHCP.
@@ -371,13 +374,26 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             existing_fixed_ips = 3
         else:
             existing_fixed_ips += 1
-        if address_pairs:
-            max_addr_pairs = num_allowed_on_backend - existing_fixed_ips
-            if len(address_pairs) > max_addr_pairs:
-                err_msg = (_("Maximum of %(max)s address pairs can be defined "
-                             "for this port on the NSX backend") %
-                           {'max': max_addr_pairs})
-                raise n_exc.InvalidInput(error_message=err_msg)
+        max_addr_pairs_v4 = num_allowed_on_backend_v4 - existing_fixed_ips
+        max_addr_pairs_v6 = num_allowed_on_backend_v6 - existing_fixed_ips
+        count_v4 = count_v6 = 0
+        for pair in address_pairs:
+            ip = pair.get('ip_address')
+            if ':' in ip:
+                count_v6 = count_v6 + 1
+            else:
+                count_v4 = count_v4 + 1
+
+        if count_v4 > max_addr_pairs_v4:
+            err_msg = (_("Maximum of %(max)s IPv4 address pairs can be "
+                         "defined for this port on the NSX backend") %
+                       {'max': max_addr_pairs_v4})
+            raise n_exc.InvalidInput(error_message=err_msg)
+        if count_v6 > max_addr_pairs_v6:
+            err_msg = (_("Maximum of %(max)s IPv6 address pairs can be "
+                         "defined for this port on the NSX backend") %
+                       {'max': max_addr_pairs_v6})
+            raise n_exc.InvalidInput(error_message=err_msg)
 
     def _create_port_address_pairs(self, context, port_data):
         (port_security, has_ip) = self._determine_port_security_and_has_ip(
