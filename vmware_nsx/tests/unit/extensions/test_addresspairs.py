@@ -90,6 +90,91 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
             port = self.deserialize(self.fmt, res)
             self.assertIn('NeutronError', port)
 
+            # Too many ipv6 pairs
+            cfg.CONF.set_default('max_allowed_address_pair', 300)
+            address_pairs = []
+            count = 1
+            while count < 17:
+                address_pairs.append({'ip_address': '1001::%s' % count})
+                count += 1
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
+
+            # Legal number of ipv6 pairs
+            address_pairs = []
+            count = 1
+            while count < 13:
+                address_pairs.append({'ip_address': '1001::%s' % count})
+                count += 1
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertNotIn('NeutronError', port)
+            self._delete('ports', port['port']['id'])
+
+    def test_create_port_allowed_address_pairs_v4(self):
+        with self.network() as net:
+            # Single IPv4
+            address_pairs = [{'ip_address': '10.0.0.12'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            address_pairs[0]['mac_address'] = port['port']['mac_address']
+            self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
+                             address_pairs)
+            self._delete('ports', port['port']['id'])
+
+            # IPv4 cidr
+            address_pairs = [{'ip_address': '10.0.0.0/24'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            print("DEBUG ADIT port %s" % port)
+            address_pairs[0]['mac_address'] = port['port']['mac_address']
+            self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
+                             address_pairs)
+            self._delete('ports', port['port']['id'])
+
+            # Illegal IPv4 cidr
+            address_pairs = [{'ip_address': '10.0.0.1/24'}]
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
+
+            # Too many ipv4 pairs
+            cfg.CONF.set_default('max_allowed_address_pair', 300)
+            address_pairs = []
+            count = 1
+            while count < 129:
+                address_pairs.append({'ip_address': '10.0.0.%s' % count})
+                count += 1
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertIn('NeutronError', port)
+
+            # Legal number of ipv4 pairs
+            address_pairs = []
+            count = 1
+            while count < 125:
+                address_pairs.append({'ip_address': '10.0.0.%s' % count})
+                count += 1
+            res = self._create_port(self.fmt, net['network']['id'],
+                                    arg_list=(addr_apidef.ADDRESS_PAIRS,),
+                                    allowed_address_pairs=address_pairs)
+            port = self.deserialize(self.fmt, res)
+            self.assertNotIn('NeutronError', port)
+            self._delete('ports', port['port']['id'])
+
     def test_update_add_bad_address_pairs_with_cidr(self):
         with self.network() as net:
             res = self._create_port(self.fmt, net['network']['id'])
