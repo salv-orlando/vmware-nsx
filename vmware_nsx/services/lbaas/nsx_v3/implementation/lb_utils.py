@@ -51,7 +51,7 @@ def get_network_from_subnet(context, plugin, subnet_id):
 
 @log_helpers.log_method_call
 def get_router_from_network(context, plugin, subnet_id):
-    subnet = plugin.get_subnet(context, subnet_id)
+    subnet = plugin.get_subnet(context.elevated(), subnet_id)
     network_id = subnet['network_id']
     ports = plugin._get_network_interface_ports(
         context.elevated(), network_id)
