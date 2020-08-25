@@ -908,8 +908,8 @@ def migrate_tier0_config(nsxlib, nsxpolicy, tier0s):
 
     entries = []
     for tier0 in tier0s:
-        uplink_port = nsxlib.logical_router_port.get_tier0_uplink_port(tier0)
-        if uplink_port:
+        uplink_ports = nsxlib.logical_router_port.get_tier0_uplink_ports(tier0)
+        for uplink_port in uplink_ports:
             entries.append({'manager_id': uplink_port['id']})
 
     migrate_resource(nsxlib, 'TIER0_LOGICAL_ROUTER_PORT', entries,
