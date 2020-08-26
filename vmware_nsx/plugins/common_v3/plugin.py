@@ -368,16 +368,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             return
         num_allowed_on_backend_v4 = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES_v4
         num_allowed_on_backend_v6 = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES_v6
-        # Counting existing ports to take into account. If no fixed ips
-        # are defined - we set it to 3 in order to reserve 2 fixed and another
-        # for DHCP.
-        existing_fixed_ips = len(port.get('fixed_ips', []))
-        if existing_fixed_ips == 0:
-            existing_fixed_ips = 3
-        else:
-            existing_fixed_ips += 1
-        max_addr_pairs_v4 = num_allowed_on_backend_v4 - existing_fixed_ips
-        max_addr_pairs_v6 = num_allowed_on_backend_v6 - existing_fixed_ips
+        # Reserving 1 additional ipv4 fixed ip, and 2 for ipv6
+        # (including link local)
+        max_addr_pairs_v4 = num_allowed_on_backend_v4 - 1
+        max_addr_pairs_v6 = num_allowed_on_backend_v6 - 2
         count_v4 = count_v6 = 0
         for pair in address_pairs:
             ip = pair.get('ip_address')
