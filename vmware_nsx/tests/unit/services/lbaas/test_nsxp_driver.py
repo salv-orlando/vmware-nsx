@@ -617,45 +617,6 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
-    def test_stats(self):
-        lb_with_listener = self.lb_dict
-        lb_with_listener['listeners'] = [self.listener_dict]
-        BYTES = 100
-        stats = {'results': [{'virtual_servers': [
-            {'virtual_server_path': 'infra/%s' % self.listener.id,
-             'statistics': {'bytes_in': BYTES, 'bytes_out': BYTES}}]}]}
-        expected = {'active_connections': 0,
-                    'bytes_in': BYTES,
-                    'bytes_out': BYTES,
-                    'total_connections': 0}
-        with mock.patch.object(self.service_client, 'get_statistics',
-                               return_value=stats):
-            statistics = self.edge_driver.loadbalancer.stats(
-                self.context, lb_with_listener)
-            self.assertEqual(expected, statistics)
-
-    def test_refresh(self):
-        pass
-
-    def test_status_update(self):
-        with mock.patch.object(self.service_client, 'get_status'
-                               ) as mock_get_lb_service_status, \
-            mock.patch.object(self.service_client, 'get_virtual_servers_status'
-                              ) as mock_get_vs_status, \
-            mock.patch.object(self.pool_client, 'get'
-                              ) as mock_get_pool:
-            mock_get_lb_service_status.return_value = SERVICE_STATUSES
-            mock_get_vs_status.return_value = VS_STATUSES
-            mock_get_pool.return_value = LB_POOL_WITH_MEMBER
-            statuses = self.edge_driver.loadbalancer.get_operating_status(
-                self.context, self.lb.id, with_members=True)
-            self.assertEqual(1, len(statuses['loadbalancers']))
-            self.assertEqual('ONLINE', statuses['loadbalancers'][0]['status'])
-            # The rest of the statuses are not yet supported
-            self.assertEqual(0, len(statuses['pools']))
-            self.assertEqual(0, len(statuses['listeners']))
-            self.assertEqual(0, len(statuses['members']))
-
     def test_add_tags_callback(self):
         callback = p_utils.add_service_tag_callback(LB_ID)
 
