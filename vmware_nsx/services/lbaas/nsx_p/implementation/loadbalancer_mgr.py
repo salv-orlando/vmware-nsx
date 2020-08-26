@@ -244,7 +244,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         vs_list = self._get_lb_virtual_servers(context, lb)
         try:
-            rsp = service_client.get_statistics(lb['id'])
+            rsp = service_client.get_statistics(lb['id'], silent=True)
             for result in rsp.get('results', []):
                 for vs in result.get('virtual_servers', []):
                     # Skip the virtual server that doesn't belong
@@ -264,6 +264,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         return stats
 
     def get_operating_status(self, context, id, with_members=False):
+
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         try:
             service_status = service_client.get_status(id)
@@ -329,14 +330,14 @@ def _get_octavia_lb_status(result):
 def status_getter(context, core_plugin):
     nsxlib_lb = core_plugin.nsxpolicy.load_balancer
     lb_client = nsxlib_lb.lb_service
-    lbs = lb_client.list()
+    lbs = lb_client.list(silent=True)
     lb_statuses = []
     lsn_statuses = []
     pool_statuses = []
     member_statuses = []
     for lb in lbs:
         try:
-            service_status = lb_client.get_status(lb['id'])
+            service_status = lb_client.get_status(lb['id'], silent=True)
             if not isinstance(service_status, dict):
                 service_status = {}
         except nsxlib_exc.ManagerError:
