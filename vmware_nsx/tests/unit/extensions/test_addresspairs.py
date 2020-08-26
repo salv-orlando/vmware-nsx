@@ -132,7 +132,6 @@ class TestAllowedAddressPairsNSXp(test_p_plugin.NsxPPluginTestCaseMixin,
                                     arg_list=(addr_apidef.ADDRESS_PAIRS,),
                                     allowed_address_pairs=address_pairs)
             port = self.deserialize(self.fmt, res)
-            print("DEBUG ADIT port %s" % port)
             address_pairs[0]['mac_address'] = port['port']['mac_address']
             self.assertEqual(port['port'][addr_apidef.ADDRESS_PAIRS],
                              address_pairs)
