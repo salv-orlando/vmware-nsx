@@ -89,7 +89,7 @@ COMPONENT_STATUS_OK = 2
 ROLLBACK_DATA = []
 EDGE_FW_SEQ = 1
 DFW_SEQ = 1
-
+NSX_ROUTER_SECTIONS = []
 SERVICE_UP_RETRIES = 30
 
 
@@ -373,6 +373,7 @@ def migrate_resource(nsxlib, resource_type, entries,
 
     LOG.info("Going to migrate %d %s objects in groups of max %s",
              len(entries), resource_type, limit)
+    start_time = time.time()
 
     if limit == MIGRATE_LIMIT_NO_LIMIT:
         migrate_objects(nsxlib, {'type': resource_type,
@@ -414,6 +415,10 @@ def migrate_resource(nsxlib, resource_type, entries,
                                 {'type': resource_type,
                                  'resource_ids': entries[index:index + limit]},
                                 use_admin=use_admin)
+
+    elapsed_time = time.time() - start_time
+    LOG.info("Migrating %d %s objects took %s seconds",
+             len(entries), resource_type, elapsed_time)
 
 
 def get_configured_values(plugin, az_attribute):
@@ -1044,6 +1049,56 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
                      count_internals=True)
 
 
+def migrate_edge_firewalls(nsxlib, nsxpolicy, plugin):
+    # -- Migrate edge firewall sections:
+    # The MP plugin uses the default MP edge firewall section, while the policy
+    # plugin uses a non default one, so regular migration cannot be used.
+    # Instead, create new edge firewall sections, and remove rules from the MP
+    # default sections
+
+    # This is a hack to use the v3 plugin with the policy fwaas driver
+    class MigrationNsxpFwaasCallbacks(fwaas_callbacks_v2.NsxpFwaasCallbacksV2):
+        def __init__(self, with_rpc):
+            super(MigrationNsxpFwaasCallbacks, self).__init__(with_rpc)
+            # Make sure fwaas is considered as enabled
+            self.fwaas_enabled = True
+
+        def _get_port_firewall_group_id(self, context, port_id):
+            # Override this api because directory.get_plugin does not work from
+            # admin utils context.
+            driver_db = firewall_db_v2.FirewallPluginDb()
+            return driver_db.get_fwg_attached_to_port(context, port_id)
+
+    fwaas_callbacks = MigrationNsxpFwaasCallbacks(False)
+    plugin.nsxpolicy = nsxpolicy
+    ctx = context.get_admin_context()
+    routers = plugin.get_routers(ctx)
+    global NSX_ROUTER_SECTIONS
+    for rtr in routers:
+        nsx_router_id = db.get_nsx_router_id(ctx.session, rtr['id'])
+        nsx_rtr = nsxlib.logical_router.get(nsx_router_id)
+        for sec in nsx_rtr.get('firewall_sections', []):
+            section_id = sec['target_id']
+            section = nsxlib.firewall_section.get(section_id)
+            if section['display_name'] != 'Default LR Layer3 Section':
+                continue
+            rules = nsxlib.firewall_section.get_rules(section_id)['results']
+            if len(rules) <= 1:
+                continue
+            # Non default rules exist. need to migrate this section
+            router_db = plugin._get_router(ctx, rtr['id'])
+            ports = plugin._get_router_interfaces(ctx, rtr['id'])
+            fwaas_callbacks.update_router_firewall(
+                ctx, rtr['id'], router_db, ports)
+            LOG.debug("Created GW policy for router %s", rtr['id'])
+
+            # delete rule from the default mp section at the end of the loop
+            # so the new section will have time to realize
+            NSX_ROUTER_SECTIONS.append({'id': section_id,
+                                        'default_rule': rules[-1],
+                                        'router_id': rtr['id']})
+
+
 def migrate_dhcp_servers(nsxlib, nsxpolicy):
     # Each MP DHCP server will be migrated to a policy DHCP server config
     # which will be used by a segment later. It will get the neutron network id
@@ -1191,6 +1246,7 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         # Migrate firewall sections last as those take the longest to rollback
         # in case of error
         migrate_dfw_sections(nsxlib, nsxpolicy, plugin)
+        migrate_edge_firewalls(nsxlib, nsxpolicy, plugin)
 
         # Finalize the migration (cause policy realization)
         end_migration_process(nsxlib)
@@ -1369,55 +1425,8 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
                 LOG.debug("Updated gateway of network %s", net['id'])
                 break
 
-    # -- Migrate edge firewall sections:
-    # The MP plugin uses the default MP edge firewall section, while the policy
-    # plugin uses a non default one, so regular migration cannot be used.
-    # Instead, create new edge firewall sections, and remove rules from the MP
-    # default sections
-
-    # This is a hack to use the v3 plugin with the policy fwaas driver
-    class MigrationNsxpFwaasCallbacks(fwaas_callbacks_v2.NsxpFwaasCallbacksV2):
-        def __init__(self, with_rpc):
-            super(MigrationNsxpFwaasCallbacks, self).__init__(with_rpc)
-            # Make sure fwaas is considered as enabled
-            self.fwaas_enabled = True
-
-        def _get_port_firewall_group_id(self, context, port_id):
-            # Override this api because directory.get_plugin does not work from
-            # admin utils context.
-            driver_db = firewall_db_v2.FirewallPluginDb()
-            return driver_db.get_fwg_attached_to_port(context, port_id)
-
-    fwaas_callbacks = MigrationNsxpFwaasCallbacks(False)
-    plugin.nsxpolicy = nsxpolicy
-    routers = plugin.get_routers(ctx)
-    nsx_router_sections = []
-    for rtr in routers:
-        nsx_router_id = db.get_nsx_router_id(ctx.session, rtr['id'])
-        nsx_rtr = nsxlib.logical_router.get(nsx_router_id)
-        for sec in nsx_rtr.get('firewall_sections', []):
-            section_id = sec['target_id']
-            section = nsxlib.firewall_section.get(section_id)
-            if section['display_name'] != 'Default LR Layer3 Section':
-                continue
-            rules = nsxlib.firewall_section.get_rules(section_id)['results']
-            if len(rules) <= 1:
-                continue
-            # Non default rules exist. need to migrate this section
-            router_db = plugin._get_router(ctx, rtr['id'])
-            ports = plugin._get_router_interfaces(ctx, rtr['id'])
-            fwaas_callbacks.update_router_firewall(
-                ctx, rtr['id'], router_db, ports)
-            LOG.debug("Created GW policy for router %s", rtr['id'])
-
-            # delete rule from the default mp section at the end of the loop
-            # so the new section will have time to realize
-            nsx_router_sections.append({'id': section_id,
-                                        'default_rule': rules[-1],
-                                        'router_id': rtr['id']})
-
-    # Remove old rules from the default sections
-    for section in nsx_router_sections:
+    # -- Delete MP edge firewall rules
+    for section in NSX_ROUTER_SECTIONS:
         # make sure the policy section was already realized
         # with runtime_status=SUCESS
         nsxpolicy.gateway_policy.wait_until_state_sucessful(
@@ -1428,13 +1437,6 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
         LOG.debug("Deleted MP edge FW section %s rules", section['id'])
 
     LOG.info("Post-migration actions done.")
-
-
-def edge_firewall_migration_cond(resource):
-    return (resource.get('display_name') == 'Default LR Layer3 Section' and
-            resource.get('enforced_on') == 'LOGICALROUTER' and
-            resource.get('category') == 'Default' and
-            resource.get('section_type') == 'LAYER3')
 
 
 def pre_migration_checks(nsxlib, plugin):
@@ -1469,21 +1471,6 @@ def pre_migration_checks(nsxlib, plugin):
                 LOG.error("Pre migration check failed: Tier0 %s has BGP "
                           "neighbors but BGP is disabled. Please remove the "
                           "neighbors or enable BGP and try again.", tier0)
-                return False
-
-    # Firewall section with too many rules
-    fw_sections = nsxlib.firewall_section.list()
-    for section in fw_sections:
-        if (dfw_migration_cond(section) or
-            edge_firewall_migration_cond(section)):
-            n_rules = nsxlib.firewall_section.get_rules(
-                section['id'])['result_count']
-            if n_rules >= MIGRATE_LIMIT_SECTION_AND_RULES:
-                LOG.error("Pre migration check failed: Firewall section %s "
-                          "has %s rules and cannot be migrated. Please make "
-                          "sure each section has less than %s rules and try "
-                          "again.", section['id'], n_rules,
-                          MIGRATE_LIMIT_SECTION_AND_RULES)
                 return False
 
     # DHCP relay is unsupported
