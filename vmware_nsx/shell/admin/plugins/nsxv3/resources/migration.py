@@ -19,6 +19,7 @@ import logging
 import paramiko
 import tenacity
 
+from neutron.extensions import securitygroup as ext_sg
 from neutron_fwaas.db.firewall.v2 import firewall_db_v2
 from neutron_lib.callbacks import registry
 from neutron_lib import context
@@ -992,8 +993,14 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
         if policy_id == p_plugin.NSX_P_DEFAULT_SECTION:
             category = p_plugin.NSX_P_DEFAULT_SECTION_CATEGORY
         else:
-            sg = plugin.get_security_group(ctx, policy_id)
-            provider = sg.get('provider')
+            try:
+                sg = plugin.get_security_group(ctx, policy_id)
+            except ext_sg.SecurityGroupNotFound:
+                LOG.warning("Neutron SG %s was not found. Section %s may be "
+                            "an orphaned", policy_id, resource['id'])
+                provider = False
+            else:
+                provider = sg.get('provider')
             if provider:
                 category = p_plugin.NSX_P_PROVIDER_SECTION_CATEGORY
 
