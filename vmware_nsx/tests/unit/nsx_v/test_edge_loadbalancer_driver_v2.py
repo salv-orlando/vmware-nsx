@@ -355,12 +355,6 @@ class TestEdgeLbaasV2LoadbalancerOnRtr(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
-    def test_stats(self):
-        pass
-
-    def test_refresh(self):
-        pass
-
 
 class TestEdgeLbaasV2LoadbalancerOnEdge(TestEdgeLbaasV2LoadbalancerOnRtr):
     @property

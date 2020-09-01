@@ -452,43 +452,6 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
-    def test_stats(self):
-        pass
-
-    def test_refresh(self):
-        pass
-
-    def test_status_update(self):
-        with mock.patch.object(nsx_db, 'get_nsx_lbaas_loadbalancer_binding'
-                               ) as mock_get_lb_binding, \
-            mock.patch.object(self.service_client, 'get_status'
-                              ) as mock_get_lb_service_status, \
-            mock.patch.object(self.service_client, 'get_virtual_servers_status'
-                              ) as mock_get_vs_status, \
-            mock.patch.object(nsx_db, 'get_nsx_lbaas_pool_binding_by_lb_pool'
-                              ) as mock_get_pool_binding, \
-            mock.patch.object(self.pool_client, 'get'
-                              ) as mock_get_pool, \
-            mock.patch.object(nsx_db,
-                              'get_nsx_lbaas_listener_binding_by_lb_and_vs'
-                              ) as mock_get_listener_binding:
-            mock_get_lb_binding.return_value = LB_BINDING
-            mock_get_pool_binding.return_value = POOL_BINDING
-            mock_get_listener_binding.return_value = LISTENER_BINDING
-            mock_get_lb_service_status.return_value = SERVICE_STATUSES
-            mock_get_vs_status.return_value = VS_STATUSES
-            mock_get_pool.return_value = LB_POOL_WITH_MEMBER
-            statuses = self.edge_driver.loadbalancer.get_operating_status(
-                self.context, self.lb.id, with_members=True)
-            self.assertEqual(1, len(statuses['loadbalancers']))
-            self.assertEqual('ONLINE', statuses['loadbalancers'][0]['status'])
-            self.assertEqual(1, len(statuses['pools']))
-            self.assertEqual('OFFLINE', statuses['pools'][0]['status'])
-            self.assertEqual(1, len(statuses['listeners']))
-            self.assertEqual('ONLINE', statuses['listeners'][0]['status'])
-            self.assertEqual(1, len(statuses['members']))
-            self.assertEqual('OFFLINE', statuses['members'][0]['status'])
-
 
 class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
     def setUp(self):
