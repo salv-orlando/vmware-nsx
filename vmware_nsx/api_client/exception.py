@@ -100,8 +100,7 @@ def fiveZeroThree(response=None):
 def fourZeroThree(response=None):
     if 'read-only' in response.body:
         raise ReadOnlyMode()
-    else:
-        raise Forbidden()
+    raise Forbidden()
 
 
 def zero(self, response=None):

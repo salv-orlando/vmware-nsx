@@ -94,7 +94,21 @@ disable=
  too-many-statements,
  cyclic-import,
  no-name-in-module,
- bad-super-call
+ bad-super-call,
+# new for python3 version of pylint
+ consider-using-set-comprehension,
+ unnecessary-pass,
+ useless-object-inheritance,
+ raise-missing-from,
+ super-with-arguments,
+ inconsistent-return-statements,
+ unnecessary-comprehension,
+ consider-using-in,
+ consider-using-get,
+ assignment-from-none,
+ invalid-overridden-method,
+ raising-format-tuple,
+ comparison-with-callable
 
 [BASIC]
 # Variable names can be 1 to 31 characters long, with lowercase and underscores

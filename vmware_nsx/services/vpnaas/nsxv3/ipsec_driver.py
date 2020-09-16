@@ -211,7 +211,7 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
                 self._get_dpd_profile_name(connection),
                 description='neutron dpd profile',
                 timeout=dpd_info.get('timeout'),
-                enabled=True if dpd_info.get('action') == 'hold' else False,
+                enabled=bool(dpd_info.get('action') == 'hold'),
                 tags=self._nsx_tags(context, connection))
         except nsx_lib_exc.ManagerError as e:
             msg = _("Failed to create a DPD profile: %s") % e
@@ -227,7 +227,7 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
         self._nsx_vpn.dpd_profile.update(dpdprofile_id,
                 name=self._get_dpd_profile_name(connection),
                 timeout=dpd_info.get('timeout'),
-                enabled=True if dpd_info.get('action') == 'hold' else False)
+                enabled=bool(dpd_info.get('action') == 'hold'))
 
     def _create_peer_endpoint(self, context, connection, ikeprofile_id,
                               ipsecprofile_id, dpdprofile_id):

@@ -33,7 +33,7 @@ class NsxV3AvailabilityZone(common_az.ConfiguredAvailabilityZone):
 
     def get_az_opts(self):
         # Should be implemented by children
-        pass
+        return {}
 
     def init_from_config_section(self, az_name, mandatory_dhcp=True):
         az_info = self.get_az_opts()

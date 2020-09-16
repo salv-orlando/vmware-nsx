@@ -1787,21 +1787,19 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                             raise n_exc.BadRequest(
                                     resource='networks',
                                     msg=msg)
-                        else:
-                            set_len = len(ip_addresses)
-                            ip_addresses.add(ap['ip_address'])
-                            if len(ip_addresses) == set_len:
-                                msg = _('IP address %(ip)s is allowed '
-                                        'by more than 1 logical port. '
-                                        'This is not supported by the '
-                                        'backend. Port security cannot '
-                                        'be enabled for network %(net)s') % {
-                                    'ip': ap['ip_address'], 'net': id}
-                                LOG.error(msg)
-                                raise n_exc.BadRequest(
-                                    resource='networks',
-                                    msg=msg)
-                            valid_ports.append(port)
+                        set_len = len(ip_addresses)
+                        ip_addresses.add(ap['ip_address'])
+                        if len(ip_addresses) == set_len:
+                            msg = _('IP address %(ip)s is allowed '
+                                    'by more than 1 logical port. '
+                                    'This is not supported by the '
+                                    'backend. Port security cannot '
+                                    'be enabled for network %(net)s') % {
+                                'ip': ap['ip_address'], 'net': id}
+                            LOG.error(msg)
+                            raise n_exc.BadRequest(
+                                resource='networks', msg=msg)
+                        valid_ports.append(port)
             try:
                 sg_policy_id, predefined = (
                         self._prepare_spoofguard_policy(
@@ -1848,7 +1846,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             net_morefs = nsx_db.get_nsx_switch_ids(context.session, id)
         else:
             net_morefs = []
-        backend_network = True if len(net_morefs) > 0 else False
+        backend_network = bool(len(net_morefs) > 0)
         self._validate_network_qos(context, net_attrs, backend_network)
 
         # PortSecurity validation checks
@@ -2822,7 +2820,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         # (even if not compute port to be on the safe side)
         self._delete_dhcp_static_binding(
             context, neutron_db_port,
-            log_error=(True if compute_port else False))
+            log_error=bool(compute_port))
 
     def base_delete_subnet(self, context, subnet_id):
         with locking.LockManager.get_lock('neutron-base-subnet'):
@@ -3350,7 +3348,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             if r.get('router_type') == constants.SHARED:
                 msg = _("Cannot specify router-size for shared router")
                 raise n_exc.BadRequest(resource="router", msg=msg)
-            elif r.get('distributed') is True:
+            if r.get('distributed') is True:
                 msg = _("Cannot specify router-size for distributed router")
                 raise n_exc.BadRequest(resource="router", msg=msg)
         else:
@@ -3556,42 +3554,41 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 if r["distributed"]:
                     err_msg = _('Unable to update distributed mode')
                     raise n_exc.InvalidInput(error_message=err_msg)
-                else:
-                    # should migrate the router because its type changed
-                    new_router_type = router['router']['router_type']
-                    self._validate_router_size(router)
-                    self._validate_router_migration(
-                        context, router_id, new_router_type, r)
+                # should migrate the router because its type changed
+                new_router_type = router['router']['router_type']
+                self._validate_router_size(router)
+                self._validate_router_migration(
+                    context, router_id, new_router_type, r)
 
-                    # remove the router from the old pool, and free resources
-                    old_router_driver = \
-                        self._router_managers.get_tenant_router_driver(
-                            context, r['router_type'])
-                    old_router_driver.detach_router(context, router_id, router)
+                # remove the router from the old pool, and free resources
+                old_router_driver = \
+                    self._router_managers.get_tenant_router_driver(
+                        context, r['router_type'])
+                old_router_driver.detach_router(context, router_id, router)
 
-                    # update the router-type
-                    with db_api.CONTEXT_WRITER.using(context):
-                        router_db = self._get_router(context, router_id)
-                        self._process_nsx_router_create(
-                            context, router_db, router['router'])
+                # update the router-type
+                with db_api.CONTEXT_WRITER.using(context):
+                    router_db = self._get_router(context, router_id)
+                    self._process_nsx_router_create(
+                        context, router_db, router['router'])
 
-                    # update availability zone
-                    router['router']['availability_zone_hints'] = r.get(
-                        'availability_zone_hints')
+                # update availability zone
+                router['router']['availability_zone_hints'] = r.get(
+                    'availability_zone_hints')
 
-                    # add the router to the new pool
-                    appliance_size = router['router'].get(ROUTER_SIZE)
-                    new_router_driver = \
-                        self._router_managers.get_tenant_router_driver(
-                            context, new_router_type)
-                    new_router_driver.attach_router(
-                        context,
-                        router_id,
-                        router,
-                        appliance_size=appliance_size)
-                    # continue to update the router with the new driver
-                    # but remove the router-size that was already updated
-                    router['router'].pop(ROUTER_SIZE, None)
+                # add the router to the new pool
+                appliance_size = router['router'].get(ROUTER_SIZE)
+                new_router_driver = \
+                    self._router_managers.get_tenant_router_driver(
+                        context, new_router_type)
+                new_router_driver.attach_router(
+                    context,
+                    router_id,
+                    router,
+                    appliance_size=appliance_size)
+                # continue to update the router with the new driver
+                # but remove the router-size that was already updated
+                router['router'].pop(ROUTER_SIZE, None)
 
         if (validators.is_attr_set(gw_info) and
             not gw_info.get('enable_snat', cfg.CONF.enable_snat_by_default)):
@@ -4475,7 +4472,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                         raise n_exc.InvalidInput(error_message=msg)
 
                 new_policy = security_group.get(sg_policy.POLICY)
-                sg_with_policy = True if new_policy else False
+                sg_with_policy = bool(new_policy)
             else:
                 # called from update_security_group.
                 # Check if the existing security group has policy or not
@@ -4528,8 +4525,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         self._validate_security_group(context, sg_data, default_sg)
 
         with db_api.CONTEXT_WRITER.using(context):
-            is_provider = True if sg_data.get(provider_sg.PROVIDER) else False
-            is_policy = True if sg_data.get(sg_policy.POLICY) else False
+            is_provider = bool(sg_data.get(provider_sg.PROVIDER))
+            is_policy = bool(sg_data.get(sg_policy.POLICY))
             if is_provider or is_policy:
                 new_sg = self.create_security_group_without_rules(
                     context, security_group, default_sg, is_provider)

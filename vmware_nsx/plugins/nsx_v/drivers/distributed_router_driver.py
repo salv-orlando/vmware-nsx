@@ -89,7 +89,7 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
     def update_router(self, context, router_id, router):
         r = router['router']
         self._validate_no_size(r)
-        is_routes_update = True if 'routes' in r else False
+        is_routes_update = bool('routes' in r)
         gw_info = self.plugin._extract_external_gw(context, router,
                                                    is_extract=True)
         super(nsx_v.NsxVPluginV2, self.plugin).update_router(
@@ -236,9 +236,8 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
             if router_id in dist_routers:
                 # attach to the same router again
                 raise n_exc.InvalidInput(error_message=err_msg)
-            else:
-                # attach to multiple routers
-                raise l3_exc.RouterInterfaceAttachmentConflict(reason=err_msg)
+            # attach to multiple routers
+            raise l3_exc.RouterInterfaceAttachmentConflict(reason=err_msg)
         # Validate that the subnet is not a v6 one
         subnet = self.plugin.get_subnet(context.elevated(), subnet_id)
         if (subnet.get('ip_version') == 6 or

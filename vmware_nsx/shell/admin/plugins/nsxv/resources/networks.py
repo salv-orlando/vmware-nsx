@@ -28,7 +28,7 @@ from vmware_nsx.plugins.nsx_v.vshield.common import exceptions
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
-from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 from vmware_nsx.shell import resources as shell
 
 LOG = logging.getLogger(__name__)

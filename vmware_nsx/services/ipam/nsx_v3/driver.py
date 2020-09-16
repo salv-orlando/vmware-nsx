@@ -185,9 +185,8 @@ class Nsxv3IpamSubnet(common.NsxAbstractIpamSubnet):
                 msg = (_("NSX-V3 IPAM failed to allocate: pool %s was not "
                          "found") % self._nsx_pool_id)
                 raise ipam_exc.IpamValueInvalid(message=msg)
-            else:
-                # another backend error
-                raise ipam_exc.IPAllocationFailed()
+            # another backend error
+            raise ipam_exc.IPAllocationFailed()
         except Exception as e:
             LOG.error("NSX IPAM failed to allocate ip %(ip)s of subnet "
                       "%(id)s: %(e)s",

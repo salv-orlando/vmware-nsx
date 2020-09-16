@@ -12,6 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import sys
+
 import netaddr
 from oslo_log import log as logging
 
@@ -200,7 +202,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         LOG.error("The NSX-V plugin configuration is not ready to be "
                   "migrated to NSX-T. %s error%s found.", n_errors,
                   's were' if plural else ' was')
-        exit(n_errors)
+        sys.exit(n_errors)
 
     LOG.info("The NSX-V plugin configuration is ready to be migrated to "
              "NSX-T.")

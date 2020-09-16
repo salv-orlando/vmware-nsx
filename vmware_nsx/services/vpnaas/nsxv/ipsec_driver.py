@@ -205,7 +205,7 @@ class NSXvIPsecVpnDriver(service_drivers.VpnDriver):
                 raise nsxv_exc.NsxIPsecVpnMappingNotFound(conn=ipsec_id)
 
             vse_sites.remove(del_site)
-            enabled = True if vse_sites else False
+            enabled = bool(vse_sites)
             try:
                 self._update_ipsec_config(edge_id, vse_sites, enabled)
             except vcns_exc.VcnsApiException:

@@ -1851,8 +1851,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                             nsx_lib_exc.SecurityGroupMaximumCapacityReached):
                         raise nsx_exc.SecurityGroupMaximumCapacityReached(
                             err_msg=e.msg)
-                    else:
-                        raise e
+                    raise e
 
         # Update DHCP bindings.
         if cfg.CONF.nsx_v3.native_dhcp_metadata:
@@ -2179,12 +2178,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             self._update_router_gw_info(context, router_id, {})
         nsx_router_id = nsx_db.get_nsx_router_id(context.session,
                                                  router_id)
-        ret_val = super(NsxV3Plugin, self).delete_router(context,
-                                                         router_id)
+        super(NsxV3Plugin, self).delete_router(context, router_id)
         # if delete was called due to create error, there might not be a
         # backend id
         if not nsx_router_id:
-            return ret_val
+            return
 
         # Remove logical router from the NSX backend
         # It is safe to do now as db-level checks for resource deletion were
@@ -2205,8 +2203,6 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             LOG.warning("Backend router deletion for neutron router %s "
                         "failed. The object was however removed from the "
                         "Neutron database", router_id)
-
-        return ret_val
 
     @nsx_plugin_common.api_replay_mode_wrapper
     def update_router(self, context, router_id, router):
@@ -3064,8 +3060,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 # backend reboot. The exception raised should reflect
                 # short-term availability issue (500) rather than 404
                 raise nsx_exc.NsxPluginTemporaryError(err_msg=msg)
-            else:
-                raise ex
+            raise ex
 
         return secgroup_db
 

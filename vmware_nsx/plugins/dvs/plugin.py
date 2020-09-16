@@ -488,10 +488,9 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
                     addr_apidef.ADDRESS_PAIRS)):
                 if not port_security:
                     raise addr_exc.AddressPairAndPortSecurityRequired()
-                else:
-                    self._process_create_allowed_address_pairs(
-                        context, neutron_db,
-                        port_data[addr_apidef.ADDRESS_PAIRS])
+                self._process_create_allowed_address_pairs(
+                    context, neutron_db,
+                    port_data[addr_apidef.ADDRESS_PAIRS])
             else:
                 # remove ATTR_NOT_SPECIFIED
                 port_data[addr_apidef.ADDRESS_PAIRS] = []
@@ -544,7 +543,7 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
                 #  has address pairs in request
                 if has_addr_pairs:
                     raise addr_exc.AddressPairAndPortSecurityRequired()
-                elif not delete_addr_pairs:
+                if not delete_addr_pairs:
                     # check if address pairs are in db
                     ret_port[addr_apidef.ADDRESS_PAIRS] = (
                         self.get_allowed_address_pairs(context, id))

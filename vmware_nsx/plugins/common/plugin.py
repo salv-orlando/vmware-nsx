@@ -52,8 +52,8 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
                     address_scope_db.AddressScopeDbMixin):
     """Common methods for NSX-V, NSX-V3 and NSX-P plugins"""
 
-    @property
-    def plugin_type(self):
+    @staticmethod
+    def plugin_type():
         return "Unknown"
 
     @staticmethod

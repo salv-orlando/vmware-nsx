@@ -50,7 +50,7 @@ class DhcpMetadataBuilder(object):
     def router_id_get(self, context, subnet=None):
         """Return the router and interface used for the subnet."""
         if not subnet:
-            return
+            return None
         network_id = subnet['network_id']
         filters = {
             'network_id': [network_id],

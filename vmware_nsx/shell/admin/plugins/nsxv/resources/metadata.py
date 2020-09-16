@@ -33,7 +33,7 @@ from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
-from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 from vmware_nsx.shell import resources as shell
 
 

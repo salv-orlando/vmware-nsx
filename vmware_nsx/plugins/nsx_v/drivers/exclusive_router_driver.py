@@ -48,7 +48,7 @@ class RouterExclusiveDriver(router_driver.RouterBaseDriver):
 
     def update_router(self, context, router_id, router):
         r = router['router']
-        is_routes_update = True if 'routes' in r else False
+        is_routes_update = bool('routes' in r)
 
         gw_info = self.plugin._extract_external_gw(context, router,
                                                    is_extract=True)
@@ -105,7 +105,7 @@ class RouterExclusiveDriver(router_driver.RouterBaseDriver):
         # Add DB attributes to the router data structure
         # before creating it as an exclusive router
         router_attr = self._build_router_data_from_db(router_db, router)
-        allow_metadata = True if self.plugin.metadata_proxy_handler else False
+        allow_metadata = bool(self.plugin.metadata_proxy_handler)
         self.create_router(context,
                            router_attr,
                            allow_metadata=allow_metadata,

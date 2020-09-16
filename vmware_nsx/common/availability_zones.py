@@ -103,8 +103,7 @@ class ConfiguredAvailabilityZones(object):
                     opt_value=default_availability_zones,
                     reason=_("The default AZ is not defined in the NSX "
                              "plugin"))
-            else:
-                self._default_az = self.availability_zones[default_az_name]
+            self._default_az = self.availability_zones[default_az_name]
         else:
             self._default_az = self.availability_zones[self.default_name]
 

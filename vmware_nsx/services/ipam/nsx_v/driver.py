@@ -152,8 +152,7 @@ class NsxvIpamSubnet(common.NsxAbstractIpamSubnet, common.NsxIpamBase):
                 # No more IP addresses available on the pool
                 raise ipam_exc.IpAddressGenerationFailure(
                     subnet_id=self._subnet_id)
-            else:
-                raise ipam_exc.IPAllocationFailed()
+            raise ipam_exc.IPAllocationFailed()
         return ip_address
 
     def backend_deallocate(self, address):

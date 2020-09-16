@@ -337,7 +337,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
                 profile_id=connection['id'],
                 description='neutron dpd profile %s' % connection['id'],
                 dpd_probe_interval=dpd_info.get('timeout'),
-                enabled=True if dpd_info.get('action') == 'hold' else False,
+                enabled=bool(dpd_info.get('action') == 'hold'),
                 tags=self._nsx_tags(context, connection))
         except nsx_lib_exc.ManagerError as e:
             msg = _("Failed to create a DPD profile: %s") % e
@@ -354,7 +354,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
             connection['id'],
             name=self._get_dpd_profile_name(connection),
             dpd_probe_interval=dpd_info.get('timeout'),
-            enabled=True if dpd_info.get('action') == 'hold' else False)
+            enabled=bool(dpd_info.get('action') == 'hold'))
 
     def _create_local_endpoint(self, context, connection, vpnservice):
         """Creating/overwrite an NSX local endpoint for a logical router

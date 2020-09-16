@@ -13,6 +13,7 @@
 #    under the License.
 
 import copy
+import sys
 import time
 
 import logging
@@ -1493,7 +1494,7 @@ def MP2Policy_pre_migration_check(resource, event, trigger, **kwargs):
             # Failed
             LOG.error("T2P migration cannot run. Please fix the configuration "
                       "and try again\n\n")
-            exit(1)
+            sys.exit(1)
 
 
 def _get_nsxlib_from_config(verbose):
@@ -1505,7 +1506,7 @@ def _get_nsxlib_from_config(verbose):
         not len(cfg.CONF.nsx_v3.nsx_api_password)):
         LOG.error("T2P migration cannot run. Please provide nsx_api_user and "
                   "nsx_api_password in the configuration.")
-        exit(1)
+        sys.exit(1)
 
     retriables = [nsxlib_exc.APITransactionAborted,
                   nsxlib_exc.ServerBusy]
@@ -1548,7 +1549,7 @@ def _get_nsxlib_from_config(verbose):
 
     LOG.error("T2P migration failed. Cannot connect to NSX with managers %s",
               nsx_api_managers)
-    exit(1)
+    sys.exit(1)
 
 
 @admin_utils.output_header
@@ -1599,7 +1600,7 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
             # Failed
             LOG.error("T2P migration cannot run. Please fix the configuration "
                       "and try again\n\n")
-            exit(1)
+            sys.exit(1)
         elapsed_time = time.time() - start_time
         LOG.debug("Pre-migration took %s seconds", elapsed_time)
 
@@ -1607,7 +1608,7 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
         if not migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
             # Failed
             LOG.error("T2P migration failed. Aborting\n\n")
-            exit(1)
+            sys.exit(1)
         elapsed_time = time.time() - start_time
         LOG.debug("Migration took %s seconds", elapsed_time)
 

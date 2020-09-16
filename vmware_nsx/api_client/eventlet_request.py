@@ -141,7 +141,7 @@ class EventletApiRequest(request.ApiRequest):
                 if attempt <= self._retries:
                     if req.status in (httplib.UNAUTHORIZED, httplib.FORBIDDEN):
                         continue
-                    elif req.status == httplib.SERVICE_UNAVAILABLE:
+                    if req.status == httplib.SERVICE_UNAVAILABLE:
                         timeout = 0.5
                         continue
                     # else fall through to return the error code

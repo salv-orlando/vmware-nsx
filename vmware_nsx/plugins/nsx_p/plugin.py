@@ -1105,7 +1105,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def _is_dhcp_network(self, context, net_id):
         dhcp_port = self._get_net_dhcp_port(context, net_id)
-        return True if dhcp_port else False
+        return bool(dhcp_port)
 
     def _get_segment_subnets(self, context, net_id, net_az=None,
                              interface_subnets=None,
@@ -1164,7 +1164,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     not validators.is_attr_set(dns_nameservers)):
                     # Use pre-configured dns server
                     dns_nameservers = net_az.nameservers
-                is_ipv6 = True if dhcp_subnet.get('ip_version') == 6 else False
+                is_ipv6 = bool(dhcp_subnet.get('ip_version') == 6)
                 server_ip = "%s/%s" % (dhcp_server_ip, cidr_prefix)
                 kwargs = {'server_address': server_ip,
                           'dns_servers': dns_nameservers}
@@ -2457,7 +2457,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
     def service_router_has_loadbalancers(self, context, router_id):
         service = lb_utils.get_router_nsx_lb_service(self.nsxpolicy, router_id)
-        return True if service else False
+        return bool(service)
 
     def service_router_has_vpnaas(self, context, router_id):
         """Return True if there is a vpn service attached to this router"""
@@ -2663,7 +2663,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self._run_under_transaction(_do_add_nat)
 
             # always advertise ipv6 subnets if gateway is set
-            advertise_ipv6_subnets = True if info else False
+            advertise_ipv6_subnets = bool(info)
             self._update_router_advertisement_rules(router_id,
                                                     router_subnets,
                                                     advertise_ipv6_subnets)
@@ -2762,8 +2762,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                           "deletion, but going on with the deletion anyway: "
                           "%s", router_id, e)
 
-        ret_val = super(NsxPolicyPlugin, self).delete_router(
-            context, router_id)
+        super(NsxPolicyPlugin, self).delete_router(context, router_id)
 
         try:
             self.nsxpolicy.tier1.delete_locale_service(router_id)
@@ -2782,8 +2781,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                      "failed. The object was however removed from the "
                      "Neutron database: %(e)s") % {'id': router_id, 'e': e})
             nsx_exc.NsxPluginException(err_msg=msg)
-
-        return ret_val
 
     def _get_static_route_id(self, route):
         return "%s-%s" % (route['destination'].replace('/', '_'),

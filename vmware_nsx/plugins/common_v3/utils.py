@@ -130,6 +130,8 @@ def get_client_cert_provider(conf_path=cfg.CONF.nsx_v3):
         # when new connection is opened, and deleted immediately after.
         return get_DbCertProvider(conf_path)
 
+    return None
+
 
 def get_nsxlib_wrapper(nsx_username=None, nsx_password=None, basic_auth=False,
                        plugin_conf=None, allow_overwrite_header=False,

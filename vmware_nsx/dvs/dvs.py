@@ -208,8 +208,7 @@ class DvsManager(VCManagerBase):
                                     # NOTE(garyk): update cache
                                     return val
             raise exceptions.NetworkNotFound(net_id=net_id)
-        else:
-            return self._get_portgroup(net_id)
+        return self._get_portgroup(net_id)
 
     def _is_vlan_network_by_moref(self, moref):
         """
@@ -990,4 +989,3 @@ class ClusterManager(VCManagerBase):
 
 class VCManager(DvsManager, VMManager, ClusterManager):
     """Management class for all vc related tasks."""
-    pass

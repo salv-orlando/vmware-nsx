@@ -179,7 +179,7 @@ class ExtendedSecurityGroupPropertiesMixin(object):
     def _is_policy_security_group(self, context, security_group_id):
         sg_prop = self._get_security_group_properties(context,
                                                       security_group_id)
-        return True if sg_prop.policy else False
+        return bool(sg_prop.policy)
 
     def _get_security_group_policy(self, context, security_group_id):
         sg_prop = self._get_security_group_properties(context,

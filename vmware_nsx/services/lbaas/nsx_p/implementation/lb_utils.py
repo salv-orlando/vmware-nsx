@@ -345,8 +345,7 @@ def remove_service_tag_callback(lb_id):
                 msg = _("This LB service should be deleted")
                 raise n_exc.BadRequest(resource='lbaas-loadbalancer-delete',
                                        msg=msg)
-            else:
-                body['tags'].remove(match_tag)
+            body['tags'].remove(match_tag)
 
     return _update_calback
 

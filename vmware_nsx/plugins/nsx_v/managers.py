@@ -82,7 +82,7 @@ class RouterTypeManager(stevedore.named.NamedExtensionManager):
                 if driver:
                     return rt
             raise nsx_exc.NoRouterAvailable()
-        elif context.is_admin:
+        if context.is_admin:
             driver = self.drivers.get(router_type)
             if driver:
                 return router_type

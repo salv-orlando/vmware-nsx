@@ -308,14 +308,14 @@ class NsxvFlowClassifierDriver(fc_driver.FlowClassifierDriverBase):
                 msg = _("Failed to find redirect rule %s "
                         "on backed") % flow_classifier['id']
                 raise exc.FlowClassifierException(message=msg)
-            else:
-                # The flowclassifier plugin currently supports updating only
-                # name or description
-                name = redirect_rule.find('name')
-                name.text = self._rule_name(flow_classifier)
-                notes = redirect_rule.find('notes')
-                notes.text = flow_classifier.get('description') or ''
-                self.update_redirect_section_in_backed(section)
+
+            # The flowclassifier plugin currently supports updating only
+            # name or description
+            name = redirect_rule.find('name')
+            name.text = self._rule_name(flow_classifier)
+            notes = redirect_rule.find('notes')
+            notes.text = flow_classifier.get('description') or ''
+            self.update_redirect_section_in_backed(section)
 
     @log_helpers.log_method_call
     def delete_flow_classifier(self, context):

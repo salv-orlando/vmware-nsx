@@ -64,7 +64,7 @@ def get_nsx_switch_ids(session, cluster, neutron_network_id):
         if not nsx_switches:
             LOG.warning("Unable to find NSX switches for Neutron network "
                         "%s", neutron_network_id)
-            return
+            return []
         nsx_switch_ids = []
         with session.begin(subtransactions=True):
             for nsx_switch in nsx_switches:
@@ -104,10 +104,9 @@ class LsnManager(object):
                           network_id)
                 raise p_exc.LsnNotFound(entity='network',
                                         entity_id=network_id)
-            else:
-                LOG.warning('Unable to find Logical Service Node for '
-                            'the requested network %s.',
-                            network_id)
+            LOG.warning('Unable to find Logical Service Node for '
+                        'the requested network %s.',
+                        network_id)
 
     def lsn_create(self, context, network_id):
         """Create a LSN associated to the network."""
@@ -147,11 +146,10 @@ class LsnManager(object):
                     raise p_exc.LsnPortNotFound(lsn_id=lsn_id,
                                                 entity='subnet',
                                                 entity_id=subnet_id)
-                else:
-                    LOG.warning('Unable to find Logical Service Node Port '
-                                'for LSN %(lsn_id)s and subnet '
-                                '%(subnet_id)s',
-                                {'lsn_id': lsn_id, 'subnet_id': subnet_id})
+                LOG.warning('Unable to find Logical Service Node Port '
+                            'for LSN %(lsn_id)s and subnet '
+                            '%(subnet_id)s',
+                            {'lsn_id': lsn_id, 'subnet_id': subnet_id})
                 return (lsn_id, None)
             else:
                 return (lsn_id, lsn_port_id)
@@ -174,11 +172,10 @@ class LsnManager(object):
                     raise p_exc.LsnPortNotFound(lsn_id=lsn_id,
                                                 entity='MAC',
                                                 entity_id=mac)
-                else:
-                    LOG.warning('Unable to find Logical Service Node '
-                                'Port for LSN %(lsn_id)s and mac address '
-                                '%(mac)s',
-                                {'lsn_id': lsn_id, 'mac': mac})
+                LOG.warning('Unable to find Logical Service Node '
+                            'Port for LSN %(lsn_id)s and mac address '
+                            '%(mac)s',
+                            {'lsn_id': lsn_id, 'mac': mac})
                 return (lsn_id, None)
             else:
                 return (lsn_id, lsn_port_id)

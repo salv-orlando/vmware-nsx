@@ -90,7 +90,7 @@ def nsx_list_missing_spoofguard_policies(resource, event, trigger,
     no policy on NSXv backend to back it.
     """
     props = kwargs.get('property')
-    reverse = True if props and props[0] == 'reverse' else False
+    reverse = bool(props and props[0] == 'reverse')
     if reverse:
         LOG.info("Spoofguard policies on NSXv but not present in "
                  "Neutron Db")

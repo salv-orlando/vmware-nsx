@@ -71,7 +71,7 @@ def lsn_for_network_get(cluster, network_id):
                                 cluster=cluster)['results']
     if not results:
         raise exception.NotFound()
-    elif len(results) == 1:
+    if len(results) == 1:
         return results[0]['uuid']
 
 
@@ -127,7 +127,7 @@ def _lsn_port_get(cluster, lsn_id, filters):
                                 cluster=cluster)['results']
     if not results:
         raise exception.NotFound()
-    elif len(results) == 1:
+    if len(results) == 1:
         return results[0]['uuid']
 
 

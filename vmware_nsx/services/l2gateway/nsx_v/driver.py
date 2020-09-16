@@ -115,7 +115,6 @@ class NsxvL2GatewayDriver(l2gateway_db.L2GatewayMixin):
 
         devices[0]['device_name'] = edge_id
         l2_gateway[self.gateway_resource]['devices'] = devices
-        return
 
     def update_l2_gateway_precommit(self, context, l2_gateway):
         pass
@@ -176,7 +175,6 @@ class NsxvL2GatewayDriver(l2gateway_db.L2GatewayMixin):
                           "rolling back changes on neutron.")
             raise l2gw_exc.L2GatewayServiceDriverError(
                 method='create_l2_gateway_connection_postcommit')
-        return
 
     def create_l2_gateway_connection(self, context, l2_gateway_connection):
         """Create a L2 gateway connection."""
@@ -186,7 +184,6 @@ class NsxvL2GatewayDriver(l2gateway_db.L2GatewayMixin):
         gw_db = self._get_l2_gateway(context, l2gw_id)
         if gw_db.network_connections:
             raise nsx_exc.NsxL2GWInUse(gateway_id=l2gw_id)
-        return
 
     def delete_l2_gateway_connection_precommit(self, context,
                                                l2_gateway_connection):

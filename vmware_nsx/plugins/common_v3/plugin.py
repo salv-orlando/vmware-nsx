@@ -197,7 +197,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _setup_rpc(self):
         """Should be implemented by each plugin"""
-        pass
+        return
 
     @property
     def support_external_port_tagging(self):
@@ -209,7 +209,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def update_port_nsx_tags(self, context, port_id, tags, is_delete=False):
         """Can be implemented by each plugin to update the backend port tags"""
-        pass
+        return
 
     def start_rpc_listeners(self):
         if self.start_rpc_listeners_called:
@@ -247,6 +247,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if len(tag_parts) != 2:
             LOG.warning("Skipping tag %s for port %s: wrong format",
                         external_tag, port_id)
+            return {}
         else:
             return {'scope': tag_parts[0][:nsxlib_utils.MAX_RESOURCE_TYPE_LEN],
                     'tag': tag_parts[1][:nsxlib_utils.MAX_TAG_LEN]}
@@ -264,6 +265,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if tags_plugin:
             extra_tags = tags_plugin.get_tags(context, 'ports', port_id)
             return self._translate_external_tags(extra_tags['tags'], port_id)
+        return None
 
     def _get_interface_subnet(self, context, interface_info):
         is_port, is_sub = self._validate_interface_info(interface_info)
@@ -284,6 +286,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
         if subnet_id:
             return self.get_subnet(context, subnet_id)
+        return None
 
     def _get_interface_network_id(self, context, interface_info, subnet=None):
         if subnet:
@@ -397,11 +400,10 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if validators.is_attr_set(address_pairs):
             if not port_security:
                 raise addr_exc.AddressPairAndPortSecurityRequired()
-            else:
-                self._validate_address_pairs(address_pairs)
-                self._validate_number_of_address_pairs(port_data)
-                self._process_create_allowed_address_pairs(context, port_data,
-                                                           address_pairs)
+            self._validate_address_pairs(address_pairs)
+            self._validate_number_of_address_pairs(port_data)
+            self._process_create_allowed_address_pairs(context, port_data,
+                                                       address_pairs)
         else:
             port_data[addr_apidef.ADDRESS_PAIRS] = []
 
@@ -471,7 +473,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             #  has address pairs in request
             if has_addr_pairs:
                 raise addr_exc.AddressPairAndPortSecurityRequired()
-            elif not delete_addr_pairs:
+            if not delete_addr_pairs:
                 # check if address pairs are in db
                 updated_port[addr_apidef.ADDRESS_PAIRS] = (
                     self.get_allowed_address_pairs(context, id))
@@ -640,6 +642,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 subnet = self.get_subnet(context.elevated(),
                                          fixed_ip_list[i]['subnet_id'])
                 return subnet['ip_version']
+            return None
 
         ipver1 = get_fixed_ip_version(0)
         ipver2 = get_fixed_ip_version(1)
@@ -935,23 +938,23 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _ens_qos_supported(self):
         """Should be implemented by each plugin"""
-        pass
+        return False
 
     def _has_native_dhcp_metadata(self):
         """Should be implemented by each plugin"""
-        pass
+        return False
 
     def _get_nsx_net_tz_id(self, nsx_net):
         """Should be implemented by each plugin"""
-        pass
+        return 0
 
     def _get_network_nsx_id(self, context, neutron_id):
         """Should be implemented by each plugin"""
-        pass
+        return 0
 
     def _get_tier0_uplink_cidrs(self, tier0_id):
         """Should be implemented by each plugin"""
-        pass
+        return []
 
     def _is_ens_tz_net(self, context, net_id):
         """Return True if the network is based on an END transport zone"""
@@ -967,7 +970,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _is_overlay_network(self, context, network_id):
         """Should be implemented by each plugin"""
-        pass
+        return False
 
     def _generate_segment_id(self, context, physical_network, net_data,
                              restricted_vlans):
@@ -1169,7 +1172,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         """Validate that the network TZ matches the mdproxy edge cluster
         Should be implemented by each plugin.
         """
-        pass
+        return
 
     def _network_is_nsx_net(self, context, network_id):
         bindings = nsx_db.get_network_bindings(context.session, network_id)
@@ -1194,7 +1197,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         db_entry = context.session.query(models_v2.Network).filter_by(
             id=network_id).first()
         if db_entry:
-            return True if db_entry.vlan_transparent else False
+            return bool(db_entry.vlan_transparent)
 
     def _is_backend_port(self, context, port_data, delete=False):
         # Can be implemented by each plugin
@@ -1315,7 +1318,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         as the subnets attached to the Tier1 router
         Should be implemented by each plugin.
         """
-        pass
+        return
 
     def _get_router_gw_info(self, context, router_id):
         router = self.get_router(context, router_id)
@@ -1423,16 +1426,14 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
         # Advertise NAT routes if enable SNAT to support FIP. In the NoNAT
         # use case, only NSX connected routes need to be advertised.
-        actions['advertise_route_nat_flag'] = (
-            True if new_enable_snat else False)
-        actions['advertise_route_connected_flag'] = (
-            True if not new_enable_snat else False)
+        actions['advertise_route_nat_flag'] = bool(new_enable_snat)
+        actions['advertise_route_connected_flag'] = bool(not new_enable_snat)
 
         # the purpose of this var is to be able to differ between
         # adding a gateway w/o snat and adding snat (when adding/removing gw
         # the snat option is on by default).
-        new_with_snat = True if (new_enable_snat and newaddr) else False
-        has_gw = True if newaddr else False
+        new_with_snat = bool(new_enable_snat and newaddr)
+        has_gw = bool(newaddr)
 
         if sr_currently_exists:
             # currently there is a service router on the backend
@@ -2023,7 +2024,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _get_net_dhcp_relay(self, context, net_id):
         """Should be implemented by each plugin"""
-        pass
+        return None
 
     def _get_ipv6_subnet(self, context, network):
         for subnet in network.subnets:
@@ -2281,7 +2282,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _get_neutron_net_ids_by_nsx_id(self, context, nsx_id):
         """Should be implemented by each plugin"""
-        pass
+        return []
 
     def _validate_number_of_subnet_static_routes(self, subnet_input):
         s = subnet_input['subnet']
@@ -2673,7 +2674,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 count += 1
                 if count > 1:
                     return False
-        return True if count == 1 else False
+        return bool(count == 1)
 
     def _cidrs_overlap(self, cidr0, cidr1):
         return cidr0.first <= cidr1.last and cidr1.first <= cidr0.last
@@ -2906,7 +2907,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def verify_sr_at_backend(self, context, router_id):
         """Should be implemented by each plugin"""
-        pass
+        return
 
 
 class TagsCallbacks(object):

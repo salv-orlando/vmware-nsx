@@ -167,10 +167,9 @@ def parse_backup_edge_pool_opt_per_az(az):
         if r['edge_size'] in edge_pool_dict.keys():
             raise n_exc.Invalid(_("Duplicate edge pool configuration for "
                                   "availability zone %s") % az.name)
-        else:
-            edge_pool_dict[r['edge_size']] = {
-                'minimum_pooled_edges': r['minimum_pooled_edges'],
-                'maximum_pooled_edges': r['maximum_pooled_edges']}
+        edge_pool_dict[r['edge_size']] = {
+            'minimum_pooled_edges': r['minimum_pooled_edges'],
+            'maximum_pooled_edges': r['maximum_pooled_edges']}
     return edge_pool_dicts
 
 
@@ -633,16 +632,15 @@ class EdgeManager(object):
                             raise nsx_exc.NsxPluginException(
                                 err_msg=(_("update dhcp interface for net %s "
                                           "failed") % network_id))
-                        else:
-                            # Occurs when there are DB inconsistency
-                            sb["is_overlapped"] = True
-                            LOG.error("unexpected sub intf %(id)s on edge "
-                                      "%(edge_id)s overlaps with new net "
-                                      "%(net_id)s. we would update with "
-                                      "deleting it for DB consistency",
-                                      {'id': ls_id,
-                                       'edge_id': edge_id,
-                                       'net_id': network_id})
+                        # Occurs when there are DB inconsistency
+                        sb["is_overlapped"] = True
+                        LOG.error("unexpected sub intf %(id)s on edge "
+                                  "%(edge_id)s overlaps with new net "
+                                  "%(net_id)s. we would update with "
+                                  "deleting it for DB consistency",
+                                  {'id': ls_id,
+                                   'edge_id': edge_id,
+                                   'net_id': network_id})
             iface_list = [sub for sub in sub_interfaces
                           if not sub.get('is_overlapped', False)]
 

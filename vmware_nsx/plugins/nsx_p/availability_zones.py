@@ -69,12 +69,11 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
                 if self.is_default():
                     raise cfg.RequiredOptError(config_name,
                                                group=cfg.OptGroup('nsx_p'))
-                else:
-                    msg = (_("No %(res)s provided for availability "
-                             "zone %(az)s") % {
-                        'res': config_name,
-                        'az': self.name})
-                    raise nsx_exc.NsxPluginException(err_msg=msg)
+                msg = (_("No %(res)s provided for availability "
+                         "zone %(az)s") % {
+                    'res': config_name,
+                    'az': self.name})
+                raise nsx_exc.NsxPluginException(err_msg=msg)
             return None
 
         try:
@@ -101,13 +100,12 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
             if self.is_default():
                 raise cfg.RequiredOptError(config_name,
                                            group=cfg.OptGroup('nsx_p'))
-            else:
-                msg = (_("Could not find %(res)s %(id)s for availability "
-                         "zone %(az)s") % {
-                    'res': config_name,
-                    'id': name_or_id,
-                    'az': self.name})
-                raise nsx_exc.NsxPluginException(err_msg=msg)
+            msg = (_("Could not find %(res)s %(id)s for availability "
+                     "zone %(az)s") % {
+                'res': config_name,
+                'id': name_or_id,
+                'az': self.name})
+            raise nsx_exc.NsxPluginException(err_msg=msg)
 
     def translate_configured_names_to_uuids(self, nsxpolicy, nsxlib=None,
                                             search_scope=None):

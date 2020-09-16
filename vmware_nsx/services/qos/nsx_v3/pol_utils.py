@@ -143,7 +143,7 @@ class PolicyQosNotificationsHandler(object):
         """Translate the neutron DSCP marking rule values into NSX-lib
         Policy QoS Dscp object
         """
-        trusted = False if dscp_rule else True
+        trusted = bool(not dscp_rule)
         priority = dscp_rule.dscp_mark if dscp_rule else 0
         return self._nsxpolicy.qos_profile.build_dscp(
             trusted=trusted, priority=priority)

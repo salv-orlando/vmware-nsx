@@ -205,7 +205,7 @@ def main():
     conn = libvirt.open('qemu:///system')
     if conn is None:
         LOG.error('Failed to connect to libvirt')
-        exit(1)
+        sys.exit(1)
 
     auth = identity.Password(username=opts['username'],
                              password=opts['password'],
@@ -218,17 +218,17 @@ def main():
 
     if auth is None:
         LOG.error('Failed to authenticate with keystone')
-        exit(1)
+        sys.exit(1)
 
     sess = session.Session(auth=auth)
     if sess is None:
         LOG.error('Failed to create keystone session')
-        exit(1)
+        sys.exit(1)
 
     neutron = client.Client(session=sess)
     if neutron is None:
         LOG.error('Failed to create neutron session')
-        exit(1)
+        sys.exit(1)
 
     instances = conn.listAllDomains()
     if not instances:

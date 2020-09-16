@@ -14,7 +14,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -26,7 +25,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -38,7 +36,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -50,7 +47,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -62,7 +58,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -78,7 +73,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -90,7 +84,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -102,7 +95,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -114,7 +106,6 @@
               - x/networking-l2gw
               - openstack/networking-sfc
               - x/vmware-nsxlib
-              - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
@@ -129,7 +120,6 @@
       - x/networking-l2gw
       - openstack/networking-sfc
       - x/vmware-nsxlib
-      - openstack/neutron-fwaas
       - openstack/neutron-dynamic-routing
       - openstack/neutron-vpnaas
       - x/tap-as-a-service

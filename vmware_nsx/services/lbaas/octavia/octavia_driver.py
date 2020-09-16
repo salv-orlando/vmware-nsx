@@ -242,7 +242,7 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
     def obj_to_dict(self, obj, is_update=False, project_id=None):
         obj_type = obj.__class__.__name__
         # create a dictionary out of the object
-        render_unsets = False if is_update else True
+        render_unsets = bool(not is_update)
         obj_dict = obj.to_dict(recurse=True, render_unsets=render_unsets)
 
         # Update the dictionary to match what the nsx driver expects

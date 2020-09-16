@@ -155,7 +155,7 @@ class ApiRequest(object, metaclass=abc.ABCMeta):
                 if response.status not in [httplib.MOVED_PERMANENTLY,
                                            httplib.TEMPORARY_REDIRECT]:
                     break
-                elif redirects >= self._redirects:
+                if redirects >= self._redirects:
                     LOG.info("[%d] Maximum redirects exceeded, aborting "
                              "request", self._rid())
                     break
