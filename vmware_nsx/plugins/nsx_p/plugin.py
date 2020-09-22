@@ -2030,6 +2030,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 LOG.error(err_msg)
                 raise n_exc.InvalidInput(error_message=err_msg)
 
+    def raise_port_error(self, e):
+        """Raise the proper error when segment port PATCH fails"""
+        if isinstance(e, nsx_lib_exc.ManagerError):
+            if e.status_code == 400:
+                # Try to get the important part of the message logged
+                try:
+                    msg = e.msg.split('relatedErrors: ')[1][:-1]
+                except Exception:
+                    msg = e.msg
+                raise n_exc.InvalidInput(error_message=msg)
+
+        raise e
+
     def create_port(self, context, port, l2gw_port_check=False):
         port_data = port['port']
         # validate the new port parameters
@@ -2098,12 +2111,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self._create_or_update_port_on_backend(
                     context, port_data, is_psec_on, qos_policy_id)
             except Exception as e:
-                with excutils.save_and_reraise_exception():
-                    LOG.error('Failed to create port %(id)s on NSX '
-                              'backend. Exception: %(e)s',
-                              {'id': neutron_db['id'], 'e': e})
-                    super(NsxPolicyPlugin, self).delete_port(
-                        context, neutron_db['id'])
+                LOG.error('Failed to create port %(id)s on NSX '
+                          'backend. Exception: %(e)s',
+                          {'id': neutron_db['id'], 'e': e})
+                super(NsxPolicyPlugin, self).delete_port(
+                    context, neutron_db['id'])
+                self.raise_port_error(e)
 
         # Attach the QoS policy to the port in the neutron DB
         if qos_policy_id:
@@ -2306,11 +2319,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                           'backend. Exception: %(e)s',
                           {'id': port_id, 'e': e})
                 # Rollback the change
-                with excutils.save_and_reraise_exception():
-                    with db_api.CONTEXT_WRITER.using(context):
-                        self._revert_neutron_port_update(
-                            context, port_id, original_port, updated_port,
-                            port_security, sec_grp_updated)
+                with db_api.CONTEXT_WRITER.using(context):
+                    self._revert_neutron_port_update(
+                        context, port_id, original_port, updated_port,
+                        port_security, sec_grp_updated)
+                self.raise_port_error(e)
         else:
             # if this port changed ownership to router interface, it should
             # be deleted from policy, since policy handles router connectivity
