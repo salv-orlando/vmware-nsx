@@ -1665,6 +1665,9 @@ class TestL3NatTestCase(L3NatTest,
         super(TestL3NatTestCase, self).test_floatingip_update(
             expected_status=constants.FLOATINGIP_STATUS_DOWN)
 
+    def test_router_add_gateway_notifications(self):
+        self.skipTest('not supported')
+
     def test_floatingip_with_invalid_create_port(self):
         self._test_floatingip_with_invalid_create_port(self._plugin_name)
 

@@ -278,6 +278,24 @@ class TestNSXvBgpPlugin(test_plugin.NsxVPluginV2TestCase,
         # base class tests uses no-snat router with floating ips
         self.skipTest('No SNAT with floating ips not supported')
 
+    def test_get_external_networks_for_port_same_address_scope_v6(self):
+        self.skipTest('No IPv6 support')
+
+    def test_get_external_networks_for_port_different_address_scope_v6(self):
+        self.skipTest('No IPv6 support')
+
+    def test__get_dvr_fixed_ip_routes_by_bgp_speaker_different_scope(self):
+        self.skipTest('Not supported')
+
+    def test_get_external_networks_for_port_different_address_scope_v4(self):
+        self.skipTest('Not supported')
+
+    def test__get_dvr_fixed_ip_routes_by_bgp_speaker_no_scope(self):
+        self.skipTest('Not supported')
+
+    def test__get_dvr_fixed_ip_routes_by_bgp_speaker_same_scope(self):
+        self.skipTest('Not supported')
+
     def test_add_bgp_peer_with_bad_id(self):
             with self.subnetpool_with_address_scope(
                 4, prefixes=['8.0.0.0/8']) as sp:

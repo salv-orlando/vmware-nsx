@@ -2895,6 +2895,12 @@ class TestExclusiveRouterTestCase(L3NatTest, L3NatTestCaseBase,
                 if validate_ext_gw:
                     pass
 
+    def test_update_router_interface_port_ipv6_subnet_ext_ra(self):
+        self.skipTest('not supported')
+
+    def test_router_add_gateway_notifications(self):
+        self.skipTest('not supported')
+
     def test_router_create_with_gwinfo_and_l3_ext_net(self):
         self._test_router_create_with_gwinfo_and_l3_ext_net()
 
@@ -4127,6 +4133,12 @@ class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
             TestVdrTestCase,
             self).test_router_update_gateway_with_different_external_subnet()
 
+    def test_update_router_interface_port_ipv6_subnet_ext_ra(self):
+        self.skipTest('not supported')
+
+    def test_router_add_gateway_notifications(self):
+        self.skipTest('not supported')
+
     def test_floatingip_multi_external_one_internal(self):
         self.skipTest('skipped')
 
@@ -4570,6 +4582,9 @@ class TestNSXvAllowedAddressPairs(NsxVPluginV2TestCase,
 
     def test_create_overlap_with_fixed_ip(self):
         pass
+
+    def test_router_add_gateway_notifications(self):
+        self.skipTest('not supported')
 
     def test_create_port_with_cidr_address_pair(self):
         with self.network() as net:
