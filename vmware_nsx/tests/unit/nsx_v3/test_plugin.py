@@ -1939,6 +1939,9 @@ class TestL3NatTestCase(L3NatTest,
         obj.network = obj.original_network
         return result
 
+    def test_router_add_gateway_notifications(self):
+        self.skipTest('not supported')
+
     @with_external_subnet
     def test_router_update_gateway_with_external_ip_used_by_gw(self):
         super(TestL3NatTestCase,
