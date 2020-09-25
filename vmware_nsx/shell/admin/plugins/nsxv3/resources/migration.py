@@ -75,7 +75,7 @@ MIGRATE_LIMIT_SWITCH_PROFILE = 1500
 MIGRATE_LIMIT_LOGICAL_SWITCH = 500
 MIGRATE_LIMIT_LOGICAL_PORT = 1500
 MIGRATE_LIMIT_NS_GROUP = 2000
-MIGRATE_LIMIT_SECTION_AND_RULES = 1500
+MIGRATE_LIMIT_DFW_SECTION = 3000
 MIGRATE_LIMIT_LB_SERVICE = 2000
 MIGRATE_LIMIT_LB_VIRTUAL_SERVER = 2000
 MIGRATE_LIMIT_LB_MONITOR = 1500
@@ -1046,8 +1046,8 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
         policy_id_callback=get_policy_id_callback,
         metadata_callback=add_metadata)
     migrate_resource(nsxlib, 'DFW_SECTION', entries,
-                     MIGRATE_LIMIT_SECTION_AND_RULES,
-                     count_internals=True)
+                     MIGRATE_LIMIT_DFW_SECTION,
+                     count_internals=False)
 
 
 def migrate_edge_firewalls(nsxlib, nsxpolicy, plugin):
