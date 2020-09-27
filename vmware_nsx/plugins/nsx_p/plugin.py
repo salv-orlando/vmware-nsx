@@ -205,11 +205,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self.nsxpolicy = v3_utils.get_nsxpolicy_wrapper()
         # NOTE: This is needed for passthrough APIs, should be removed when
         # policy has full support
-        self.nsxlib = None
-        if cfg.CONF.nsx_p.allow_passthrough:
-            self.nsxlib = v3_utils.get_nsxlib_wrapper(
-                plugin_conf=cfg.CONF.nsx_p,
-                allow_overwrite_header=True)
+        self.nsxlib = self.nsxpolicy.get_nsxlib_passthrough()
 
         super(NsxPolicyPlugin, self).__init__()
 
@@ -585,10 +581,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # each process has its own keepalive loops + state
             self.nsxpolicy.reinitialize_cluster(resource, event, trigger,
                                                 payload=payload)
-
-            if self.nsxlib:
-                self.nsxlib.reinitialize_cluster(resource, event, trigger,
-                                                 payload=payload)
 
             # Init the FWaaS support without RPC listeners
             # for the spawn workers
