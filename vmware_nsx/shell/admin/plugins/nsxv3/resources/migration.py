@@ -181,8 +181,7 @@ def ensure_migration_state_ready(nsxlib, with_abort=False):
             send_migration_plan_action(nsxlib, 'abort')
             return ensure_migration_state_ready(
                 nsxlib, with_abort=with_abort)
-        else:
-            return False
+        return False
 
     return True
 
@@ -1187,8 +1186,7 @@ def migrate_lb_profiles(nsxlib, nsxpolicy):
         if (res.get('resource_type') ==
             nsxlib_lb.PersistenceProfileTypes.SOURCE_IP):
             return "%s_%s" % (policy_id, 'sourceip')
-        else:
-            return "%s_%s" % (policy_id, 'cookie')
+        return "%s_%s" % (policy_id, 'cookie')
 
     _migrate_lb_resource(nsxlib, nsxpolicy,
                          lb_const.LB_POOL_TYPE,

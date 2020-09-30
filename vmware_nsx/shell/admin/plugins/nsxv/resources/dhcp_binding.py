@@ -108,24 +108,23 @@ def nsx_update_dhcp_edge_binding(resource, event, trigger, **kwargs):
     if not kwargs.get('property'):
         LOG.error("Need to specify edge-id parameter")
         return
-    else:
-        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
-        edge_id = properties.get('edge-id')
-        if not edge_id:
-            LOG.error("Need to specify edge-id parameter")
-            return
-        LOG.info("Updating NSXv Edge: %s", edge_id)
-        # Need to create a plugin object; so that we are able to
-        # do neutron list-ports.
-        with utils.NsxVPluginWrapper() as plugin:
-            nsxv_manager = vcns_driver.VcnsDriver(
-                               edge_utils.NsxVCallbacks(plugin))
-            edge_manager = edge_utils.EdgeManager(nsxv_manager, plugin)
-            try:
-                edge_manager.update_dhcp_service_config(
-                    neutron_db.context, edge_id)
-            except exceptions.ResourceNotFound:
-                LOG.error("Edge %s not found", edge_id)
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    edge_id = properties.get('edge-id')
+    if not edge_id:
+        LOG.error("Need to specify edge-id parameter")
+        return
+    LOG.info("Updating NSXv Edge: %s", edge_id)
+    # Need to create a plugin object; so that we are able to
+    # do neutron list-ports.
+    with utils.NsxVPluginWrapper() as plugin:
+        nsxv_manager = vcns_driver.VcnsDriver(
+            edge_utils.NsxVCallbacks(plugin))
+        edge_manager = edge_utils.EdgeManager(nsxv_manager, plugin)
+        try:
+            edge_manager.update_dhcp_service_config(
+                neutron_db.context, edge_id)
+        except exceptions.ResourceNotFound:
+            LOG.error("Edge %s not found", edge_id)
 
 
 def delete_old_dhcp_edge(context, old_edge_id, bindings):

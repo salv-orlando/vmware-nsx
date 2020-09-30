@@ -57,8 +57,7 @@ def include_object(object, name, type_, reflected, compare_to):
     if (type_ == 'table' and
         name in set(external.TABLES) - set(external.REPO_VMWARE_TABLES)):
         return False
-    else:
-        return True
+    return True
 
 
 def run_migrations_offline():

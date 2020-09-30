@@ -95,8 +95,7 @@ class Projectpluginmap(extensions.ExtensionDescriptor):
     def get_extended_resources(self, version):
         if version == "2.0":
             return RESOURCE_ATTRIBUTE_MAP
-        else:
-            return {}
+        return {}
 
 
 class ProjectPluginReadOnly(nexception.NotAuthorized):

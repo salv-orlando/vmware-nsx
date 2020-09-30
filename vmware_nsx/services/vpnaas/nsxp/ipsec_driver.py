@@ -464,7 +464,7 @@ class NSXpIPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
                 # VPNaaS connection status should be ACTIVE or DOWN
                 if status == 'UP':
                     return 'ACTIVE'
-                elif status == 'DOWN' or status == 'DEGRADED':
+                if status == 'DOWN' or status == 'DEGRADED':
                     return 'DOWN'
         except nsx_lib_exc.ResourceNotFound:
             LOG.debug("Status for VPN session %s was not found",

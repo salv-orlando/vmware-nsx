@@ -63,8 +63,7 @@ def get_network_nsx_id(session, neutron_id):
         # This should not happen, but added here in case the network was
         # created before this code was added.
         return neutron_id
-    else:
-        return mappings[0]
+    return mappings[0]
 
 
 @admin_utils.output_header

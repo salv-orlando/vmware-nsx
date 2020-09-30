@@ -878,8 +878,7 @@ class Vcns(object):
             uri_path = uri_prefix
         if is_async:
             return (uri_path + "?async=true")
-        else:
-            return uri_path
+        return uri_path
 
     def add_vm_to_exclude_list(self, vm_id):
         uri = '%s/%s' % (EXCLUDELIST_PREFIX, vm_id)

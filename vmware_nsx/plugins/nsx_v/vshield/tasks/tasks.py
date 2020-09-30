@@ -344,10 +344,8 @@ class TaskManager(object):
         LOG.info("TaskManager terminated")
 
     def has_pending_task(self):
-        if self._tasks_queue or self._tasks or self._main_thread_exec_task:
-            return True
-        else:
-            return False
+        return bool(self._tasks_queue or self._tasks or
+                    self._main_thread_exec_task)
 
     def show_pending_tasks(self):
         for task in self._tasks_queue:

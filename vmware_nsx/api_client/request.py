@@ -246,12 +246,11 @@ class ApiRequest(object, metaclass=abc.ABCMeta):
                 else:
                     url = result.path
                 return (conn, url)      # case 1
-            else:
-                LOG.warning("[%(rid)d] Received invalid redirect "
-                            "location: '%(url)s'",
-                            {'rid': self._rid(), 'url': url})
-                return (conn, None)     # case 3
-        elif result.scheme not in ["http", "https"] or not result.hostname:
+            LOG.warning("[%(rid)d] Received invalid redirect "
+                        "location: '%(url)s'",
+                        {'rid': self._rid(), 'url': url})
+            return (conn, None)     # case 3
+        if result.scheme not in ["http", "https"] or not result.hostname:
             LOG.warning("[%(rid)d] Received malformed redirect "
                         "location: %(url)s",
                         {'rid': self._rid(), 'url': url})

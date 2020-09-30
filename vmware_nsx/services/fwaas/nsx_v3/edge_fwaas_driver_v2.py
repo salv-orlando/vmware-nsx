@@ -116,7 +116,7 @@ class EdgeFwaasV3DriverV2(base_driver.CommonEdgeFwaasV3Driver):
                 l4_protocol=l4_protocol,
                 source_ports=source_ports,
                 destination_ports=destination_ports)]
-        elif l4_protocol == consts.ICMPV4:
+        if l4_protocol == consts.ICMPV4:
             # Add both icmp v4 & v6 services
             return [
                 self.nsx_firewall.get_nsservice(

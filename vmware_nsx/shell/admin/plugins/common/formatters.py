@@ -44,7 +44,7 @@ def output_formatter(resource_name, resources_list, attrs):
             tableout.add_row(resource_list)
         return tableout
 
-    elif fmt == 'json':
+    if fmt == 'json':
         js_output = {}
         js_output[resource_name] = []
         for resource in resources_list:

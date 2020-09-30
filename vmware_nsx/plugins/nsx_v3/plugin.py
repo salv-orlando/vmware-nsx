@@ -1010,8 +1010,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             # This should not happen, but added here in case the network was
             # created before this code was added.
             return neutron_id
-        else:
-            return mappings[0]
+        return mappings[0]
 
     def update_network(self, context, id, network):
         original_net = super(NsxV3Plugin, self).get_network(context, id)
@@ -1609,7 +1608,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
     def _get_resource_type_for_device_id(self, device_owner, device_id):
         if device_owner in const.ROUTER_INTERFACE_OWNERS:
             return 'os-router-uuid'
-        elif device_owner.startswith(const.DEVICE_OWNER_COMPUTE_PREFIX):
+        if device_owner.startswith(const.DEVICE_OWNER_COMPUTE_PREFIX):
             return 'os-instance-uuid'
 
     def _update_port_on_backend(self, context, lport_id,

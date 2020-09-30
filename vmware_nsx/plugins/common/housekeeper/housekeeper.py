@@ -127,11 +127,10 @@ class NsxHousekeeper(stevedore.named.NamedExtensionManager):
             if non_readonly_jobs:
                 return True
             return False
-        else:
-            # specific job is allowed if it is not in the readonly list
-            if job_name in self.readonly_jobs:
-                return False
-            return True
+        # specific job is allowed if it is not in the readonly list
+        if job_name in self.readonly_jobs:
+            return False
+        return True
 
     def run(self, context, job_name, readonly=False):
         self.results = {}

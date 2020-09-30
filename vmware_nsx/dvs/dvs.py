@@ -347,13 +347,12 @@ class DvsManager(VCManagerBase):
             return self._update_net_port_groups_config(net_moref,
                                                        spec_update_calback,
                                                        spec_update_data)
-        else:
-            dvs_moref = self._get_dvs_moref_by_id(dvs_id)
-            return self._update_vxlan_port_groups_config(dvs_moref,
-                                                         net_id,
-                                                         net_moref,
-                                                         spec_update_calback,
-                                                         spec_update_data)
+        dvs_moref = self._get_dvs_moref_by_id(dvs_id)
+        return self._update_vxlan_port_groups_config(dvs_moref,
+                                                     net_id,
+                                                     net_moref,
+                                                     spec_update_calback,
+                                                     spec_update_data)
 
     # Update the dvs port groups config for a vxlan network
     # Searching the port groups for a partial match to the network id & moref

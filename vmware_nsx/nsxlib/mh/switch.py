@@ -89,8 +89,7 @@ def get_lswitches(cluster, neutron_net_id):
         results.extend(lookup_switches_by_tag())
     if results:
         return results
-    else:
-        raise exception.NetworkNotFound(net_id=neutron_net_id)
+    raise exception.NetworkNotFound(net_id=neutron_net_id)
 
 
 # This api is currently used only for unittests

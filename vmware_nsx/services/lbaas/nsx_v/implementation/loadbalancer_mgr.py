@@ -47,18 +47,16 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
     def _get_lb_flavor_size(self, context, flavor_id):
         if not flavor_id:
             return vcns_const.SERVICE_SIZE_MAPPING['lb']
-        else:
-            flavor = flavors_plugin.FlavorsPlugin.get_flavor(
-                self.flavor_plugin, context, flavor_id)
-            flavor_size = flavor['name']
-            if flavor_size.lower() in vcns_const.ALLOWED_EDGE_SIZES:
-                return flavor_size.lower()
-            else:
-                err_msg = (_("Invalid flavor size %(flavor)s, only %(sizes)s "
-                             "are supported") %
-                           {'flavor': flavor_size,
-                            'sizes': vcns_const.ALLOWED_EDGE_SIZES})
-                raise n_exc.InvalidInput(error_message=err_msg)
+        flavor = flavors_plugin.FlavorsPlugin.get_flavor(
+            self.flavor_plugin, context, flavor_id)
+        flavor_size = flavor['name']
+        if flavor_size.lower() in vcns_const.ALLOWED_EDGE_SIZES:
+            return flavor_size.lower()
+        err_msg = (_("Invalid flavor size %(flavor)s, only %(sizes)s "
+                     "are supported") %
+                   {'flavor': flavor_size,
+                    'sizes': vcns_const.ALLOWED_EDGE_SIZES})
+        raise n_exc.InvalidInput(error_message=err_msg)
 
     def create(self, context, lb, completor):
         sub_id = lb['vip_subnet_id']

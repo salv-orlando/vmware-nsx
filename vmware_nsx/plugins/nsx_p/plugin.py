@@ -952,11 +952,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # use this profile
         if STATEFUL_DHCP_NDRA_PROFILE_ID in profiles:
             return STATEFUL_DHCP_NDRA_PROFILE_ID
-        elif STATELESS_DHCP_NDRA_PROFILE_ID in profiles:
+        if STATELESS_DHCP_NDRA_PROFILE_ID in profiles:
             return STATELESS_DHCP_NDRA_PROFILE_ID
-        elif SLAAC_NDRA_PROFILE_ID in profiles:
+        if SLAAC_NDRA_PROFILE_ID in profiles:
             # if there is slaac subnet and no DHCP subnet use SLAAC
             return SLAAC_NDRA_PROFILE_ID
+
         return NO_SLAAC_NDRA_PROFILE_ID
 
     def _update_slaac_on_router(self, context, router_id,
@@ -1402,7 +1403,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if subnet.enable_dhcp and subnet.ip_version == ip_version:
                 if ip_version == 4:
                     return True
-                elif subnet.ipv6_address_mode != const.IPV6_SLAAC:
+                if subnet.ipv6_address_mode != const.IPV6_SLAAC:
                     return True
         return False
 
@@ -4109,15 +4110,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 # If it is an NSX network, return the TZ of the backend segment
                 segment_id = bindings[0].phy_uuid
                 return self.nsxpolicy.segment.get_transport_zone_id(segment_id)
-            elif bind_type == utils.NetworkTypes.L3_EXT:
+            if bind_type == utils.NetworkTypes.L3_EXT:
                 # External network has tier0 as phy_uuid
                 return
-            else:
-                return bindings[0].phy_uuid
-        else:
-            # Get the default one for the network AZ
-            az = self.get_network_az_by_net_id(context, net_id)
-            return az._default_overlay_tz_uuid
+            return bindings[0].phy_uuid
+        # Get the default one for the network AZ
+        az = self.get_network_az_by_net_id(context, net_id)
+        return az._default_overlay_tz_uuid
 
     def _validate_router_tz(self, context, tier0_uuid, subnets):
         # make sure the related GW (Tier0 router) belongs to the same TZ

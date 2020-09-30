@@ -39,13 +39,12 @@ class LockManager(object):
             LOG.debug('Lock %s taken with stack trace %s', name,
                       traceback.extract_stack(limit=5))
             return lck
-        else:
-            # Ensure that external=True
-            kwargs['external'] = True
-            lck = LockManager._get_lock_local(name, **kwargs)
-            LOG.debug('Lock %s taken with stack trace %s', name,
-                      traceback.extract_stack(limit=5))
-            return lck
+        # Ensure that external=True
+        kwargs['external'] = True
+        lck = LockManager._get_lock_local(name, **kwargs)
+        LOG.debug('Lock %s taken with stack trace %s', name,
+                  traceback.extract_stack(limit=5))
+        return lck
 
     @staticmethod
     def _get_lock_local(name, **kwargs):

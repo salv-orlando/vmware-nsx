@@ -47,13 +47,12 @@ def import_projects(resource, event, trigger, **kwargs):
     if not kwargs.get('property'):
         LOG.error("Need to specify plugin and project parameters")
         return
-    else:
-        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
-        plugin = properties.get('plugin')
-        project = properties.get('project')
-        if not plugin or not project:
-            LOG.error("Need to specify plugin and project parameters")
-            return
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    plugin = properties.get('plugin')
+    project = properties.get('project')
+    if not plugin or not project:
+        LOG.error("Need to specify plugin and project parameters")
+        return
     if plugin not in projectpluginmap.VALID_TYPES:
         LOG.error("The supported plugins are %s", projectpluginmap.VALID_TYPES)
         return

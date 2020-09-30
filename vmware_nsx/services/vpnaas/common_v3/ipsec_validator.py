@@ -158,10 +158,9 @@ class IPsecCommonValidator(vpn_validator.VpnReferenceValidator):
     def _get_peer_cidrs(self, context, ipsec_site_conn):
         if ipsec_site_conn['peer_cidrs']:
             return ipsec_site_conn['peer_cidrs']
-        else:
-            # peer endpoint group
-            self.vpn_plugin.get_endpoint_info(context, ipsec_site_conn)
-            return ipsec_site_conn['peer_epg_cidrs']['endpoints']
+        # peer endpoint group
+        self.vpn_plugin.get_endpoint_info(context, ipsec_site_conn)
+        return ipsec_site_conn['peer_epg_cidrs']['endpoints']
 
     def _check_policy_rules_overlap(self, context, ipsec_site_conn):
         """validate no overlapping policy rules

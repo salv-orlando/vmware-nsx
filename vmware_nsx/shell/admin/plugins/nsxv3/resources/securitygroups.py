@@ -407,12 +407,11 @@ def reuse_default_section(resource, event, trigger, **kwargs):
             LOG.info('Neutron DB is already configured correctly with section '
                      '%s and NS group %s', section_id, nsgroup_id)
             return True
-        else:
-            LOG.info('Deleting old DB mappings for section %s and NS group %s',
-                db_section_id, db_nsgroup_id)
-            nsx_db.delete_sg_mappings(
-                context, plugin_utils.NSX_V3_OS_DFW_UUID,
-                db_nsgroup_id, db_section_id)
+        LOG.info('Deleting old DB mappings for section %s and NS group %s',
+            db_section_id, db_nsgroup_id)
+        nsx_db.delete_sg_mappings(
+            context, plugin_utils.NSX_V3_OS_DFW_UUID,
+            db_nsgroup_id, db_section_id)
 
     # Add mappings to the neutron DB
     LOG.info('Creating new DB mappings for section %s and NS group %s',

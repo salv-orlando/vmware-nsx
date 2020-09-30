@@ -150,8 +150,7 @@ def device_id_to_vm_id(device_id, obfuscate=False):
     # hashing
     if len(device_id) > MAX_DISPLAY_NAME_LEN or obfuscate:
         return hashlib.sha1(device_id.encode()).hexdigest()
-    else:
-        return device_id or "N/A"
+    return device_id or "N/A"
 
 
 def check_and_truncate(display_name):
@@ -264,8 +263,7 @@ def get_name_and_uuid(name, uuid, tag=None, maxlen=80):
     if tag:
         maxlen = maxlen - len(tag) - 1
         return name[:maxlen] + '_' + tag + short_uuid
-    else:
-        return name[:maxlen] + short_uuid
+    return name[:maxlen] + short_uuid
 
 
 def is_ipv4_ip_address(addr):

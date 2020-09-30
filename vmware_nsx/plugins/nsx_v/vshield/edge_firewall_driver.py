@@ -45,33 +45,31 @@ class EdgeFirewallDriver(object):
     def _convert_firewall_action(self, action):
         if action == FWAAS_ALLOW:
             return VSE_FWAAS_ALLOW
-        elif action == FWAAS_DENY:
+        if action == FWAAS_DENY:
             return VSE_FWAAS_DENY
-        elif action == FWAAS_REJECT:
+        if action == FWAAS_REJECT:
             return VSE_FWAAS_REJECT
-        else:
-            msg = _("Invalid action value %s in a firewall rule") % action
-            raise vcns_exc.VcnsBadRequest(resource='firewall_rule', msg=msg)
+        msg = _("Invalid action value %s in a firewall rule") % action
+        raise vcns_exc.VcnsBadRequest(resource='firewall_rule', msg=msg)
 
     def _restore_firewall_action(self, action):
         if action == VSE_FWAAS_ALLOW:
             return FWAAS_ALLOW
-        elif action == VSE_FWAAS_DENY:
+        if action == VSE_FWAAS_DENY:
             return FWAAS_DENY
-        elif action == VSE_FWAAS_REJECT:
+        if action == VSE_FWAAS_REJECT:
             return FWAAS_REJECT
-        else:
-            msg = (_("Invalid action value %s in "
-                     "a vshield firewall rule") % action)
-            raise vcns_exc.VcnsBadRequest(resource='firewall_rule', msg=msg)
+        msg = (_("Invalid action value %s in "
+                 "a vshield firewall rule") % action)
+        raise vcns_exc.VcnsBadRequest(resource='firewall_rule', msg=msg)
 
     def _get_port_range(self, min_port, max_port):
         if not min_port or min_port == 'any':
             return None
         if min_port == max_port:
             return str(min_port)
-        else:
-            return '%d:%d' % (min_port, max_port)
+
+        return '%d:%d' % (min_port, max_port)
 
     def _get_ports_list_from_string(self, port_str):
         """Receives a string representation of the service ports,
@@ -96,8 +94,7 @@ class EdgeFirewallDriver(object):
                 if port and port.isdigit():
                     ports_set.add(int(port))
             return sorted(list(ports_set))
-        else:
-            return [int(port_str.strip())]
+        return [int(port_str.strip())]
 
     def _convert_firewall_rule(self, rule, index=None):
         vcns_rule = {
@@ -239,8 +236,7 @@ class EdgeFirewallDriver(object):
             if str(rule_cur['ruleId']) == rule_vseid:
                 if (i + 1) == len(fw_cfg['firewallRules']['firewallRules']):
                     return None
-                else:
-                    return fw_cfg['firewallRules']['firewallRules'][i + 1]
+                return fw_cfg['firewallRules']['firewallRules'][i + 1]
 
     def get_firewall_rule(self, context, id, edge_id):
         rule_map = nsxv_db.get_nsxv_edge_firewallrule_binding(

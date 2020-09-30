@@ -180,9 +180,8 @@ def router_binding_obj_exist(context, binding, net_ids, rtr_ids, plr_tlr_ids):
             router_id, vcns_const.DHCP_EDGE_PREFIX)
         if _is_id_prefix_in_list(net_id_prefix, net_ids):
             return True
-        else:
-            LOG.warning("Network for binding entry %s not found", router_id)
-            return False
+        LOG.warning("Network for binding entry %s not found", router_id)
+        return False
 
     if router_id.startswith(vcns_const.PLR_EDGE_PREFIX):
         # Look for the TLR that matches this PLR
@@ -191,32 +190,28 @@ def router_binding_obj_exist(context, binding, net_ids, rtr_ids, plr_tlr_ids):
             tlr_id = plr_tlr_ids[router_id]
             if _is_id_prefix_in_list(tlr_id, rtr_ids):
                 return True
-            else:
-                LOG.warning("TLR Router %s for PLR binding entry %s not found",
-                            tlr_id, router_id)
-                return False
-        else:
-            LOG.warning("TLR Router binding for PLR binding entry %s not "
-                        "found", router_id)
+            LOG.warning("TLR Router %s for PLR binding entry %s not found",
+                        tlr_id, router_id)
             return False
+        LOG.warning("TLR Router binding for PLR binding entry %s not "
+                    "found", router_id)
+        return False
 
     if router_id.startswith(lb_common.RESOURCE_ID_PFX):
         # should have a load balancer starting with this id on the same edge
         if nsxv_db.get_nsxv_lbaas_loadbalancer_binding_by_edge(
             context.session, binding.edge_id):
             return True
-        else:
-            LOG.warning("Loadbalancer for binding entry %s not found",
-                        router_id)
-            return False
+        LOG.warning("Loadbalancer for binding entry %s not found",
+                    router_id)
+        return False
 
     # regular router
     # get the id. and look for a router with this id
     if _is_id_prefix_in_list(router_id, rtr_ids):
         return True
-    else:
-        LOG.warning("Router for binding entry %s not found", router_id)
-        return False
+    LOG.warning("Router for binding entry %s not found", router_id)
+    return False
 
 
 def get_orphaned_edges():

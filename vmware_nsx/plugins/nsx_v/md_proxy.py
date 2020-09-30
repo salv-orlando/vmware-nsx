@@ -251,8 +251,7 @@ class NsxVMetadataProxyHandler(object):
         ports = self.nsxv_plugin.get_ports(context, filters=filters)
         if ports:
             return ports[0]['fixed_ips'][0]['ip_address']
-        else:
-            LOG.error("No port found for metadata for %s", rtr_id)
+        LOG.error("No port found for metadata for %s", rtr_id)
 
     def _get_edge_rtr_id_by_ext_ip(self, context, edge_ip):
         rtr_list = nsxv_db.get_nsxv_internal_edge(

@@ -77,25 +77,24 @@ class RouterSharedDriver(router_driver.RouterBaseDriver):
         if not edge_id:
             return super(nsx_v.NsxVPluginV2, self.plugin).update_router(
                 context, router_id, router)
-        else:
-            with locking.LockManager.get_lock(str(edge_id)):
-                gw_info = self.plugin._extract_external_gw(
-                    context, router, is_extract=True)
-                super(nsx_v.NsxVPluginV2, self.plugin).update_router(
-                    context, router_id, router)
+        with locking.LockManager.get_lock(str(edge_id)):
+            gw_info = self.plugin._extract_external_gw(
+                context, router, is_extract=True)
+            super(nsx_v.NsxVPluginV2, self.plugin).update_router(
+                context, router_id, router)
 
-            if gw_info != constants.ATTR_NOT_SPECIFIED:
-                self.plugin._update_router_gw_info(context, router_id, gw_info)
-            if 'admin_state_up' in r:
-                # If router was deployed on a different edge then
-                # admin-state-up is already updated on the new edge.
-                current_edge_id = (
-                    edge_utils.get_router_edge_id(context, router_id))
-                if current_edge_id == edge_id:
-                    self.plugin._update_router_admin_state(context, router_id,
-                                                           self.get_type(),
-                                                           r['admin_state_up'])
-            return self.plugin.get_router(context, router_id)
+        if gw_info != constants.ATTR_NOT_SPECIFIED:
+            self.plugin._update_router_gw_info(context, router_id, gw_info)
+        if 'admin_state_up' in r:
+            # If router was deployed on a different edge then
+            # admin-state-up is already updated on the new edge.
+            current_edge_id = (
+                edge_utils.get_router_edge_id(context, router_id))
+            if current_edge_id == edge_id:
+                self.plugin._update_router_admin_state(context, router_id,
+                                                       self.get_type(),
+                                                       r['admin_state_up'])
+        return self.plugin.get_router(context, router_id)
 
     def detach_router(self, context, router_id, router):
         LOG.debug("Detach shared router id %s", router_id)

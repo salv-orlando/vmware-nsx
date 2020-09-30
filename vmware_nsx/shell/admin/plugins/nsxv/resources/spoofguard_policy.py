@@ -77,8 +77,7 @@ def get_missing_spoofguard_policy_mappings(reverse=None):
 
     if reverse:
         return nsxv_spoofguard_policies - neutron_spoofguard_policy_mappings
-    else:
-        return neutron_spoofguard_policy_mappings - nsxv_spoofguard_policies
+    return neutron_spoofguard_policy_mappings - nsxv_spoofguard_policies
 
 
 @admin_utils.output_header

@@ -74,8 +74,7 @@ class Nsxpolicy(extensions.ExtensionDescriptor):
     def get_extended_resources(self, version):
         if version == "2.0":
             return RESOURCE_ATTRIBUTE_MAP
-        else:
-            return {}
+        return {}
 
 
 class NsxPolicyReadOnly(nexception.NotAuthorized):

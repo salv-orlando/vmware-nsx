@@ -227,14 +227,13 @@ def nsx_redo_metadata_cfg(resource, event, trigger, **kwargs):
         if edge_id:
             nsx_redo_metadata_cfg_for_edge(edgeapi.context, plugin, edge_id)
             return
-        else:
-            # if the net-id property exist - recreate the edge for this network
-            az_name = properties.get('az-name')
-            if az_name:
-                nsx_redo_metadata_cfg_for_az(edgeapi.context, plugin, az_name)
-                return
-            LOG.error('Cannot parse properties %s', properties)
+        # if the net-id property exist - recreate the edge for this network
+        az_name = properties.get('az-name')
+        if az_name:
+            nsx_redo_metadata_cfg_for_az(edgeapi.context, plugin, az_name)
             return
+        LOG.error('Cannot parse properties %s', properties)
+        return
 
     nsx_redo_metadata_cfg_all(edgeapi.context, plugin)
 

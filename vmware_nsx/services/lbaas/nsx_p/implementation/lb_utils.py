@@ -144,17 +144,16 @@ def update_router_lb_vip_advertisement(context, core_plugin, router_id):
 def get_monitor_policy_client(lb_client, hm):
     if hm['type'] == lb_const.LB_HEALTH_MONITOR_TCP:
         return lb_client.lb_monitor_profile_tcp
-    elif hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTP:
+    if hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTP:
         return lb_client.lb_monitor_profile_http
-    elif hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTPS:
+    if hm['type'] == lb_const.LB_HEALTH_MONITOR_HTTPS:
         return lb_client.lb_monitor_profile_https
-    elif hm['type'] == lb_const.LB_HEALTH_MONITOR_PING:
+    if hm['type'] == lb_const.LB_HEALTH_MONITOR_PING:
         return lb_client.lb_monitor_profile_icmp
-    else:
-        msg = (_('Cannot create health monitor %(monitor)s with '
-                 'type %(type)s') % {'monitor': hm['id'],
-                                     'type': hm['type']})
-        raise n_exc.InvalidInput(error_message=msg)
+    msg = (_('Cannot create health monitor %(monitor)s with '
+             'type %(type)s') % {'monitor': hm['id'],
+                                 'type': hm['type']})
+    raise n_exc.InvalidInput(error_message=msg)
 
 
 def get_tags(plugin, resource_id, resource_type, project_id, project_name):
@@ -243,11 +242,10 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, switch_type,
                        'pool_id': pool['id']})
             pp_client.update(persistence_profile_id, **pp_kwargs)
             return persistence_profile_id, None
-        else:
-            # Prepare removal of persistence profile
-            return (None, functools.partial(delete_persistence_profile,
-                                            nsxpolicy, profile_path))
-    elif pers_type:
+        # Prepare removal of persistence profile
+        return (None, functools.partial(delete_persistence_profile,
+                                        nsxpolicy, profile_path))
+    if pers_type:
         # Create persistence profile
         pp_id = "%s_%s" % (pool['id'], pers_id_suffix)
         pp_kwargs['persistence_profile_id'] = pp_id
@@ -293,8 +291,7 @@ def get_lb_nsx_lb_service(nsxpolicy, lb_id):
 def get_service_lb_name(lb, router_id=None):
     if router_id:
         return utils.get_name_and_uuid('rtr', router_id)
-    else:
-        return utils.get_name_and_uuid(lb.get('name') or 'lb', lb.get('id'))
+    return utils.get_name_and_uuid(lb.get('name') or 'lb', lb.get('id'))
 
 
 def get_service_lb_tag(lb_id):

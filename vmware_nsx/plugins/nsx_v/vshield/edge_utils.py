@@ -86,8 +86,7 @@ def get_vdr_transit_network_plr_address():
     # was "169.254.2.3"
     if conf.DEFAULT_VDR_TRANSIT_NETWORK == cfg.CONF.nsxv.vdr_transit_network:
         return conf.DEFAULT_PLR_ADDRESS
-    else:
-        return str(ip[2])
+    return str(ip[2])
 
 
 def validate_vdr_transit_network():
@@ -1293,7 +1292,7 @@ class EdgeManager(object):
         if not ports:
             LOG.debug('No metadata ports found for %s', org_router_id)
             return
-        elif len(ports) > 1:
+        if len(ports) > 1:
             LOG.debug('Expecting one metadata port for %s. Found %d ports',
                       org_router_id, len(ports))
 
@@ -1516,35 +1515,34 @@ class EdgeManager(object):
             }
             address_groups['addressGroups'].append(address_group)
             return True
-        else:
-            for ind, address_group in enumerate(
-                address_groups['addressGroups']):
-                if address_group['primaryAddress'] == old_ip:
-                    # this is the one we should update
+        for ind, address_group in enumerate(
+            address_groups['addressGroups']):
+            if address_group['primaryAddress'] == old_ip:
+                # this is the one we should update
+                if new_ip:
+                    address_group['primaryAddress'] = new_ip
+                else:
+                    # delete this entry
+                    address_groups['addressGroups'].pop(ind)
+                return True
+            # try to find a match in the secondary ips
+            if (address_group.get('secondaryAddresses') is not None):
+                secondary = address_group['secondaryAddresses']
+                secondary_ips = secondary['ipAddress']
+                if old_ip in secondary_ips:
+                    # We should update the secondary addresses
                     if new_ip:
-                        address_group['primaryAddress'] = new_ip
+                        # replace the old with the new
+                        secondary_ips.remove(old_ip)
+                        secondary_ips.append(new_ip)
                     else:
                         # delete this entry
-                        address_groups['addressGroups'].pop(ind)
-                    return True
-                # try to find a match in the secondary ips
-                if (address_group.get('secondaryAddresses') is not None):
-                    secondary = address_group['secondaryAddresses']
-                    secondary_ips = secondary['ipAddress']
-                    if old_ip in secondary_ips:
-                        # We should update the secondary addresses
-                        if new_ip:
-                            # replace the old with the new
-                            secondary_ips.remove(old_ip)
-                            secondary_ips.append(new_ip)
+                        if len(secondary_ips) == 1:
+                            # delete the whole structure
+                            del address_group['secondaryAddresses']
                         else:
-                            # delete this entry
-                            if len(secondary_ips) == 1:
-                                # delete the whole structure
-                                del address_group['secondaryAddresses']
-                            else:
-                                secondary_ips.remove(old_ip)
-                        return True
+                            secondary_ips.remove(old_ip)
+                    return True
 
         # The old ip was not found
         return False
@@ -1807,8 +1805,7 @@ class EdgeManager(object):
             if router_ids == [router_id]:
                 self._free_edge_appliance(context, router_id)
                 return True
-            else:
-                nsxv_db.delete_nsxv_router_binding(context.session, router_id)
+            nsxv_db.delete_nsxv_router_binding(context.session, router_id)
 
     def is_router_conflict_on_edge(self, context, router_id,
                                    conflict_router_ids,
@@ -2156,9 +2153,7 @@ def get_dhcp_binding_for_binding_id(nsxv_manager, edge_id, binding_id):
     ver = nsxv_manager.vcns.get_version()
     if c_utils.is_nsxv_dhcp_binding_supported(ver):
         return _get_dhcp_binding(nsxv_manager, edge_id, binding_id)
-    else:
-        return _get_dhcp_binding_for_binding_id(nsxv_manager, edge_id,
-                                                binding_id)
+    return _get_dhcp_binding_for_binding_id(nsxv_manager, edge_id, binding_id)
 
 
 def query_dhcp_service_config(nsxv_manager, edge_id):

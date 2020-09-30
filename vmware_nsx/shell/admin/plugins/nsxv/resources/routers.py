@@ -183,9 +183,8 @@ def nsx_recreate_router_or_edge(resource, event, trigger, **kwargs):
     if old_edge_id:
         LOG.info("ReCreating NSXv Router Edge: %s", old_edge_id)
         return nsx_recreate_router_edge(old_edge_id)
-    else:
-        LOG.info("ReCreating NSXv Router: %s", router_id)
-        return nsx_recreate_router(router_id)
+    LOG.info("ReCreating NSXv Router: %s", router_id)
+    return nsx_recreate_router(router_id)
 
 
 @admin_utils.output_header

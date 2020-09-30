@@ -57,12 +57,11 @@ class NsxvIpamDriver(common.NsxAbstractIpamDriver, common.NsxIpamBase):
         """Return True if the network of the request is an ipv6 network"""
         if isinstance(subnet_request, ipam_req.SpecificSubnetRequest):
             return subnet_request.subnet_cidr.version == 6
-        else:
-            if subnet_request.allocation_pools:
-                for pool in subnet_request.allocation_pools:
-                    if pool.version == 6:
-                        return True
-            return False
+        if subnet_request.allocation_pools:
+            for pool in subnet_request.allocation_pools:
+                if pool.version == 6:
+                    return True
+        return False
 
     def _is_supported_net(self, subnet_request):
         """This driver supports only ipv4 external/provider networks"""

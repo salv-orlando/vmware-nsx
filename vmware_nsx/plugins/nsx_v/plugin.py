@@ -840,11 +840,10 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         if bindings:
             if not multiprovider:
                 return bindings[0].binding_type in net_types
-            else:
-                for binding in bindings:
-                    if binding.binding_type not in net_types:
-                        return False
-                return True
+            for binding in bindings:
+                if binding.binding_type not in net_types:
+                    return False
+            return True
         return False
 
     def _extend_network_dict_provider(self, context, network,
@@ -896,7 +895,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
         if not context.is_admin:
             return subnet
-        elif fields and as_providers.ADV_SERVICE_PROVIDERS in fields:
+        if fields and as_providers.ADV_SERVICE_PROVIDERS in fields:
             subnet[as_providers.ADV_SERVICE_PROVIDERS] = (
                 self._get_subnet_as_providers(context, subnet))
         return subnet
@@ -1187,9 +1186,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
     def _get_physical_network(self, network_type, net_data):
         if network_type == c_utils.NsxVNetworkTypes.VXLAN:
             return self._get_network_vdn_scope_id(net_data)
-        else:
-            # Use the dvs_id of the availability zone
-            return self._get_network_az_dvs_id(net_data)
+        # Use the dvs_id of the availability zone
+        return self._get_network_az_dvs_id(net_data)
 
     def _generate_segment_id(self, context, physical_network, net_data):
         bindings = nsxv_db.get_network_bindings_by_physical_net(

@@ -140,7 +140,7 @@ class ApiClientBase(object, metaclass=abc.ABCMeta):
                       {'rid': rid,
                        'conn': api_client.ctrl_conn_to_str(http_conn)})
             return
-        elif hasattr(http_conn, "no_release"):
+        if hasattr(http_conn, "no_release"):
             return
 
         priority = http_conn.priority

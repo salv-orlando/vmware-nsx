@@ -421,7 +421,7 @@ class NSXv3IPsecVpnDriver(common_driver.NSXcommonIPsecVpnDriver):
             # VPNaaS connection status should be ACTIVE or DOWN
             if status == 'UP':
                 return 'ACTIVE'
-            elif status == 'DOWN' or status == 'DEGRADED':
+            if status == 'DOWN' or status == 'DEGRADED':
                 return 'DOWN'
 
     def _delete_session(self, session_id):

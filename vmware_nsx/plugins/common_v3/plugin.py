@@ -248,9 +248,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.warning("Skipping tag %s for port %s: wrong format",
                         external_tag, port_id)
             return {}
-        else:
-            return {'scope': tag_parts[0][:nsxlib_utils.MAX_RESOURCE_TYPE_LEN],
-                    'tag': tag_parts[1][:nsxlib_utils.MAX_TAG_LEN]}
+        return {'scope': tag_parts[0][:nsxlib_utils.MAX_RESOURCE_TYPE_LEN],
+                'tag': tag_parts[1][:nsxlib_utils.MAX_TAG_LEN]}
 
     def _translate_external_tags(self, external_tags, port_id):
         new_tags = []
@@ -1310,8 +1309,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if not network.get(pnet.PHYSICAL_NETWORK):
             az = self.get_network_az(network)
             return az._default_tier0_router
-        else:
-            return network.get(pnet.PHYSICAL_NETWORK)
+        return network.get(pnet.PHYSICAL_NETWORK)
 
     def _validate_router_tz(self, context, tier0_uuid, subnets):
         """Ensure the related GW (Tier0 router) belongs to the same TZ
@@ -2277,8 +2275,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
              not self.use_policy_dhcp)):
             return self._create_bulk_with_callback('subnet', context, subnets,
                                                    _post_create, _rollback)
-        else:
-            return self._create_bulk('subnet', context, subnets)
+        return self._create_bulk('subnet', context, subnets)
 
     def _get_neutron_net_ids_by_nsx_id(self, context, nsx_id):
         """Should be implemented by each plugin"""

@@ -241,10 +241,9 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         plugin = self.get_plugin_by_type(plugin_type)
         if plugin:
             return plugin._get_octavia_objects()
-        else:
-            return {'loadbalancer': None, 'listener': None, 'pool': None,
-                    'member': None, 'healthmonitor': None, 'l7policy': None,
-                    'l7rule': None}
+        return {'loadbalancer': None, 'listener': None, 'pool': None,
+                'member': None, 'healthmonitor': None, 'l7policy': None,
+                'l7rule': None}
 
     def init_complete(self, resource, event, trigger, payload=None):
         with locking.LockManager.get_lock('plugin-init-complete-tvd'):
@@ -548,19 +547,18 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 if subnets:
                     return subnets
             return []
-        else:
-            # Read project plugin to filter relevant projects according to
-            # plugin
-            req_p = self._get_plugin_for_request(context, filters)
-            filters = filters or {}
-            subnets = super(NsxTVDPlugin, self).get_subnets(
-                context, filters=filters, fields=fields, sorts=sorts,
-                limit=limit, marker=marker, page_reverse=page_reverse)
-            for subnet in subnets[:]:
-                p = self._get_plugin_from_project(context, subnet['tenant_id'])
-                if req_p and p != req_p:
-                    subnets.remove(subnet)
-            return subnets
+        # Read project plugin to filter relevant projects according to
+        # plugin
+        req_p = self._get_plugin_for_request(context, filters)
+        filters = filters or {}
+        subnets = super(NsxTVDPlugin, self).get_subnets(
+            context, filters=filters, fields=fields, sorts=sorts,
+            limit=limit, marker=marker, page_reverse=page_reverse)
+        for subnet in subnets[:]:
+            p = self._get_plugin_from_project(context, subnet['tenant_id'])
+            if req_p and p != req_p:
+                subnets.remove(subnet)
+        return subnets
 
     def delete_subnet(self, context, id):
         p = self._get_subnet_plugin_by_id(context, id)
@@ -903,8 +901,7 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         data = nsx_db.get_project_plugin_mapping(context.session, id)
         if data:
             return self._get_project_plugin_dict(data)
-        else:
-            raise n_exc.ObjectNotFound(id=id)
+        raise n_exc.ObjectNotFound(id=id)
 
     def get_project_plugin_maps(self, context, filters=None, fields=None,
                                 sorts=None, limit=None, marker=None,

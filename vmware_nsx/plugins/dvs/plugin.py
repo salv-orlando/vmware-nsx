@@ -188,10 +188,9 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
     def _dvs_get_id(self, net_data):
         if net_data['name'] == '':
             return net_data['id']
-        else:
-            # Maximum name length is 80 characters. 'id' length is 36
-            # maximum prefix for name is 43
-            return '%s-%s' % (net_data['name'][:43], net_data['id'])
+        # Maximum name length is 80 characters. 'id' length is 36
+        # maximum prefix for name is 43
+        return '%s-%s' % (net_data['name'][:43], net_data['id'])
 
     def _add_port_group(self, dvs_id, net_data, vlan_tag, trunk_mode):
         if validators.is_attr_set(net_data.get(pnet.PHYSICAL_NETWORK)):

@@ -122,8 +122,7 @@ class EventletApiRequest(request.ApiRequest):
             LOG.info('[%d] Request timeout.', self._rid())
             self._request_error = Exception(_('Request timeout'))
             return None
-        else:
-            return self._handle_request()
+        return self._handle_request()
 
     def _handle_request(self):
         '''First level request handling.'''

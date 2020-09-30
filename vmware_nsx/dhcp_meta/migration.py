@@ -123,14 +123,13 @@ class MigrationManager(object):
         count = len(subnets)
         if count == 0:
             return None
-        elif count == 1 and subnets[0]['cidr'] == rpc.METADATA_SUBNET_CIDR:
+        if count == 1 and subnets[0]['cidr'] == rpc.METADATA_SUBNET_CIDR:
             reason = _("Cannot migrate a 'metadata' network")
             raise n_exc.BadRequest(resource='network', msg=reason)
-        elif count > 1:
+        if count > 1:
             reason = _("Unable to support multiple subnets per network")
             raise p_exc.LsnMigrationConflict(net_id=network_id, reason=reason)
-        else:
-            return subnets[0]
+        return subnets[0]
 
     def migrate(self, context, network_id, subnet=None):
         """Migrate subnet resources to LSN."""

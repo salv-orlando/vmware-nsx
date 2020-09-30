@@ -65,17 +65,17 @@ def get_router_from_network(context, plugin, subnet_id):
 def get_lb_flavor_size(flavor_plugin, context, flavor_id):
     if not flavor_id:
         return lb_const.DEFAULT_LB_SIZE
-    else:
-        flavor = flavors_plugin.FlavorsPlugin.get_flavor(
-            flavor_plugin, context, flavor_id)
-        flavor_size = flavor['name']
-        if flavor_size in lb_const.LB_FLAVOR_SIZES:
-            return flavor_size.upper()
-        else:
-            err_msg = (_("Invalid flavor size %(flavor)s, only 'small', "
-                         "'medium', or 'large' are supported") %
-                       {'flavor': flavor_size})
-            raise n_exc.InvalidInput(error_message=err_msg)
+
+    flavor = flavors_plugin.FlavorsPlugin.get_flavor(
+        flavor_plugin, context, flavor_id)
+    flavor_size = flavor['name']
+    if flavor_size in lb_const.LB_FLAVOR_SIZES:
+        return flavor_size.upper()
+
+    err_msg = (_("Invalid flavor size %(flavor)s, only 'small', "
+                 "'medium', or 'large' are supported") %
+               {'flavor': flavor_size})
+    raise n_exc.InvalidInput(error_message=err_msg)
 
 
 @log_helpers.log_method_call
@@ -97,8 +97,7 @@ def validate_lb_subnet(context, plugin, subnet_id):
         context, plugin, subnet_id)
     if network.get('router:external') or valid_router:
         return True
-    else:
-        return False
+    return False
 
 
 @log_helpers.log_method_call
@@ -125,14 +124,11 @@ def validate_lb_member_subnet(context, plugin, subnet_id, lb):
         # Lb on non-external network. member must be on the same router
         if lb_router_id == member_router_id:
             return True
-        else:
-            return False
-    else:
-        # LB on external network. member subnet must have a router
-        if member_router_id:
-            return True
-        else:
-            return False
+        return False
+    # LB on external network. member subnet must have a router
+    if member_router_id:
+        return True
+    return False
 
 
 def get_rule_match_conditions(policy):
@@ -321,11 +317,10 @@ def setup_session_persistence(nsxlib, pool, pool_tags,
                        'pool_id': pool['id']})
             pp_client.update(persistence_profile_id, **pp_kwargs)
             return persistence_profile_id, None
-        else:
-            # Prepare removal of persistence profile
-            return (None, functools.partial(delete_persistence_profile,
-                                            nsxlib, persistence_profile_id))
-    elif pers_type:
+        # Prepare removal of persistence profile
+        return (None, functools.partial(delete_persistence_profile,
+                                        nsxlib, persistence_profile_id))
+    if pers_type:
         # Create persistence profile
         pp_data = pp_client.create(**pp_kwargs)
         LOG.debug("Created persistence profile %(profile_id)s for "

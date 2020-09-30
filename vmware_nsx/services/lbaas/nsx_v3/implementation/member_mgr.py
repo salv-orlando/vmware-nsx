@@ -37,10 +37,9 @@ class EdgeMemberManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         if floating_ips:
             return (floating_ips[0]['fixed_ip_address'],
                     floating_ips[0]['router_id'])
-        else:
-            msg = (_('Member IP %(fip)s is an external IP, and is expected to '
-                     'be a floating IP') % {'fip': fip})
-            raise n_exc.BadRequest(resource='lbaas-vip', msg=msg)
+        msg = (_('Member IP %(fip)s is an external IP, and is expected to '
+                 'be a floating IP') % {'fip': fip})
+        raise n_exc.BadRequest(resource='lbaas-vip', msg=msg)
 
     def _get_updated_pool_members(self, context, lb_pool, member):
         network = lb_utils.get_network_from_subnet(

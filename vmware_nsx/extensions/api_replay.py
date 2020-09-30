@@ -90,8 +90,7 @@ class Api_replay(extensions.ExtensionDescriptor):
     def get_extended_resources(self, version):
         if version == "2.0":
             return RESOURCE_ATTRIBUTE_MAP
-        else:
-            return {}
+        return {}
 
     def get_required_extensions(self):
         # make sure this extension is called after those, so our change

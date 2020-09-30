@@ -136,15 +136,14 @@ def _validate_plugin_choice(selected_plugin, nsx_plugin):
                 sys.exit(1)
             # use nsxv or nsxv3 plugins
             return selected_plugin
-        else:
-            # use the TVD pluging
-            return nsx_plugin
-    else:
-        if selected_plugin:
-            LOG.error('Cannot select plugin. The current plugin is %s',
-                      nsx_plugin)
-            sys.exit(1)
+        # use the TVD pluging
         return nsx_plugin
+
+    if selected_plugin:
+        LOG.error('Cannot select plugin. The current plugin is %s',
+                  nsx_plugin)
+        sys.exit(1)
+    return nsx_plugin
 
 
 def main(argv=sys.argv[1:]):

@@ -316,9 +316,9 @@ def _get_choices():
     plugin = get_plugin()
     if plugin == 'nsxv3':
         return nsxv3_resources_names
-    elif plugin == 'nsxv':
+    if plugin == 'nsxv':
         return nsxv_resources_names
-    elif plugin == 'nsxtvd':
+    if plugin == 'nsxtvd':
         return nsxtvd_resources_names
 
 
@@ -326,9 +326,9 @@ def _get_resources():
     plugin = get_plugin()
     if plugin == 'nsxv3':
         return 'NSX-V3 resources: %s' % (', '.join(nsxv3_resources_names))
-    elif plugin == 'nsxv':
+    if plugin == 'nsxv':
         return 'NSX-V resources: %s' % (', '.join(nsxv_resources_names))
-    elif plugin == 'nsxtvd':
+    if plugin == 'nsxtvd':
         return 'NSX-TVD resources: %s' % (', '.join(nsxtvd_resources_names))
 
 

@@ -55,8 +55,7 @@ def filter_plugins(cls):
                 context.session, project_id)
         if mapping:
             return mapping['plugin']
-        else:
-            raise exceptions.ObjectNotFound(id=project_id)
+        raise exceptions.ObjectNotFound(id=project_id)
 
     def add_separate_plugin_hook(name):
         orig_method = getattr(cls, name, None)
