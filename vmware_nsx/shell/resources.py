@@ -81,9 +81,9 @@ ops = [op.value for op in Operations]
 
 
 class Resource(object):
-    def __init__(self, name, ops):
+    def __init__(self, name, ops_obj):
         self.name = name
-        self.supported_ops = ops
+        self.supported_ops = ops_obj
 
 
 # Add supported NSX-V3 resources in this dictionary

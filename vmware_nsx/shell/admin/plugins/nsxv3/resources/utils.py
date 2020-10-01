@@ -85,9 +85,9 @@ def get_connected_nsxlib(nsx_username=None, nsx_password=None,
     return _NSXLIB
 
 
-def get_plugin_filters(context):
+def get_plugin_filters(ctx):
     return admin_utils.get_plugin_filters(
-        context, projectpluginmap.NsxPlugins.NSX_T)
+        ctx, projectpluginmap.NsxPlugins.NSX_T)
 
 
 class NeutronDbClient(db_base_plugin_v2.NeutronDbPluginV2):
@@ -112,15 +112,15 @@ class NeutronDbClient(db_base_plugin_v2.NeutronDbPluginV2):
         return super(NeutronDbClient, self).get_networks(
             self.context, filters=filters, fields=fields)
 
-    def get_network(self, context, network_id):
-        if not context:
-            context = self.context
-        return super(NeutronDbClient, self).get_network(context, network_id)
+    def get_network(self, ctx, network_id):
+        if not ctx:
+            ctx = self.context
+        return super(NeutronDbClient, self).get_network(ctx, network_id)
 
-    def get_subnet(self, context, subnet_id):
-        if not context:
-            context = self.context
-        return super(NeutronDbClient, self).get_subnet(context, subnet_id)
+    def get_subnet(self, ctx, subnet_id):
+        if not ctx:
+            ctx = self.context
+        return super(NeutronDbClient, self).get_subnet(ctx, subnet_id)
 
     def get_lswitch_and_lport_id(self, port_id):
         return nsx_db.get_nsx_switch_and_port_id(self.context.session, port_id)
@@ -196,24 +196,24 @@ class NsxV3PluginWrapper(plugin.NsxV3Plugin):
     def _init_dhcp_metadata(self):
         pass
 
-    def _extend_get_network_dict_provider(self, context, net):
-        self._extend_network_dict_provider(context, net)
+    def _extend_get_network_dict_provider(self, ctx, net):
+        self._extend_network_dict_provider(ctx, net)
         # skip getting the Qos policy ID because get_object calls
         # plugin init again on admin-util environment
 
-    def _extend_get_port_dict_binding(self, context, port):
-        self._extend_port_dict_binding(context, port)
+    def _extend_get_port_dict_binding(self, ctx, port):
+        self._extend_port_dict_binding(ctx, port)
         # skip getting the Qos policy ID because get_object calls
         # plugin init again on admin-util environment
 
-    def delete_network(self, context, network_id):
-        if not context:
-            context = self.context
+    def delete_network(self, ctx, network_id):
+        if not ctx:
+            ctx = self.context
         return super(NsxV3PluginWrapper, self).delete_network(
-            context, network_id)
+            ctx, network_id)
 
-    def remove_router_interface(self, context, router_id, interface):
-        if not context:
-            context = self.context
+    def remove_router_interface(self, ctx, router_id, interface):
+        if not ctx:
+            ctx = self.context
         return super(NsxV3PluginWrapper, self).remove_router_interface(
-            context, router_id, interface)
+            ctx, router_id, interface)

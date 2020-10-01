@@ -25,4 +25,3 @@ class NsxV3QosNotificationDriver(
     """
     # The message queue is no longer needed in Pike.
     # Keeping this class for a while for existing configurations.
-    pass

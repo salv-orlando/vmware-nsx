@@ -160,8 +160,8 @@ class DhcpMetadataAccess(object):
         report = self.migration_manager.report(context, network_id)
         return {'network': network_id, 'report': report}
 
-    def create_lsn(self, context, lsn):
-        network_id = lsn['lsn']['network']
+    def create_lsn(self, context, lsn_data):
+        network_id = lsn_data['lsn']['network']
         subnet = self.migration_manager.validate(context, network_id)
         subnet_id = None if not subnet else subnet['id']
         self.migration_manager.migrate(context, network_id, subnet)

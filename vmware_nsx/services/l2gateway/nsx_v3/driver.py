@@ -218,11 +218,11 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
 
     def _prevent_l2gw_port_delete(self, resource, event,
                                   trigger, payload=None):
-        context = payload.context
+        ctx = payload.context
         port_id = payload.resource_id
         port_check = payload.metadata['port_check']
         if port_check:
-            self.prevent_l2gw_port_deletion(context, port_id)
+            self.prevent_l2gw_port_deletion(ctx, port_id)
 
     def _validate_device_list(self, devices, check_backend=True):
         # In NSXv3, one L2 gateway is mapped to one bridge endpoint profle.
@@ -254,35 +254,35 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
                     "gateway driver")
             raise n_exc.InvalidInput(error_message=msg)
 
-    def create_l2_gateway(self, context, l2_gateway):
+    def create_l2_gateway(self, ctx, l2_gateway):
         """Create a logical L2 gateway."""
         gw = l2_gateway[self.gateway_resource]
         devices = gw['devices']
         self._validate_device_list(devices)
 
-    def create_l2_gateway_precommit(self, context, l2_gateway):
+    def create_l2_gateway_precommit(self, ctx, l2_gateway):
         pass
 
-    def create_l2_gateway_postcommit(self, context, l2_gateway):
+    def create_l2_gateway_postcommit(self, ctx, l2_gateway):
         pass
 
-    def update_l2_gateway_precommit(self, context, l2_gateway):
+    def update_l2_gateway_precommit(self, ctx, l2_gateway):
         pass
 
-    def update_l2_gateway_postcommit(self, context, l2_gateway):
+    def update_l2_gateway_postcommit(self, ctx, l2_gateway):
         pass
 
-    def delete_l2_gateway(self, context, l2_gateway_id):
+    def delete_l2_gateway(self, ctx, l2_gateway_id):
         pass
 
-    def delete_l2_gateway_precommit(self, context, l2_gateway_id):
+    def delete_l2_gateway_precommit(self, ctx, l2_gateway_id):
         pass
 
-    def delete_l2_gateway_postcommit(self, context, l2_gateway_id):
+    def delete_l2_gateway_postcommit(self, ctx, l2_gateway_id):
         pass
 
-    def _validate_network(self, context, network_id):
-        network = self._core_plugin.get_network(context, network_id)
+    def _validate_network(self, ctx, network_id):
+        network = self._core_plugin.get_network(ctx, network_id)
         network_type = network.get(providernet.NETWORK_TYPE)
         # If network is a provider network, verify whether it is of type GENEVE
         if network_type and network_type != nsx_utils.NsxV3NetworkTypes.GENEVE:
@@ -295,40 +295,40 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
             raise l2gw_exc.L2GatewaySegmentationRequired
         return plugin_utils.is_valid_vlan_tag(seg_id)
 
-    def create_l2_gateway_connection(self, context, l2_gateway_connection):
+    def create_l2_gateway_connection(self, ctx, l2_gateway_connection):
         gw_connection = l2_gateway_connection.get(self.connection_resource)
         network_id = gw_connection.get(l2gw_const.NETWORK_ID)
-        self._validate_network(context, network_id)
+        self._validate_network(ctx, network_id)
 
-    def _get_bep(self, context, l2gw_id):
+    def _get_bep(self, ctx, l2gw_id):
         # In NSXv3, there will be only one device configured per L2 gateway.
         # The name of the device shall carry the bridge endpoint profile id.
-        devices = self._get_l2_gateway_devices(context, l2gw_id)
+        devices = self._get_l2_gateway_devices(ctx, l2gw_id)
         return devices[0].get('device_name')
 
-    def _get_conn_parameters(self, context, gw_connection):
-        """Return interface and segmenantion id for a connection. """
+    def _get_conn_parameters(self, ctx, gw_connection):
+        """Return interface and segmentation id for a connection. """
         if not gw_connection:
             return
         l2gw_id = gw_connection.get(l2gw_const.L2GATEWAY_ID)
         seg_id = gw_connection.get(l2gw_const.SEG_ID)
-        devices = self._get_l2_gateway_devices(context, l2gw_id)
+        devices = self._get_l2_gateway_devices(ctx, l2gw_id)
         # TODO(salv-orlando): support more than a single interface
-        interface = self._get_l2_gw_interfaces(context, devices[0]['id'])[0]
+        interface = self._get_l2_gw_interfaces(ctx, devices[0]['id'])[0]
         if not seg_id:
             # Seg-id was not passed as part of connection-create. Retrieve
             # seg-id from L2 gateway's interface.
             seg_id = interface.get('segmentation_id')
         return interface['interface_name'], seg_id
 
-    def create_l2_gateway_connection_precommit(self, context, gw_connection):
+    def create_l2_gateway_connection_precommit(self, ctx, gw_connection):
         """Validate the L2 gateway connection
         Do not allow another connection with the same bride cluster and seg_id
         """
-        admin_ctx = context.elevated()
+        admin_ctx = ctx.elevated()
         nsxlib = self._core_plugin.nsxlib
         l2gw_id = gw_connection.get(l2gw_const.L2GATEWAY_ID)
-        devices = self._get_l2_gateway_devices(context, l2gw_id)
+        devices = self._get_l2_gateway_devices(ctx, l2gw_id)
         bep_id = devices[0].get('device_name')
         # Check for bridge endpoint profile existence
         # if bridge endpoint profile is not found, this is likely an old
@@ -379,23 +379,23 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
                             'bep_id': bep_id})
                     raise n_exc.InvalidInput(error_message=msg)
 
-    def create_l2_gateway_connection_postcommit(self, context, gw_connection):
+    def create_l2_gateway_connection_postcommit(self, ctx, gw_connection):
         """Create a L2 gateway connection on the backend"""
         nsxlib = self._core_plugin.nsxlib
         l2gw_id = gw_connection.get(l2gw_const.L2GATEWAY_ID)
         network_id = gw_connection.get(l2gw_const.NETWORK_ID)
-        device_name = self._get_bep(context, l2gw_id)
+        device_name = self._get_bep(ctx, l2gw_id)
         interface_name, seg_id = self._get_conn_parameters(
-            context, gw_connection)
+            ctx, gw_connection)
         self._validate_segment_id(seg_id)
         tenant_id = gw_connection['tenant_id']
-        if context.is_admin and not tenant_id:
-            tenant_id = context.tenant_id
+        if ctx.is_admin and not tenant_id:
+            tenant_id = ctx.tenant_id
             gw_connection['tenant_id'] = tenant_id
         try:
             tags = nsxlib.build_v3_tags_payload(
                 gw_connection, resource_type='os-neutron-l2gw-id',
-                project_name=context.tenant_name)
+                project_name=ctx.tenant_name)
             bridge_endpoint = nsxlib.bridge_endpoint.create(
                 device_name=device_name,
                 vlan_transport_zone_id=interface_name,
@@ -420,11 +420,11 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
         try:
             #TODO(abhiraut): Consider adding UT for port check once UTs are
             #                refactored
-            port = self._core_plugin.create_port(context, port_dict,
+            port = self._core_plugin.create_port(ctx, port_dict,
                                                  l2gw_port_check=True)
             # Deallocate IP address from the port.
             for fixed_ip in port.get('fixed_ips', []):
-                self._core_plugin._delete_ip_allocation(context, network_id,
+                self._core_plugin._delete_ip_allocation(ctx, network_id,
                                                         fixed_ip['subnet_id'],
                                                         fixed_ip['ip_address'])
             LOG.debug("IP addresses deallocated on port %s", port['id'])
@@ -437,14 +437,14 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
                     bridge_endpoint['id'])
                 super(NsxV3Driver,
                       self).delete_l2_gateway_connection(
-                          context,
+                          ctx,
                           gw_connection['id'])
 
         try:
-            with db_api.CONTEXT_WRITER.using(context):
+            with db_api.CONTEXT_WRITER.using(ctx):
                 # Update neutron's database with the mappings.
                 nsx_db.add_l2gw_connection_mapping(
-                    session=context.session,
+                    session=ctx.session,
                     connection_id=gw_connection['id'],
                     bridge_endpoint_id=bridge_endpoint['id'],
                     port_id=port['id'])
@@ -453,7 +453,7 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
                 # from the device spec
                 if seg_id and not gw_connection.get(l2gw_const.SEG_ID):
                     conn_db = self._plugin._get_l2_gateway_connection(
-                        context, gw_connection['id'])
+                        ctx, gw_connection['id'])
                     conn_db['segmentation_id'] = seg_id
                     # Ensure the object is updated as well so the
                     # create response returns the segmentation_id
@@ -469,20 +469,20 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
                     bridge_endpoint['id'])
                 super(NsxV3Driver,
                       self).delete_l2_gateway_connection(
-                          context,
+                          ctx,
                           gw_connection['id'])
         return gw_connection
 
-    def delete_l2_gateway_connection_postcommit(self, context, gw_connection):
+    def delete_l2_gateway_connection_postcommit(self, ctx, gw_connection):
         pass
 
-    def delete_l2_gateway_connection_precommit(self, context, gw_connection):
+    def delete_l2_gateway_connection_precommit(self, ctx, gw_connection):
         pass
 
-    def delete_l2_gateway_connection(self, context, gw_connection):
+    def delete_l2_gateway_connection(self, ctx, gw_connection):
         """Delete a L2 gateway connection."""
         conn_mapping = nsx_db.get_l2gw_connection_mapping(
-            session=context.session,
+            session=ctx.session,
             connection_id=gw_connection)
         if not conn_mapping:
             LOG.error("Unable to delete gateway connection %(id)s: mapping "
@@ -491,7 +491,7 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
             return
         bridge_endpoint_id = conn_mapping.get('bridge_endpoint_id')
         # Delete the logical port from the bridge endpoint.
-        self._core_plugin.delete_port(context=context,
+        self._core_plugin.delete_port(context=ctx,
                                       port_id=conn_mapping.get('port_id'),
                                       l2gw_port_check=False)
         try:
@@ -503,20 +503,18 @@ class NsxV3Driver(l2gateway_db.L2GatewayMixin):
             raise l2gw_exc.L2GatewayServiceDriverError(
                 method='delete_l2_gateway_connection')
 
-    def prevent_l2gw_port_deletion(self, context, port_id):
+    def prevent_l2gw_port_deletion(self, ctx, port_id):
         """Prevent core plugin from deleting L2 gateway port."""
         try:
-            port = self._core_plugin.get_port(context, port_id)
+            port = self._core_plugin.get_port(ctx, port_id)
         except n_exc.PortNotFound:
             return
         if port['device_owner'] == nsx_constants.BRIDGE_ENDPOINT:
             reason = _("has device owner %s") % port['device_owner']
             raise n_exc.ServicePortInUse(port_id=port_id, reason=reason)
 
-    def add_port_mac(self, context, port_dict):
+    def add_port_mac(self, ctx, port_dict):
         """Process a created Neutron port."""
-        pass
 
-    def delete_port_mac(self, context, port):
+    def delete_port_mac(self, ctx, port):
         """Process a deleted Neutron port."""
-        pass

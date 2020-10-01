@@ -162,12 +162,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                  tenant_name, tenant_domain_id,
                                  password, auth_url)
         endpoint = sess.get_endpoint(service_type='load-balancer')
-        client = octavia.OctaviaAPI(
+        client_obj = octavia.OctaviaAPI(
             session=sess,
             service_type='load-balancer',
             endpoint=endpoint,
         )
-        return client
+        return client_obj
 
     def find_subnet_by_id(self, subnet_id, subnets):
         for subnet in subnets:

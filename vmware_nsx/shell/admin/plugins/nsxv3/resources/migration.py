@@ -1063,11 +1063,11 @@ def migrate_edge_firewalls(nsxlib, nsxpolicy, plugin):
             # Make sure fwaas is considered as enabled
             self.fwaas_enabled = True
 
-        def _get_port_firewall_group_id(self, context, port_id):
+        def _get_port_firewall_group_id(self, ctx, port_id):
             # Override this api because directory.get_plugin does not work from
             # admin utils context.
             driver_db = firewall_db_v2.FirewallPluginDb()
-            return driver_db.get_fwg_attached_to_port(context, port_id)
+            return driver_db.get_fwg_attached_to_port(ctx, port_id)
 
     fwaas_callbacks = MigrationNsxpFwaasCallbacks(False)
     plugin.nsxpolicy = nsxpolicy

@@ -2499,7 +2499,7 @@ def get_loglevel_modifier(module, level):
     return wrapper
 
 
-def update_edge_loglevel(vcns, edge_id, module, level):
+def update_edge_loglevel(vcns_obj, edge_id, module, level):
     """Update loglevel on edge for specified module"""
     if module not in SUPPORTED_EDGE_LOG_MODULES:
         LOG.error("Unrecognized logging module %s - ignored", module)
@@ -2509,19 +2509,18 @@ def update_edge_loglevel(vcns, edge_id, module, level):
         LOG.error("Unrecognized log level %s - ignored", level)
         return
 
-    vcns.update_edge_config_with_modifier(edge_id, module,
-                                          get_loglevel_modifier(module,
-                                                                level))
+    vcns_obj.update_edge_config_with_modifier(
+        edge_id, module, get_loglevel_modifier(module, level))
 
 
-def update_edge_host_groups(vcns, edge_id, dvs, availability_zone,
+def update_edge_host_groups(vcns_obj, edge_id, dvs_obj, availability_zone,
                             validate=False):
     # Update edge DRS host groups
-    h, appliances = vcns.get_edge_appliances(edge_id)
+    h, appliances = vcns_obj.get_edge_appliances(edge_id)
     vms = [appliance['vmId']
            for appliance in appliances['appliances']]
     if validate:
-        configured_vms = dvs.get_configured_vms(
+        configured_vms = dvs_obj.get_configured_vms(
             availability_zone.resource_pool,
             availability_zone.edge_host_groups)
         for vm in vms:
@@ -2539,7 +2538,7 @@ def update_edge_host_groups(vcns, edge_id, dvs, availability_zone,
                                  len(vms)))
         random.shuffle(vms)
     try:
-        dvs.update_cluster_edge_failover(
+        dvs_obj.update_cluster_edge_failover(
             availability_zone.resource_pool,
             vms, availability_zone.edge_host_groups)
     except Exception as e:
@@ -2550,11 +2549,11 @@ def update_edge_host_groups(vcns, edge_id, dvs, availability_zone,
                    'e': e})
 
 
-def clean_host_groups(dvs, availability_zone):
+def clean_host_groups(dvs_obj, availability_zone):
     try:
         LOG.info('Cleaning up host groups for AZ %s',
                  availability_zone.name)
-        dvs.cluster_host_group_cleanup(
+        dvs_obj.cluster_host_group_cleanup(
             availability_zone.resource_pool,
             availability_zone.edge_host_groups)
     except Exception as e:

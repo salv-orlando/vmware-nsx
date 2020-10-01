@@ -1751,17 +1751,17 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         # and therefore, the spoofguard policy is being removed for this net.
         orig_net = self.get_network(context, id)
         if not net_attrs[psec.PORTSECURITY]:
-            sg_policy = nsxv_db.get_spoofguard_policy_id(context.session,
-                                                         orig_net['id'])
-            if sg_policy:
+            sg_pol = nsxv_db.get_spoofguard_policy_id(context.session,
+                                                      orig_net['id'])
+            if sg_pol:
                 try:
-                    self.nsx_v.vcns.delete_spoofguard_policy(sg_policy)
+                    self.nsx_v.vcns.delete_spoofguard_policy(sg_pol)
                     nsxv_db.del_nsxv_spoofguard_binding(context.session,
-                                                        sg_policy)
+                                                        sg_pol)
                 except Exception as e:
                     LOG.error('Unable to delete spoofguard policy '
                               '%(sg_policy)s. Error: %(e)s',
-                              {'sg_policy': sg_policy, 'e': e})
+                              {'sg_policy': sg_pol, 'e': e})
             else:
                 LOG.warning("Could not locate spoofguard policy for "
                             "network %s", id)
@@ -4380,15 +4380,15 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                                               context,
                                               securitygroup,
                                               nsx_sg_id):
-        logging = (cfg.CONF.nsxv.log_security_groups_allowed_traffic or
-                   securitygroup[sg_logging.LOGGING])
+        logged = (cfg.CONF.nsxv.log_security_groups_allowed_traffic or
+                  securitygroup[sg_logging.LOGGING])
         action = 'deny' if securitygroup[provider_sg.PROVIDER] else 'allow'
         section_name = self.nsx_sg_utils.get_nsx_section_name(securitygroup)
         nsx_rules = []
         # Translate Neutron rules to NSXv fw rules and construct the fw section
         for rule in securitygroup['security_group_rules']:
             nsx_rule = self._create_nsx_rule(
-                context, rule, nsx_sg_id, logged=logging, action=action)
+                context, rule, nsx_sg_id, logged=logged, action=action)
             nsx_rules.append(nsx_rule)
         section = self.nsx_sg_utils.get_section_with_rules(
             section_name, nsx_rules)
@@ -4798,7 +4798,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         with locking.LockManager.get_lock('rule-update-%s' % sg_id):
             # Querying DB for associated dfw section id
             section_uri = self._get_section_uri(context.session, sg_id)
-            logging = self._is_security_group_logged(context, sg_id)
+            logged = self._is_security_group_logged(context, sg_id)
             provider = self._is_provider_security_group(context, sg_id)
             log_all_rules = cfg.CONF.nsxv.log_security_groups_allowed_traffic
 
@@ -4812,7 +4812,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 ruleids.add(rule['id'])
                 nsx_rules.append(
                     self._create_nsx_rule(context, rule,
-                                        logged=log_all_rules or logging,
+                                        logged=log_all_rules or logged,
                                         action='deny' if provider else 'allow')
                 )
 

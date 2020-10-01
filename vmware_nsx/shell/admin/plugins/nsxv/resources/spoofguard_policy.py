@@ -34,13 +34,13 @@ nsxv = utils.get_nsxv_client()
 
 
 def get_spoofguard_policies():
-    nsxv = utils.get_nsxv_client()
-    return nsxv.get_spoofguard_policies()[1].get("policies")
+    nsxv_c = utils.get_nsxv_client()
+    return nsxv_c.get_spoofguard_policies()[1].get("policies")
 
 
 def get_spoofguard_policy_data(policy_id):
-    nsxv = utils.get_nsxv_client()
-    return nsxv.get_spoofguard_policy_data(policy_id)[1].get(
+    nsxv_c = utils.get_nsxv_client()
+    return nsxv_c.get_spoofguard_policy_data(policy_id)[1].get(
         'spoofguardList', [])
 
 

@@ -32,14 +32,13 @@ from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 from vmware_nsx.shell import resources as shell
 
 LOG = logging.getLogger(__name__)
-nsxv = utils.get_nsxv_client()
 network_types = ['Network', 'VirtualWire', 'DistributedVirtualPortgroup']
 PORTGROUP_PREFIX = 'dvportgroup'
 
 
 def get_networks_from_backend():
-    nsxv = utils.get_nsxv_client()
-    so_list = nsxv.get_scoping_objects()
+    nsxv_c = utils.get_nsxv_client()
+    so_list = nsxv_c.get_scoping_objects()
     return et.fromstring(so_list)
 
 
@@ -76,7 +75,7 @@ def neutron_list_networks(resource, event, trigger,
 
 @admin_utils.output_header
 def nsx_update_switch(resource, event, trigger, **kwargs):
-    nsxv = utils.get_nsxv_client()
+    nsxv_c = utils.get_nsxv_client()
     if not kwargs.get('property'):
         LOG.error("Need to specify dvs-id parameter and "
                   "attribute to update. Add --property dvs-id=<dvs-id> "
@@ -89,7 +88,7 @@ def nsx_update_switch(resource, event, trigger, **kwargs):
                   "Add --property dvs-id=<dvs-id>")
         return
     try:
-        h, switch = nsxv.get_vdn_switch(dvs_id)
+        h, switch = nsxv_c.get_vdn_switch(dvs_id)
     except exceptions.ResourceNotFound:
         LOG.error("DVS %s not found", dvs_id)
         return
@@ -106,7 +105,7 @@ def nsx_update_switch(resource, event, trigger, **kwargs):
                  "%(policy)s", {'dvs': dvs_id, 'policy': policy})
         switch['teamingPolicy'] = policy
         try:
-            switch = nsxv.update_vdn_switch(switch)
+            switch = nsxv_c.update_vdn_switch(switch)
         except exceptions.VcnsApiException as e:
             desc = jsonutils.loads(e.response)
             details = desc.get('details')
@@ -318,7 +317,7 @@ def delete_backend_network(resource, event, trigger, **kwargs):
     # Note: in case the backend network is attached to other backend objects,
     # like VM, the deleting may fail and through an exception
 
-    nsxv = utils.get_nsxv_client()
+    nsxv_c = utils.get_nsxv_client()
     if moref.startswith(PORTGROUP_PREFIX):
         # get the dvs id from the backend name:
         dvs_id = get_dvs_id_from_backend_name(backend_name)
@@ -327,7 +326,7 @@ def delete_backend_network(resource, event, trigger, **kwargs):
                       "%(moref)s", {'moref': moref})
         else:
             try:
-                nsxv.delete_port_group(dvs_id, moref)
+                nsxv_c.delete_port_group(dvs_id, moref)
             except Exception as e:
                 LOG.error("Failed to delete backend network %(moref)s : "
                           "%(e)s", {'moref': moref, 'e': e})
@@ -337,7 +336,7 @@ def delete_backend_network(resource, event, trigger, **kwargs):
     else:
         # Virtual wire
         try:
-            nsxv.delete_virtual_wire(moref)
+            nsxv_c.delete_virtual_wire(moref)
         except Exception as e:
             LOG.error("Failed to delete backend network %(moref)s : "
                       "%(e)s", {'moref': moref, 'e': e})

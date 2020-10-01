@@ -74,9 +74,9 @@ def list_missing_ports(resource, event, trigger, **kwargs):
     admin_cxt = neutron_context.get_admin_context()
     filters = v3_utils.get_plugin_filters(admin_cxt)
     nsxlib = v3_utils.get_connected_nsxlib()
-    with v3_utils.NsxV3PluginWrapper() as plugin:
+    with v3_utils.NsxV3PluginWrapper() as v3_plugin:
         problems = plugin_utils.get_mismatch_logical_ports(
-            admin_cxt, nsxlib, plugin, filters)
+            admin_cxt, nsxlib, v3_plugin, filters)
 
     if len(problems) > 0:
         title = ("Found internal ports misconfiguration on the "
@@ -137,8 +137,8 @@ def migrate_compute_ports_vms(resource, event, trigger, **kwargs):
 
     # Go over all the ports from the plugin
     admin_cxt = neutron_context.get_admin_context()
-    with PortsPlugin() as plugin:
-        neutron_ports = plugin.get_ports(admin_cxt, filters=port_filters)
+    with PortsPlugin() as v3_plugin:
+        neutron_ports = v3_plugin.get_ports(admin_cxt, filters=port_filters)
 
     for port in neutron_ports:
         # skip non compute ports
@@ -202,7 +202,7 @@ def migrate_exclude_ports(resource, event, trigger, **kwargs):
         LOG.info("Version is %s", version)
         return
     admin_cxt = neutron_context.get_admin_context()
-    plugin = PortsPlugin()
+    ports_plugin = PortsPlugin()
     _port_client = resources.LogicalPort(_nsx_client)
     exclude_list = nsxlib.firewall_section.get_excludelist()
     for member in exclude_list['members']:
@@ -226,7 +226,7 @@ def migrate_exclude_ports(resource, event, trigger, **kwargs):
                 continue
             # Check if this port exists in the DB
             try:
-                plugin.get_port(admin_cxt, neutron_port_id)
+                ports_plugin.get_port(admin_cxt, neutron_port_id)
             except Exception:
                 LOG.info("Port %s is not defined in DB", neutron_port_id)
                 continue

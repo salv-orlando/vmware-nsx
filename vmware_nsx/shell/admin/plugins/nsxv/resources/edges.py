@@ -262,10 +262,10 @@ def nsx_delete_orphaned_edges(resource, event, trigger, **kwargs):
                 LOG.info("NSXv Edge deletion aborted by user")
                 return
 
-    nsxv = utils.get_nsxv_client()
+    nsxv_c = utils.get_nsxv_client()
     for edge in orphaned_edges:
         LOG.info("Deleting edge: %s", edge)
-        nsxv.delete_edge(edge)
+        nsxv_c.delete_edge(edge)
 
     LOG.info("After delete; Orphaned Edges: \n%s",
         pprint.pformat(get_orphaned_edges()))
@@ -504,7 +504,7 @@ def change_edge_appliance_reservations(properties):
         LOG.error("%s", str(e))
 
 
-def _update_host_group_for_edge(nsxv, cluster_mng, edge_id, edge):
+def _update_host_group_for_edge(nsxv_c, cluster_mng, edge_id, edge):
     if edge.get('type') == 'gatewayServices':
         try:
             az_name, size = _get_edge_az_and_size(edge_id)
@@ -513,7 +513,7 @@ def _update_host_group_for_edge(nsxv, cluster_mng, edge_id, edge):
             zones = nsx_az.NsxVAvailabilityZones()
             az = zones.get_availability_zone(az_name)
             if az.edge_ha and az.edge_host_groups:
-                edge_utils.update_edge_host_groups(nsxv, edge_id,
+                edge_utils.update_edge_host_groups(nsxv_c, edge_id,
                                                    cluster_mng, az,
                                                    validate=True)
             else:

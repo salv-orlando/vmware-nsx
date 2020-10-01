@@ -1279,14 +1279,14 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def _get_external_attachment_info(self, context, router):
         gw_port = router.gw_port
-        ipaddress = None
+        ipaddr = None
         netmask = None
         nexthop = None
 
         if gw_port:
             # gw_port may have multiple IPs, only configure the first one
             if gw_port.get('fixed_ips'):
-                ipaddress = gw_port['fixed_ips'][0]['ip_address']
+                ipaddr = gw_port['fixed_ips'][0]['ip_address']
 
             network_id = gw_port.get('network_id')
             if network_id:
@@ -1300,7 +1300,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     netmask = str(netaddr.IPNetwork(ext_subnet.cidr).netmask)
                     nexthop = ext_subnet.gateway_ip
 
-        return (ipaddress, netmask, nexthop)
+        return (ipaddr, netmask, nexthop)
 
     def _get_tier0_uuid_by_net_id(self, context, network_id):
         if not network_id:

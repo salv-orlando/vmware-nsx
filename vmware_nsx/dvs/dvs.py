@@ -202,9 +202,9 @@ class DvsManager(VCManagerBase):
                                 self._session.vim,
                                 val, ['name'])
                         if len(props) and hasattr(props[0], 'propSet'):
-                            for prop in props[0].propSet:
+                            for prop2 in props[0].propSet:
                                 # match name or mor id
-                                if net_id == prop.val or net_id == val.value:
+                                if net_id == prop2.val or net_id == val.value:
                                     # NOTE(garyk): update cache
                                     return val
             raise exceptions.NetworkNotFound(net_id=net_id)
@@ -377,8 +377,8 @@ class DvsManager(VCManagerBase):
                                                      self._session.vim,
                                                      pg_moref, ['name'])
                     if len(props) and hasattr(props[0], 'propSet'):
-                        for prop in props[0].propSet:
-                            if net_id in prop.val and net_moref in prop.val:
+                        for prop2 in props[0].propSet:
+                            if net_id in prop2.val and net_moref in prop2.val:
                                 found = True
                                 self._reconfigure_port_group(
                                     pg_moref,
