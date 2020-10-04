@@ -161,7 +161,6 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
                                     oct_const.DEVICE_OWNER_OCTAVIA]}
         lb_ports = plugin.get_ports(admin_context, filters=filters)
-        lb_routers = []
         for port in lb_ports:
             fixed_ips = port.get('fixed_ips', [])
             if fixed_ips:
@@ -178,13 +177,6 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     LOG.error("Loadbalancer %s subnet %s is not external "
                               "nor connected to a router.",
                               port.get('device_id'), subnet_id)
-                # Multiple loadbalancers on the same router cannot be supported
-                if router_id in lb_routers:
-                    n_errors = n_errors + 1
-                    LOG.error("Router %s has multiple loadbalancers which is "
-                              "not supported.", router_id)
-                else:
-                    lb_routers.append(router_id)
 
             # TODO(asarfaty): Multiple listeners on the same pool is not
             # supported, but currently the admin utility has no access to this
@@ -193,9 +185,6 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             # TODO(asarfaty): Member on external subnet must have fip as ip,
             # but currently the admin utility has no access to this information
             # from octavia
-
-        # General validations:
-        # TODO(asarfaty): multiple transport zones (migrator limitation)?
 
     if n_errors > 0:
         plural = n_errors > 1
