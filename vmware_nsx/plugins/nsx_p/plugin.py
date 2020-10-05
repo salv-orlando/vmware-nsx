@@ -1701,7 +1701,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             context, port_data)
         device_owner = port_data.get('device_owner')
         vif_id = None
-        if device_owner and device_owner != l3_db.DEVICE_OWNER_ROUTER_INTF:
+        if not device_owner or device_owner != l3_db.DEVICE_OWNER_ROUTER_INTF:
+            # Set vif_id even if no device owner so that auto-generated
+            # MP ports won't be created for VMs before neutron sets the vif-id
             vif_id = port_data['id']
 
         tags = self._build_port_tags(port_data)
