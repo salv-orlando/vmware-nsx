@@ -8,6 +8,7 @@ flake8-import-order==0.12
 flake8==2.6.2
 hacking==1.1.0
 httplib2==0.9.1
+isort==4.3.21
 kombu==4.0.0
 mock==2.0.0
 netaddr==0.7.18
