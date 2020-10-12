@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     def _get_lb_router(self, context, lb):
-        router_id = lb_utils.get_router_from_network(
+        router_id = p_utils.get_router_from_network(
             context, self.core_plugin, lb['vip_subnet_id'])
 
         return router_id
@@ -143,7 +143,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
     def delete(self, context, lb, completor):
         router_id = None
         try:
-            router_id = lb_utils.get_router_from_network(
+            router_id = p_utils.get_router_from_network(
                 context, self.core_plugin, lb['vip_subnet_id'])
         except n_exc.SubnetNotFound:
             LOG.warning("VIP subnet %s not found while deleting "

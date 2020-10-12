@@ -14,6 +14,7 @@
 #    under the License.
 
 import functools
+import netaddr
 
 from neutron_lib import exceptions as n_exc
 from oslo_log import log as logging
@@ -25,6 +26,7 @@ from vmware_nsx.services.lbaas.nsx_p.implementation import lb_const as p_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import load_balancer as nsxlib_lb
+from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3.policy import constants as p_constants
 from vmware_nsxlib.v3.policy import utils as p_utils
 from vmware_nsxlib.v3 import utils
@@ -35,6 +37,9 @@ SERVICE_LB_TAG_SCOPE = 'loadbalancer_id'
 #TODO(asarfaty): allow more LBs on the same router by setting multiple
 # ids in the same tag
 SERVICE_LB_TAG_MAX = 20
+
+VIP_GRP_ID = '%s-vip'
+MAX_SOURCES_IN_RULE = 128
 
 
 def get_rule_match_conditions(policy):
@@ -160,6 +165,10 @@ def get_monitor_policy_client(lb_client, hm):
 def get_tags(plugin, resource_id, resource_type, project_id, project_name):
     return lb_utils.get_tags(plugin, resource_id, resource_type,
                              project_id, project_name)
+
+
+def get_router_from_network(context, plugin, subnet_id):
+    return lb_utils.get_router_from_network(context, plugin, subnet_id)
 
 
 def build_persistence_profile_tags(pool_tags, listener):
@@ -361,3 +370,186 @@ def remove_service_tag_callback(lb_id):
 
 def get_lb_rtr_lock(router_id):
     return locking.LockManager.get_lock('lb-router-%s' % str(router_id))
+
+
+def _get_negated_allowed_cidrs(allowed_cidrs, is_ipv4=True):
+    allowed_set = netaddr.IPSet(allowed_cidrs)
+    all_cidr = '0.0.0.0/0' if is_ipv4 else '::/0'
+    all_set = netaddr.IPSet([all_cidr])
+    negate_set = all_set - allowed_set
+
+    # Translate to cidr, ignoring unsupported cidrs.
+    negate_cidrs = [str(cidr) for cidr in negate_set.iter_cidrs()
+                    if (not str(cidr).startswith('0.0.0.0/') and
+                        not str(cidr).startswith('::/'))]
+    # split into max len (128) lists.(%s)
+    negated_list = [negate_cidrs[i:i + MAX_SOURCES_IN_RULE]
+                    for i in range(0, len(negate_cidrs), MAX_SOURCES_IN_RULE)]
+    return negated_list
+
+
+def get_lb_vip_address(core_plugin, context, loadbalancer):
+    # If loadbalancer vip_port already has floating ip, use floating
+    # IP as the virtual server VIP address. Else, use the loadbalancer
+    # vip_address directly on virtual server.
+    filters = {'port_id': [loadbalancer['vip_port_id']]}
+    floating_ips = core_plugin.get_floatingips(context,
+                                               filters=filters)
+    if floating_ips:
+        return floating_ips[0]['floating_ip_address']
+    return loadbalancer['vip_address']
+
+
+def get_lb_router_id(core_plugin, context, loadbalancer):
+    # First try to get it from the vip subnet
+    router_id = get_router_from_network(
+        context, core_plugin, loadbalancer['vip_subnet_id'])
+    if router_id:
+        return router_id
+
+    # Try from the LB service
+    service = get_lb_nsx_lb_service(
+        core_plugin.nsxpolicy, loadbalancer['id'], try_old=True)
+    if service and service.get('connectivity_path'):
+        return p_utils.path_to_id(service['connectivity_path'])
+
+
+def set_allowed_cidrs_fw(core_plugin, context, loadbalancer, listeners):
+    nsxpolicy = core_plugin.nsxpolicy
+    lb_vip_address = get_lb_vip_address(
+        core_plugin, context, loadbalancer)
+    vip_group_id = VIP_GRP_ID % loadbalancer['id']
+    is_ipv4 = bool(':' not in lb_vip_address)
+
+    # Find out if the GW policy exists or not
+    try:
+        nsxpolicy.gateway_policy.get(
+            p_constants.DEFAULT_DOMAIN,
+            map_id=loadbalancer['id'], silent=True)
+    except nsxlib_exc.ResourceNotFound:
+        gw_exist = False
+    else:
+        gw_exist = True
+
+    # list all the relevant listeners
+    fw_listeners = []
+    for listener in listeners:
+        if listener.get('allowed_cidrs'):
+            fw_listeners.append({
+                'id': listener.get('listener_id', listener.get('id')),
+                'port': listener['protocol_port'],
+                'allowed_cidrs': listener['allowed_cidrs'],
+                'negate_cidrs': _get_negated_allowed_cidrs(
+                    listener['allowed_cidrs'],
+                    is_ipv4=is_ipv4)})
+
+    if not fw_listeners:
+        # Delete the GW policy if it exists
+        if gw_exist:
+            nsxpolicy.gateway_policy.delete(
+                p_constants.DEFAULT_DOMAIN,
+                map_id=loadbalancer['id'])
+            # Delete related services
+            tags_to_search = [{'scope': lb_const.LB_LB_TYPE,
+                               'tag': loadbalancer['id']}]
+            services = nsxpolicy.search_by_tags(
+                tags_to_search,
+                nsxpolicy.service.parent_entry_def.resource_type()
+            )['results']
+            for srv in services:
+                if not srv.get('marked_for_delete'):
+                    nsxpolicy.service.delete(srv['id'])
+            # Delete the vip group
+            nsxpolicy.group.delete(p_constants.DEFAULT_DOMAIN,
+                                   vip_group_id)
+
+        return
+
+    # Find the router to apply the rules on from the LB service
+    router_id = get_lb_router_id(core_plugin, context, loadbalancer)
+    if not router_id:
+        LOG.info("No router found for LB %s allowed cidrs",
+                 loadbalancer['id'])
+        return
+
+    # Create a group for the vip address (to make it easier to update)
+    expr = nsxpolicy.group.build_ip_address_expression(
+        [lb_vip_address])
+    tags = nsxpolicy.build_v3_tags_payload(
+        loadbalancer, resource_type=lb_const.LB_LB_TYPE,
+        project_name=context.tenant_name)
+    nsxpolicy.group.create_or_overwrite_with_conditions(
+        "LB_%s_vip" % loadbalancer['id'],
+        p_constants.DEFAULT_DOMAIN, group_id=vip_group_id,
+        conditions=[expr], tags=tags)
+    vip_group_path = nsxpolicy.group.entry_def(
+        domain_id=p_constants.DEFAULT_DOMAIN,
+        group_id=vip_group_id).get_resource_full_path()
+
+    # Create the list of rules
+    rules = []
+    for listener in fw_listeners:
+        ip_version = netaddr.IPAddress(lb_vip_address).version
+        # Create the service for this listener
+        srv_tags = nsxpolicy.build_v3_tags_payload(
+            loadbalancer, resource_type=lb_const.LB_LB_TYPE,
+            project_name=context.tenant_name)
+        srv_tags.append({
+            'scope': lb_const.LB_LISTENER_TYPE,
+            'tag': listener['id']})
+        srv_name = "LB Listener %s" % listener['id']
+        nsxpolicy.service.create_or_overwrite(
+                srv_name,
+                service_id=listener['id'],
+                description="Service for listener %s" % listener['id'],
+                protocol=nsx_constants.TCP,
+                dest_ports=[listener['port']],
+                tags=srv_tags)
+
+        # Build the rules for this listener (128 sources each)
+        rule_index = 0
+        for cidr_list in listener['negate_cidrs']:
+            rule_name = "Allowed cidrs for listener %s" % listener['id']
+            rule_id = listener['id']
+            if len(listener['negate_cidrs']) > 1:
+                rule_name = rule_name + " (part %s of %s)" % (
+                    rule_index, len(listener['negate_cidrs']))
+                rule_id = rule_id + "-%s" % rule_index
+            description = "Allow only %s" % listener['allowed_cidrs']
+            rules.append(nsxpolicy.gateway_policy.build_entry(
+                rule_name,
+                p_constants.DEFAULT_DOMAIN, loadbalancer['id'],
+                rule_id,
+                description=description,
+                action=nsx_constants.FW_ACTION_DROP,
+                ip_protocol=(nsx_constants.IPV4 if ip_version == 4
+                             else nsx_constants.IPV6),
+                dest_groups=[vip_group_path],
+                source_groups=cidr_list,
+                service_ids=[listener['id']],
+                scope=[nsxpolicy.tier1.get_path(router_id)],
+                direction=nsx_constants.IN,
+                plain_groups=True))
+            rule_index = rule_index + 1
+
+    # Create / update the GW policy
+    if gw_exist:
+        # only update the rules of this policy
+        nsxpolicy.gateway_policy.update_entries(
+            p_constants.DEFAULT_DOMAIN,
+            loadbalancer['id'], rules,
+            category=p_constants.CATEGORY_LOCAL_GW)
+    else:
+        policy_name = "LB %s allowed cidrs" % loadbalancer['id']
+        description = ("Allowed CIDRs rules for loadbalancer %s" %
+                       loadbalancer['id'])
+        tags = nsxpolicy.build_v3_tags_payload(
+            loadbalancer, resource_type=lb_const.LB_LB_TYPE,
+            project_name=context.tenant_name)
+        nsxpolicy.gateway_policy.create_with_entries(
+            policy_name, p_constants.DEFAULT_DOMAIN,
+            map_id=loadbalancer['id'],
+            description=description,
+            tags=tags,
+            entries=rules,
+            category=p_constants.CATEGORY_LOCAL_GW)
