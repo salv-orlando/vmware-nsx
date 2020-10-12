@@ -3275,6 +3275,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         for vs in vs_list:
             vs_client.update(vs['id'], ip_address=vip_address)
 
+        # Update the vip address group for allowed cidr rules
+        vip_group_id = lb_utils.VIP_GRP_ID % device_id
+        try:
+            self.nsxpolicy.group.get(policy_constants.DEFAULT_DOMAIN,
+                                     vip_group_id)
+        except nsx_lib_exc.ResourceNotFound:
+            pass
+        else:
+            expr = self.nsxpolicy.group.build_ip_address_expression(
+                [vip_address])
+            self.nsxpolicy.group.update_with_conditions(
+                policy_constants.DEFAULT_DOMAIN, vip_group_id,
+                conditions=[expr])
+
     def create_floatingip(self, context, floatingip):
         # First do some validations
         fip_data = floatingip['floatingip']

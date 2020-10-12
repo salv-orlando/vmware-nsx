@@ -20,6 +20,7 @@ from oslo_log import log as logging
 from oslo_utils import excutils
 
 from vmware_nsx._i18n import _
+from vmware_nsx.common import utils as com_utils
 from vmware_nsx.services.lbaas import base_mgr
 from vmware_nsx.services.lbaas import lb_common
 from vmware_nsx.services.lbaas import lb_const
@@ -81,16 +82,8 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     def _get_virtual_server_kwargs(self, context, listener, vs_name, tags,
                                    lb_service_id, certificate=None):
-        # If loadbalancer vip_port already has floating ip, use floating
-        # IP as the virtual server VIP address. Else, use the loadbalancer
-        # vip_address directly on virtual server.
-        filters = {'port_id': [listener['loadbalancer']['vip_port_id']]}
-        floating_ips = self.core_plugin.get_floatingips(context,
-                                                        filters=filters)
-        if floating_ips:
-            lb_vip_address = floating_ips[0]['floating_ip_address']
-        else:
-            lb_vip_address = listener['loadbalancer']['vip_address']
+        lb_vip_address = lb_utils.get_lb_vip_address(
+            self.core_plugin, context, listener['loadbalancer'])
 
         kwargs = {'virtual_server_id': listener['id'],
                   'ip_address': lb_vip_address,
@@ -165,6 +158,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 listener.get('default_pool'), listener, completor)
 
     def create(self, context, listener, completor, certificate=None):
+        self._validate_allowed_cidrs(listener, completor)
         nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
         vs_client = nsxlib_lb.virtual_server
         vs_name = utils.get_name_and_uuid(listener['name'] or 'listener',
@@ -196,7 +190,22 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
         self._update_default_pool(context, listener, completor)
 
+        # Update the allowed cidrs fw
+        listeners = copy.copy(listener['loadbalancer']['listeners'])
+        listeners.append(listener)
+        lb_utils.set_allowed_cidrs_fw(self.core_plugin,
+                                      context, listener['loadbalancer'],
+                                      listeners)
+
         completor(success=True)
+
+    def _validate_allowed_cidrs(self, listener, completor):
+        if (listener.get('allowed_cidrs') and
+            not com_utils.is_nsx_version_3_0_0(self.core_plugin._nsx_version)):
+            completor(success=False)
+            msg = (_('Allowed cidrs are not supported with NSX %s') %
+                   self.core_plugin._nsx_version)
+            raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
 
     def _get_pool_tags(self, context, pool, listener_tenant_id):
         return lb_utils.get_tags(self.core_plugin, pool['id'],
@@ -251,6 +260,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     def update(self, context, old_listener, new_listener, completor,
                certificate=None):
+        self._validate_allowed_cidrs(new_listener, completor)
         nsxlib_lb = self.core_plugin.nsxpolicy.load_balancer
         vs_client = nsxlib_lb.virtual_server
         app_client = self._get_nsxlib_app_profile(nsxlib_lb, old_listener)
@@ -294,6 +304,18 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             new_listener.get('default_pool_id')):
             self._update_default_pool(context, new_listener,
                                       completor, old_listener)
+
+        # Update the allowed cidrs fw (with an updated list of listeners)
+        listeners = []
+        for elem in new_listener['loadbalancer']['listeners']:
+            if elem['listener_id'] == new_listener['id']:
+                listeners.append(new_listener)
+            else:
+                listeners.append(elem)
+        lb_utils.set_allowed_cidrs_fw(self.core_plugin,
+                                      context, new_listener['loadbalancer'],
+                                      listeners)
+
         completor(success=True)
 
     def delete(self, context, listener, completor):
@@ -347,6 +369,16 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                          'listener %(list)s') %
                        {'crt': res_obj['id'], 'list': listener['id']})
                 LOG.error(msg)
+
+        # Update the allowed cidrs fw
+        listeners = copy.copy(listener['loadbalancer']['listeners'])
+        for elem in listeners:
+            if elem['listener_id'] == listener['id']:
+                listeners.remove(elem)
+                break
+        lb_utils.set_allowed_cidrs_fw(self.core_plugin,
+                                      context, listener['loadbalancer'],
+                                      listeners)
 
         completor(success=True)
 
