@@ -57,7 +57,7 @@ class BaseDataModel(object):
                     if isinstance(item, BaseDataModel):
                         ret[attr].append(item.to_dict())
                     else:
-                        ret[attr] = item
+                        ret[attr].append(item)
             elif isinstance(getattr(self, attr), BaseDataModel):
                 ret[attr] = value.to_dict()
             elif six.PY2 and isinstance(value, six.text_type):
@@ -654,7 +654,7 @@ class Listener(BaseDataModel):
               'loadbalancer_id', 'protocol', 'default_tls_container_id',
               'sni_containers', 'protocol_port', 'connection_limit',
               'admin_state_up', 'provisioning_status', 'operating_status',
-              'default_pool', 'loadbalancer', 'l7_policies']
+              'default_pool', 'loadbalancer', 'l7_policies', 'allowed_cidrs']
 
     def __init__(self, id=None, tenant_id=None, name=None, description=None,
                  default_pool_id=None, loadbalancer_id=None, protocol=None,
@@ -662,7 +662,7 @@ class Listener(BaseDataModel):
                  protocol_port=None, connection_limit=None,
                  admin_state_up=None, provisioning_status=None,
                  operating_status=None, default_pool=None, loadbalancer=None,
-                 l7_policies=None):
+                 l7_policies=None, allowed_cidrs=None):
         self.id = id
         self.tenant_id = tenant_id
         self.name = name
@@ -680,6 +680,7 @@ class Listener(BaseDataModel):
         self.default_pool = default_pool
         self.loadbalancer = loadbalancer
         self.l7_policies = l7_policies or []
+        self.allowed_cidrs = allowed_cidrs or []
 
     def attached_to_loadbalancer(self):
         return bool(self.loadbalancer)
@@ -700,6 +701,7 @@ class Listener(BaseDataModel):
         del ret_dict['l7_policies']
         ret_dict['l7policies'] = [{'id': l7_policy.id}
             for l7_policy in self.l7_policies]
+        ret_dict['allowed_cidrs'] = self.allowed_cidrs
         return ret_dict
 
     @classmethod
