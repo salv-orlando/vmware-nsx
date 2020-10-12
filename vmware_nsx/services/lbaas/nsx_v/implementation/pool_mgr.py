@@ -174,15 +174,16 @@ class EdgePoolManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
                     listener_binding = nsxv_db.get_nsxv_lbaas_listener_binding(
                         context.session, lb_id, listener['id'])
-                    vse = listener_mgr.listener_to_edge_vse(
-                        context,
-                        listener,
-                        lb_binding['vip_address'],
-                        None,
-                        listener_binding['app_profile_id'])
-                    with locking.LockManager.get_lock(edge_id):
-                        self.vcns.update_vip(
-                            edge_id, listener_binding['vse_id'], vse)
+                    if listener_binding:
+                        vse = listener_mgr.listener_to_edge_vse(
+                            context,
+                            listener,
+                            lb_binding['vip_address'],
+                            None,
+                            listener_binding['app_profile_id'])
+                        with locking.LockManager.get_lock(edge_id):
+                            self.vcns.update_vip(
+                                edge_id, listener_binding['vse_id'], vse)
             self.vcns.delete_pool(edge_id, edge_pool_id)
             completor(success=True)
             nsxv_db.del_nsxv_lbaas_pool_binding(

@@ -38,11 +38,13 @@ class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
     def _get_pool_lb_id(self, member):
         if not member.get('pool'):
             return
-        listener = member['pool']['listener']
+        listener = member['pool'].get('listener')
         if listener:
             lb_id = listener['loadbalancer_id']
+        elif member['pool'].get('loadbalancer_id'):
+            lb_id = member['pool']['loadbalancer_id']
         else:
-            lb_id = member['pool']['loadbalancer']['id']
+            lb_id = member['pool'].get('loadbalancer', []).get('id')
         return lb_id
 
     def _get_pool_member_ips(self, pool, operation, address):
