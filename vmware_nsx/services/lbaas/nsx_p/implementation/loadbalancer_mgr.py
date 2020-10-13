@@ -288,17 +288,21 @@ def status_getter(context, core_plugin):
                     'operating_status': _nsx_status_to_lb_status(
                         vs_status['status'])})
             for pool_status in result.get('pools', []):
+                if not pool_status.get('pool_path'):
+                    LOG.warning("pool_path missing from lb status: %s",
+                                lb_status_results)
+                    continue
                 pool_id = lib_p_utils.path_to_id(pool_status['pool_path'])
                 pool_statuses.append({
                     'id': pool_id,
                     'operating_status': _nsx_status_to_lb_status(
-                        pool_status['status'])})
+                        pool_status.get('status'))})
                 for member in pool_status.get('members', []):
                     member_statuses.append({
                         'pool_id': pool_id,
                         'member_ip': member.get('ip_address'),
                         'operating_status': _nsx_status_to_lb_status(
-                            member['status'])})
+                            member.get('status'))})
 
         else:
             lb_operating_status = lb_const.OFFLINE
