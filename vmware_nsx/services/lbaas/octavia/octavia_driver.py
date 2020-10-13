@@ -190,6 +190,8 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
             if project_id is None:
                 project_id = parent_project_id
             pool_dict['tenant_id'] = pool_dict['project_id'] = project_id
+        for member in pool_dict.get('members', []):
+            member['id'] = member['member_id']
 
         return pool_dict
 
@@ -303,9 +305,15 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
         elif obj_type == 'Pool':
             if 'listener' not in obj_dict:
                 self._get_listener_in_pool_dict(obj_dict, is_update)
+            if obj_dict.get('loadbalancer_id'):
+                # Generate a loadbalancer object
+                obj_dict['loadbalancer'] = self._get_load_balancer_dict(
+                    obj_dict['loadbalancer_id'])
             if obj_dict.get('healthmonitor'):
                 obj_dict['healthmonitor']['id'] = obj_dict[
                     'healthmonitor']['healthmonitor_id']
+            for member in obj_dict.get('members', []):
+                member['id'] = member['member_id']
 
         elif obj_type == 'Member':
             # Get the pool object

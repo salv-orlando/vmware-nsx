@@ -350,6 +350,7 @@ class NSXOctaviaListenerEndpoint(object):
                         member['pool'] = pool
                     self.member.delete_cascade(ctx, member, dummy_completor)
                 if pool.get('healthmonitor'):
+                    pool['healthmonitor']['pool'] = pool
                     self.healthmonitor.delete_cascade(
                         ctx, pool['healthmonitor'], dummy_completor)
                 self.pool.delete_cascade(ctx, pool, dummy_completor)
@@ -461,16 +462,44 @@ class NSXOctaviaListenerEndpoint(object):
 
     @log_helpers.log_method_call
     def pool_delete(self, ctxt, pool):
+        delete_result = {'value': True}
+
+        def dummy_completor(success=True):
+            delete_result['value'] = success
+
         ctx = neutron_context.Context(None, pool['project_id'])
+
+        # Octavia removes pool HMs while pool is deleted
+        if pool.get('healthmonitor'):
+            pool['healthmonitor']['pool'] = pool
+            try:
+                self.healthmonitor.delete_cascade(
+                    ctx, pool['healthmonitor'], dummy_completor)
+            except Exception as e:
+                delete_result['value'] = False
+                LOG.error('NSX driver pool_delete failed to delete HM %s', e)
+
+        for member in pool.get('members', []):
+            try:
+                if not member.get('pool'):
+                    member['pool'] = pool
+                self.member.delete_cascade(ctx, member, dummy_completor)
+            except Exception as e:
+                delete_result['value'] = False
+                LOG.error('NSX driver pool_delete failed to delete member'
+                          ' %s %s', member['id'], e)
+
         completor = self.get_completor_func(constants.POOLS,
                                             pool, delete=True)
         try:
             self.pool.delete(ctx, pool, completor)
         except Exception as e:
             LOG.error('NSX driver pool_delete failed %s', e)
+            delete_result['value'] = False
+
+        if not delete_result['value']:
             completor(success=False)
-            return False
-        return True
+        return delete_result['value']
 
     @log_helpers.log_method_call
     def pool_update(self, ctxt, old_pool, new_pool):
