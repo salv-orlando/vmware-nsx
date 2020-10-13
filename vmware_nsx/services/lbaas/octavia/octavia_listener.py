@@ -324,26 +324,43 @@ class NSXOctaviaListenerEndpoint(object):
         def dummy_completor(success=True):
             pass
 
+        completor = self.get_completor_func(constants.LOADBALANCERS,
+                                            loadbalancer, delete=True)
+
+        listener_dict = {}
         # Go over the LB tree and delete one by one using the cascade
         # api implemented for each resource
-        for listener in loadbalancer.get('listeners', []):
-            for policy in listener.get('l7policies', []):
-                for rule in policy.get('rules', []):
-                    self.l7rule.delete_cascade(ctx, rule, dummy_completor)
-                self.l7policy.delete_cascade(ctx, policy, dummy_completor)
-            self.listener.delete_cascade(ctx, listener, dummy_completor)
-        for pool in loadbalancer.get('pools', []):
-            for member in pool.get('members', []):
-                self.member.delete_cascade(ctx, member, dummy_completor)
-            if pool.get('healthmonitor'):
-                self.healthmonitor.delete_cascade(
-                    ctx, pool['healthmonitor'], dummy_completor)
-            self.pool.delete_cascade(ctx, pool, dummy_completor)
+        try:
+            for listener in loadbalancer.get('listeners', []):
+                listener['loadbalancer'] = loadbalancer
+                listener_dict[listener['id']] = listener
+                for policy in listener.get('l7policies', []):
+                    for rule in policy.get('rules', []):
+                        self.l7rule.delete_cascade(ctx, rule, dummy_completor)
+                    self.l7policy.delete_cascade(ctx, policy, dummy_completor)
+                self.listener.delete_cascade(ctx, listener, dummy_completor)
+            for pool in loadbalancer.get('pools', []):
+                if not pool.get('loadbalancer'):
+                    pool['loadbalancer'] = loadbalancer
+                if pool.get('listener_id'):
+                    pool['listener'] = listener_dict[pool['listener_id']]
+                    pool['listeners'] = [pool['listener']]
+                for member in pool.get('members', []):
+                    if not member.get('pool'):
+                        member['pool'] = pool
+                    self.member.delete_cascade(ctx, member, dummy_completor)
+                if pool.get('healthmonitor'):
+                    self.healthmonitor.delete_cascade(
+                        ctx, pool['healthmonitor'], dummy_completor)
+                self.pool.delete_cascade(ctx, pool, dummy_completor)
+        except Exception as e:
+            LOG.error('NSX driver loadbalancer_delete_cascade failed to '
+                      'delete sub-object %s', e)
+            completor(success=False)
+            return False
 
         # Delete the loadbalancer itself with the completor that marks all
         # as deleted
-        completor = self.get_completor_func(constants.LOADBALANCERS,
-                                            loadbalancer, delete=True)
         try:
             self.loadbalancer.delete_cascade(
                 ctx, loadbalancer, self.get_completor_func(
