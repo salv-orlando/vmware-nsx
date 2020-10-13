@@ -677,6 +677,8 @@ class NSXOctaviaListenerEndpoint(object):
 class NSXOctaviaStatisticsCollector(object):
     def __init__(self, core_plugin, listener_stats_getter,
                  loadbalancer_status_getter=None):
+        LOG.info("NSXOctaviaStatisticsCollector starting with interval of "
+                 "%s seconds", cfg.CONF.octavia_stats_interval)
         self.core_plugin = core_plugin
         self.listener_stats_getter = listener_stats_getter
         self.loadbalancer_status_getter = loadbalancer_status_getter
@@ -685,12 +687,18 @@ class NSXOctaviaStatisticsCollector(object):
                              cfg.CONF.octavia_stats_interval)
 
     def thread_runner(self, interval):
+        LOG.info("NSXOctaviaStatisticsCollector thread_runner is running")
         while True:
             time.sleep(interval)
-            self.collect()
+            try:
+                self.collect()
+            except Exception as e:
+                LOG.error("Octavia stats collect failed with %s", e)
 
     def collect(self):
         if not self.core_plugin.octavia_listener:
+            LOG.warning("Octavia stats collector cannot run with plugin %s",
+                        self.core_plugin)
             return
 
         endpoint = self.core_plugin.octavia_listener.endpoints[0]
