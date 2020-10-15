@@ -127,6 +127,9 @@ class NsxPPluginTestCaseMixin(
                    return_value=LOGICAL_SWITCH_ID
                    ).start()
         mock.patch("vmware_nsxlib.v3.policy.core_resources."
+                   "NsxPolicySegmentApi.wait_until_state_successful"
+                   ).start()
+        mock.patch("vmware_nsxlib.v3.policy.core_resources."
                    "NsxPolicySegmentApi.get_realized_id",
                    return_value=LOGICAL_SWITCH_ID
                    ).start()
