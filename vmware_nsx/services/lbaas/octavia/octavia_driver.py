@@ -14,6 +14,7 @@
 #    under the License.
 
 import copy
+import ipaddress
 import socket
 import time
 
@@ -555,16 +556,31 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
     def update_loadbalancer_status(self, ctxt, status):
         # refresh the driver lib session
         self.db_session = db_apis.get_session()
-        for member in status.get('members', []):
-            if member.get('id'):
-                pass
-            elif member.get('member_ip') and member.get('pool_id'):
-                db_member = self.repositories.member.get(
-                    self.db_session,
-                    pool_id=member['pool_id'],
-                    ip_address=member['member_ip'])
-                if db_member:
-                    member['id'] = db_member.id
+        if status.get('members', []):
+            # Make sure all the members have ids
+            fixed_members = []
+            for member in status['members']:
+                if member.get('id'):
+                    fixed_members.append(member)
+                elif member.get('member_ip') and member.get('pool_id'):
+                    # Find the member id by the normalized member-ip in the
+                    # octavia DB
+                    norm_ip = str(ipaddress.ip_address(member['member_ip']))
+                    db_members, _ = self.repositories.member.get_all(
+                        self.db_session,
+                        pool_id=member['pool_id'])
+                    for db_member in db_members:
+                        norm_db = str(ipaddress.ip_address(
+                            db_member.ip_address))
+                        if norm_db == norm_ip:
+                            member['id'] = db_member.id
+                            fixed_members.append(member)
+                            break
+                    if not member.get('id'):
+                        LOG.warning("update_loadbalancer_status: could not "
+                                    "find the ID of member %s of pool %s",
+                                    member['member_ip'], member['pool_id'])
+            status['members'] = fixed_members
         try:
             return super(NSXOctaviaDriverEndpoint,
                          self).update_loadbalancer_status(status)
