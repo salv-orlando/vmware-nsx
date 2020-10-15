@@ -186,6 +186,10 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             # but currently the admin utility has no access to this information
             # from octavia
 
+            # TODO(asarfaty): Load Balancer with members from various subnets
+            # not uplinked to the same edge router) - the api_replay will work
+            # but the member will not have connectivity
+
     if n_errors > 0:
         plural = n_errors > 1
         LOG.error("The NSX-V plugin configuration is not ready to be "
