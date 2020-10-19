@@ -323,9 +323,9 @@ Metadata
 V2T migration
 ~~~~~~~~~~~~~
 
-- Validate the configuration of the NSX-V plugin before migrating to NSX-T::
+- Validate the configuration of the NSX-V plugin before migrating to NSX-T. When the strict flag is true. the validation will fail on warnings as well::
 
-    nsxadmin -r nsx-migrate-v2t -o validate [--property transit-network=<cidr>]
+    nsxadmin -r nsx-migrate-v2t -o validate [--property transit-network=<cidr>] [--property strict=true]
 
 Config
 ~~~~~~

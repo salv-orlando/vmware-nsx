@@ -17,6 +17,7 @@ import sys
 import netaddr
 from oslo_log import log as logging
 
+from networking_l2gw.db.l2gateway import l2gateway_models
 from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
@@ -26,6 +27,9 @@ from neutron_lib import context as n_context
 
 from vmware_nsx.common import nsxv_constants
 from vmware_nsx.common import utils as c_utils
+from vmware_nsx.db import nsxv_db
+from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
+from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsx.shell.admin.plugins.common import constants
@@ -37,45 +41,79 @@ from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 LOG = logging.getLogger(__name__)
 
 
+def _get_router_from_network(context, plugin, subnet_id):
+    subnet = plugin.get_subnet(context.elevated(), subnet_id)
+    network_id = subnet['network_id']
+    ports = plugin._get_network_interface_ports(
+        context.elevated(), network_id)
+    if ports:
+        return ports[0]['device_id']
+
+
 @admin_utils.output_header
 def validate_config_for_migration(resource, event, trigger, **kwargs):
     """Validate the nsxv configuration before migration to nsx-t"""
 
+    # Read the command line parameters
     transit_networks = ["100.64.0.0/16"]
+    strict = False
     if kwargs.get('property'):
         # input validation
         properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
         transit_network = properties.get('transit-network')
         if transit_network:
             transit_networks = [transit_network]
+        strict = bool(properties.get('strict', 'false').lower() == 'true')
 
-    # Max number of allowed address pairs (allowing 3 for fixed ips)
-    num_allowed_addr_pairs = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES - 3
+    LOG.info("Running migration config validation in %sstrict mode",
+             '' if strict else 'non-')
 
     admin_context = n_context.get_admin_context()
     n_errors = 0
 
+    # General config options / per AZ which are unsupported
+    zones = nsx_az.NsxVAvailabilityZones()
+    unsupported_configs = ['edge_ha', 'edge_host_groups']
+    for az in zones.list_availability_zones_objects():
+        for attr in unsupported_configs:
+            if getattr(az, attr):
+                LOG.warning("WARNING: \'%s\' configuration is not supported "
+                            "and will not be honored by NSX-T (availability "
+                            "zone %s)", attr, az.name)
+                if strict:
+                    n_errors = n_errors + 1
+
     with utils.NsxVPluginWrapper() as plugin:
+        # The migration is supported only for NSX 6.4.9 and above
+        nsx_ver = plugin.nsx_v.vcns.get_version()
+        if not c_utils.is_nsxv_version_6_4_9(nsx_ver):
+            LOG.error("ERROR: Migration with NSX-V version %s is not "
+                      "supported.", nsx_ver)
+            n_errors = n_errors + 1
+
         # Ports validations:
+        # Max number of allowed address pairs (allowing 1 for fixed ips)
+        num_allowed_addr_pairs = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES_v4 - 1
         ports = plugin.get_ports(admin_context)
         for port in ports:
             net_id = port['network_id']
             # Too many address pairs in a port
             address_pairs = port.get(addr_apidef.ADDRESS_PAIRS)
             if len(address_pairs) > num_allowed_addr_pairs:
-                n_errors = n_errors + 1
-                LOG.error("%s allowed address pairs for port %s. Only %s are "
-                          "allowed.",
-                          len(address_pairs), port['id'],
-                          num_allowed_addr_pairs)
+                LOG.warning("WARNING: %s allowed address pairs for port %s. "
+                            "Only %s are allowed.",
+                            len(address_pairs), port['id'],
+                            num_allowed_addr_pairs)
+                if strict:
+                    n_errors = n_errors + 1
 
             # Compute port on external network
             if (port.get('device_owner', '').startswith(
                     nl_constants.DEVICE_OWNER_COMPUTE_PREFIX) and
                 plugin._network_is_external(admin_context, net_id)):
                 n_errors = n_errors + 1
-                LOG.error("Compute port %s on external network %s is not "
-                          "allowed.", port['id'], net_id)
+                LOG.error("ERROR: Compute port %s on external network %s is "
+                          "not allowed.", port['id'], net_id)
 
         # Networks & subnets validations:
         networks = plugin.get_networks(admin_context)
@@ -89,7 +127,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             if (net_type == c_utils.NsxVNetworkTypes.VXLAN or
                 net_type == c_utils.NsxVNetworkTypes.PORTGROUP):
                 n_errors = n_errors + 1
-                LOG.error("Network %s of type %s is not supported.",
+                LOG.error("ERROR: Network %s of type %s is not supported.",
                           net['id'], net_type)
 
             subnets = plugin._get_subnets_by_network(admin_context, net['id'])
@@ -101,8 +139,8 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     n_dhcp_subnets = n_dhcp_subnets + 1
             if n_dhcp_subnets > 1:
                 n_errors = n_errors + 1
-                LOG.error("Network %s has %s dhcp subnets. Only 1 is allowed.",
-                          net['id'], n_dhcp_subnets)
+                LOG.error("ERROR: Network %s has %s dhcp subnets. Only 1 is "
+                          "allowed.", net['id'], n_dhcp_subnets)
 
             # Subnets overlapping with the transit network
             for subnet in subnets:
@@ -123,7 +161,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     if (netaddr.IPSet(subnet_net) &
                         netaddr.IPSet(transit_networks)):
                         n_errors = n_errors + 1
-                        LOG.error("Subnet %s overlaps with the transit "
+                        LOG.error("ERROR: Subnet %s overlaps with the transit "
                                   "network ips: %s.",
                                   subnet['id'], transit_networks)
 
@@ -132,8 +170,8 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 admin_context, net['id'])
             if len(intf_ports) > 1:
                 n_errors = n_errors + 1
-                LOG.error("Network %s has interfaces on multiple routers. "
-                          "Only 1 is allowed.", net['id'])
+                LOG.error("ERROR: Network %s has interfaces on multiple "
+                          "routers. Only 1 is allowed.", net['id'])
 
         # Routers validations:
         routers = plugin.get_routers(admin_context)
@@ -149,46 +187,96 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
 
             if gw_ip_set & if_ip_set:
                 n_errors = n_errors + 1
-                LOG.error("Interface network of router %s cannot overlap with "
-                          "router GW network", router['id'])
-
-        # TODO(asarfaty): missing validations:
-        # - Vlan provider network with the same VLAN tag as the uplink
-        #   profile tag used in the relevant transport node
-        #   (cannot check this without access to the T manager)
+                LOG.error("ERROR: Interface network of router %s cannot "
+                          "overlap with router GW network", router['id'])
 
         # Octavia loadbalancers validation:
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
                                     oct_const.DEVICE_OWNER_OCTAVIA]}
         lb_ports = plugin.get_ports(admin_context, filters=filters)
         for port in lb_ports:
+            lb_id = port.get('device_id')
             fixed_ips = port.get('fixed_ips', [])
             if fixed_ips:
                 subnet_id = fixed_ips[0]['subnet_id']
                 network = lb_utils.get_network_from_subnet(
                     admin_context, plugin, subnet_id)
-                router_id = lb_utils.get_router_from_network(
+                lb_router_id = _get_router_from_network(
                     admin_context, plugin, subnet_id)
                 # Loadbalancer vip subnet must be connected to a router or
                 # belong to an external network
-                if (not router_id and network and
+                if (not lb_router_id and network and
                     not network.get('router:external')):
                     n_errors = n_errors + 1
-                    LOG.error("Loadbalancer %s subnet %s is not external "
-                              "nor connected to a router.",
+                    LOG.error("ERROR: Loadbalancer %s subnet %s is not "
+                              "external nor connected to a router.",
                               port.get('device_id'), subnet_id)
 
-            # TODO(asarfaty): Multiple listeners on the same pool is not
-            # supported, but currently the admin utility has no access to this
-            # information from octavia
+            if not lb_id:
+                continue
 
-            # TODO(asarfaty): Member on external subnet must have fip as ip,
-            # but currently the admin utility has no access to this information
-            # from octavia
+            lb_id = lb_id[3:]
+            lb_binding = nsxv_db.get_nsxv_lbaas_loadbalancer_binding(
+                admin_context.session, lb_id)
+            if not lb_binding or not lb_binding['edge_id']:
+                LOG.warning("Cannot find edge for Loadbalancer %s", lb_id)
+                continue
+            edge_id = lb_binding['edge_id']
 
-            # TODO(asarfaty): Load Balancer with members from various subnets
-            # not uplinked to the same edge router) - the api_replay will work
-            # but the member will not have connectivity
+            # Multiple listeners on the same pool is not supported
+            result = plugin.nsx_v.vcns.get_vips(edge_id)
+            if len(result) == 2:
+                edge_vs = result[1]
+                pools = []
+                for vip in edge_vs.get('virtualServer', []):
+                    if not vip.get('defaultPoolId'):
+                        continue
+                    if vip['defaultPoolId'] in pools:
+                        LOG.error("ERROR: Found multiple listeners using the "
+                                  "same default pool with loadbalancer %s. "
+                                  "This is not supported.", lb_id)
+                        n_errors = n_errors + 1
+                        break
+                    pools.append(vip['defaultPoolId'])
+
+            # Cannot support LB with members from various subnets not uplinked
+            # to the same edge router. This can be indicated by multiple
+            # internal interfaces on the LB edge
+            is_old_lb = lb_common.is_lb_on_router_edge(
+                admin_context, plugin, edge_id)
+            if not is_old_lb:
+                filters = {'device_id': [lb_id],
+                           'device_owner': [lb_common.LBAAS_DEVICE_OWNER]}
+                lb_ports = plugin.get_ports(admin_context, filters=filters)
+                # get the subnets of those ports
+                lb_subnets = list(set([port['fixed_ips'][0]['subnet_id']
+                                       for port in lb_ports]))
+                # make sure all subnets are connected to the same router
+                lb_routers = [lb_router_id]
+                for sub_id in lb_subnets:
+                    router_id = _get_router_from_network(
+                        admin_context, plugin, sub_id)
+                    if not router_id:
+                        LOG.error("ERROR: Found member of subnet %s not "
+                                  "uplinked to any router on loadbalancer "
+                                  "%s. This is not supported.",
+                                  sub_id, lb_id)
+                        n_errors = n_errors + 1
+                    elif router_id not in lb_routers:
+                        lb_routers.append(router_id)
+                if len(lb_routers) > 1:
+                    LOG.error("ERROR: Found members uplinked to different "
+                              "routers on loadbalancer %s. This is not "
+                              "supported.", lb_id)
+                    n_errors = n_errors + 1
+                    break
+
+    # L2GW is not supported with the policy plugin
+    l2gws = admin_context.session.query(l2gateway_models.L2Gateway).all()
+    if len(l2gws):
+        LOG.error("ERROR: Found %s L2Gws. Networking-l2gw is not supported.",
+                  len(l2gws))
+        n_errors = n_errors + 1
 
     if n_errors > 0:
         plural = n_errors > 1
