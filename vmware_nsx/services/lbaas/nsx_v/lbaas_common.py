@@ -94,6 +94,7 @@ def create_lb_interface(context, plugin, lb_id, subnet_id, tenant_id,
     if not subnet:
         subnet = plugin.get_subnet(context, subnet_id)
     network_id = subnet.get('network_id')
+    network = plugin.get_network(context.elevated(), network_id)
 
     port_dict = {'name': 'lb_if-' + lb_id,
                  'admin_state_up': True,
@@ -104,22 +105,30 @@ def create_lb_interface(context, plugin, lb_id, subnet_id, tenant_id,
                  'device_id': lb_id,
                  'mac_address': constants.ATTR_NOT_SPECIFIED
                  }
-    port = plugin.base_create_port(context, {'port': port_dict})
+    port = plugin.base_create_port(context.elevated(), {'port': port_dict})
     ip_addr = port['fixed_ips'][0]['ip_address']
     net = netaddr.IPNetwork(subnet['cidr'])
     resource_id = get_lb_edge_name(context, lb_id)
 
-    address_groups = [{'primaryAddress': ip_addr,
-                       'subnetPrefixLength': str(net.prefixlen),
-                       'subnetMask': str(net.netmask)}]
+    if network.get('router:external'):
+        secondary = None
+        if vip_addr:
+            secondary = [vip_addr]
+        plugin.edge_manager.update_external_interface(
+            plugin.nsx_v, context.elevated(), resource_id, network_id, ip_addr,
+            {subnet['cidr']}, secondary)
+    else:
+        address_groups = [{'primaryAddress': ip_addr,
+                           'subnetPrefixLength': str(net.prefixlen),
+                           'subnetMask': str(net.netmask)}]
 
-    if vip_addr:
-        address_groups[0]['secondaryAddresses'] = {
-            'type': 'secondary_addresses', 'ipAddress': [vip_addr]}
+        if vip_addr:
+            address_groups[0]['secondaryAddresses'] = {
+                'type': 'secondary_addresses', 'ipAddress': [vip_addr]}
 
-    edge_utils.update_internal_interface(
-        plugin.nsx_v, context, resource_id,
-        network_id, address_groups)
+        edge_utils.update_internal_interface(
+            plugin.nsx_v, context, resource_id,
+            network_id, address_groups)
 
 
 def delete_lb_interface(context, plugin, lb_id, subnet_id):
@@ -136,7 +145,7 @@ def delete_lb_interface(context, plugin, lb_id, subnet_id):
 
 def get_lbaas_edge_id(context, plugin, lb_id, vip_addr, subnet_id, tenant_id,
                       appliance_size):
-    subnet = plugin.get_subnet(context, subnet_id)
+    subnet = plugin.get_subnet(context.elevated(), subnet_id)
     network_id = subnet.get('network_id')
     availability_zone = plugin.get_network_az_by_net_id(context, network_id)
 
