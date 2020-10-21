@@ -454,6 +454,7 @@ class NsxDvsV2(addr_pair_db.AllowedAddressPairsMixin,
             if network_type and network_type == 'vlan':
                 # Not allowed to enable port security on vlan DVS ports
                 port_data[psec.PORTSECURITY] = False
+                port_security = False
             else:
                 port_security = self._get_network_security_binding(
                     context, neutron_db['network_id'])
