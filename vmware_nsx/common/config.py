@@ -810,6 +810,10 @@ nsxv_opts = [
     cfg.BoolOpt('init_validation',
                 default=True,
                 help=_("Set to False to skip plugin init validation")),
+    cfg.BoolOpt('loadbalancer_pool_transparency',
+                default=False,
+                help=_("Create LBaaS pools with transparent mode on. Use with "
+                       "use_routers_as_lbaas_platform enabled")),
 
 ]
 
