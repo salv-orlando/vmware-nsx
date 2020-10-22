@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from oslo_config import cfg
 from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
@@ -35,6 +36,9 @@ class EdgePoolManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
     def __init__(self, vcns_driver):
         super(EdgePoolManagerFromDict, self).__init__(vcns_driver)
         self._fw_section_id = None
+        self.pool_transparency = (
+                cfg.CONF.nsxv.use_routers_as_lbaas_platform and
+                cfg.CONF.nsxv.loadbalancer_pool_transparency)
 
     def create(self, context, pool, completor):
 
@@ -44,7 +48,7 @@ class EdgePoolManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
             'description': pool.get('description', pool.get('name')),
             'algorithm': lb_const.BALANCE_MAP.get(pool['lb_algorithm'],
                                                   'round-robin'),
-            'transparent': False
+            'transparent': self.pool_transparency
         }
 
         lb_id = pool['loadbalancer_id']
