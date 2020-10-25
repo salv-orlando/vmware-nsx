@@ -1618,10 +1618,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             try:
                 nsx_id = self.nsxpolicy.segment.get_realized_logical_switch_id(
                     segment_id)
-                # Make sure the LS is already active before letting nova use it
-                if utils.is_nsx_version_3_1_0(self._nsx_version):
-                    self.nsxpolicy.segment.wait_until_state_successful(
-                        segment_id, with_refresh=True)
                 # Add result to caches
                 NET_NEUTRON_2_NSX_ID_CACHE[network_id] = nsx_id
                 NET_NSX_2_NEUTRON_ID_CACHE[nsx_id] = network_id
