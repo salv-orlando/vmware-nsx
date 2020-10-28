@@ -142,6 +142,8 @@ class EdgePoolManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                 new_sess_persist = new_pool['session_persistence']
 
                 if new_sess_persist != old_sess_persist:
+                    if not new_pool['listener'].get('default_pool'):
+                        new_pool['listener']['default_pool'] = new_pool
                     listener_mgr.update_app_profile(
                         self.vcns, context, new_pool['listener'], edge_id)
 
