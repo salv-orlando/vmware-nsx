@@ -38,7 +38,7 @@ networking-sfc>=10.0.0.0 # Apache-2.0
 neutron-fwaas>=16.0.0.0 # Apache-2.0
 neutron-vpnaas>=17.0.0.0 # Apache-2.0
 neutron-dynamic-routing>=16.0.0.0 # Apache-2.0
-vmware-nsxlib>=16.0.0 # Apache-2.0
+vmware-nsxlib>=17.0.0 # Apache-2.0
 # NOTE: we require octavia but can't depend on it
 # octavia>=7.0.0.0 # Apache-2.0
 
