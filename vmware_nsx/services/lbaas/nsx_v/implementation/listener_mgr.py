@@ -113,6 +113,8 @@ def update_app_profile(vcns, context, listener, edge_id, edge_cert_id=None):
     lb_id = listener['loadbalancer_id']
     listener_binding = nsxv_db.get_nsxv_lbaas_listener_binding(
         context.session, lb_id, listener['id'])
+    if not listener_binding:
+        return
     app_profile_id = listener_binding['app_profile_id']
     app_profile = listener_to_edge_app_profile(listener, edge_cert_id)
     with locking.LockManager.get_lock(edge_id):
