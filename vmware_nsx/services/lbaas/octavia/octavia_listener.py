@@ -323,7 +323,6 @@ class NSXOctaviaListenerEndpoint(object):
 
         def dummy_completor(success=True):
             pass
-
         completor = self.get_completor_func(constants.LOADBALANCERS,
                                             loadbalancer, delete=True)
 
@@ -344,6 +343,9 @@ class NSXOctaviaListenerEndpoint(object):
                     pool['loadbalancer'] = loadbalancer
                 if pool.get('listener_id'):
                     pool['listener'] = listener_dict[pool['listener_id']]
+                    if pool['listener'].get('default_pool'):
+                        pool['listener']['default_pool']['id'] = pool[
+                            'listener']['default_pool']['pool_id']
                     pool['listeners'] = [pool['listener']]
                 for member in pool.get('members', []):
                     if not member.get('pool'):
