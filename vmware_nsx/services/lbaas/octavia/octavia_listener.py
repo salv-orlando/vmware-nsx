@@ -347,6 +347,8 @@ class NSXOctaviaListenerEndpoint(object):
                         pool['listener']['default_pool']['id'] = pool[
                             'listener']['default_pool']['pool_id']
                     pool['listeners'] = [pool['listener']]
+                else:
+                    pool['listeners'] = []
                 for member in pool.get('members', []):
                     if not member.get('pool'):
                         member['pool'] = pool
@@ -475,7 +477,7 @@ class NSXOctaviaListenerEndpoint(object):
         if pool.get('healthmonitor'):
             pool['healthmonitor']['pool'] = pool
             try:
-                self.healthmonitor.delete_cascade(
+                self.healthmonitor.delete(
                     ctx, pool['healthmonitor'], dummy_completor)
             except Exception as e:
                 delete_result['value'] = False
@@ -485,7 +487,12 @@ class NSXOctaviaListenerEndpoint(object):
             try:
                 if not member.get('pool'):
                     member['pool'] = pool
-                self.member.delete_cascade(ctx, member, dummy_completor)
+                if ('loadbalancer' in member['pool'] and
+                    not member.get('subnet_id')):
+                    # Use the parent vip_subnet_id instead
+                    member['subnet_id'] = member['pool']['loadbalancer'][
+                        'vip_subnet_id']
+                self.member.delete(ctx, member, dummy_completor)
             except Exception as e:
                 delete_result['value'] = False
                 LOG.error('NSX driver pool_delete failed to delete member'
