@@ -351,7 +351,7 @@ def stats_getter(context, core_plugin, ignore_list=None):
         try:
             # get the NSX statistics for this LB service
             stats_results = lb_service_client.get_statistics(
-                lb_service_id, silent=True).get('results', [])
+                lb_service_id, realtime=True, silent=True).get('results', [])
             if stats_results:
                 rsp = stats_results[0]
             else:
