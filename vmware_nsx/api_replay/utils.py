@@ -19,6 +19,8 @@ from oslo_config import cfg
 from oslo_utils import uuidutils
 import webob.exc
 
+from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
+
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 
@@ -245,19 +247,18 @@ class PrepareObjectForMigration(object):
         if remove_qos:
             body = self.drop_fields(body, ['qos_policy_id'])
 
+        num_allowed_pairs = nsxlib_consts.NUM_ALLOWED_IP_ADDRESSES_v4 - 1
         if 'allowed_address_pairs' in body:
             if not body['allowed_address_pairs']:
                 # remove allowed_address_pairs if empty:
                 del body['allowed_address_pairs']
             else:
-                # remove unsupported allowed_address_pairs
-                for pair in body['allowed_address_pairs']:
-                    ip = pair.get('ip_address')
-                    if len(ip.split('/')) > 1:
-                        LOG.warning("ignoring allowed_address_pair %s for "
-                                    "port %s as cidr is not supported",
-                                    pair, port['id'])
-                        body['allowed_address_pairs'].remove(pair)
+                if len(body['allowed_address_pairs']) > num_allowed_pairs:
+                    body['allowed_address_pairs'] = body[
+                        'allowed_address_pairs'][:num_allowed_pairs]
+                    LOG.warning("ignoring extra allowed_address_pair for "
+                                "port %s as only %s are allowed",
+                                port['id'], num_allowed_pairs)
 
         # remove port security if mac learning is enabled
         if (body.get('mac_learning_enabled') and
