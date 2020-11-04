@@ -303,10 +303,9 @@ def _nsx_status_to_lb_status(nsx_status):
                               'NO_STANDBY']:
         return lb_const.ONLINE
     # Statuses that are considered OFFLINE:
-    if nsx_status.upper() in ['PRIMARY_DOWN', 'DETACHED', 'DOWN', 'ERROR']:
+    if nsx_status.upper() in ['PRIMARY_DOWN', 'DETACHED', 'DOWN', 'ERROR',
+                              'DISABLED']:
         return lb_const.OFFLINE
-    if nsx_status.upper() == 'DISABLED':
-        return lb_const.DISABLED
 
     # default fallback
     LOG.debug("NSX LB status %s - interpreted as ONLINE", nsx_status)
