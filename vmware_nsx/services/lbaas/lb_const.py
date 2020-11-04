@@ -127,13 +127,16 @@ LISTENERS = 'listeners'
 POOLS = 'pools'
 MEMBERS = 'members'
 
+# Operating statuses
 ONLINE = 'ONLINE'
 OFFLINE = 'OFFLINE'
 DEGRADED = 'DEGRADED'
-ENABLED = 'ENABLED'
-DISABLED = 'DISABLED'
 ACTIVE = 'ACTIVE'
 ERROR = 'ERROR'
 UNKNOWN = 'UNKNOWN'
+
+# Admin states
+ENABLED = 'ENABLED'
+DISABLED = 'DISABLED'
 
 VMWARE_LB_VIP_OWNER = 'vmware-lb-vip'
