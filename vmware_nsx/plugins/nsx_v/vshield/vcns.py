@@ -388,6 +388,12 @@ class Vcns(object):
             VIP_RESOURCE, vip_vseid)
         return self.do_request(HTTP_GET, uri, decode=True)
 
+    def get_vips(self, edge_id):
+        uri = self._build_uri_path(
+            edge_id, LOADBALANCER_SERVICE,
+            VIP_RESOURCE)
+        return self.do_request(HTTP_GET, uri, decode=True)
+
     def update_vip(self, edge_id, vip_vseid, vip_new):
         uri = self._build_uri_path(
             edge_id, LOADBALANCER_SERVICE,
