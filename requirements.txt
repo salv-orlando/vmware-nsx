@@ -33,7 +33,7 @@ decorator>=4.4.1 # BSD
 # These repos are installed from git in OpenStack CI if the job
 # configures them as required-projects:
 neutron>=17.0.0.0 # Apache-2.0
-networking-l2gw>=16.0.0 # Apache-2.0
+networking-l2gw>=17.0.1 # Apache-2.0
 networking-sfc>=10.0.0.0 # Apache-2.0
 neutron-fwaas>=16.0.0.0 # Apache-2.0
 neutron-vpnaas>=17.0.0.0 # Apache-2.0
