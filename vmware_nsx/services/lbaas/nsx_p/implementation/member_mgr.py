@@ -67,7 +67,7 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         # to the member subnet's router.
         service_client = self.core_plugin.nsxpolicy.load_balancer.lb_service
         service = p_utils.get_lb_nsx_lb_service(
-            self.core_plugin.nsxpolicy, lb['id'])
+            self.core_plugin.nsxpolicy, lb['id'], try_old=True)
         if not service:
             completor(success=False)
             msg = (_('Cannot find loadbalancer %(lb_id)s service') %
