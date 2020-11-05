@@ -47,7 +47,7 @@ function install_neutron_projects {
             sudo chown -R ${USER}:${USER} src/${pkg}
         fi
     done
-    # same for l2wg which is out of stadium (last stable branch is ussuri)
+    # same for l2wg which is out of stadium
     pkg_list="networking-l2gw"
     for pkg in `echo $pkg_list`
     do
@@ -60,7 +60,7 @@ function install_neutron_projects {
         elif use_library_from_git $pkg; then
             echo "Project $pkg enabled explicitly from LIBS_FROM_GIT"
         else
-            sudo -H ${PIP} install -e "git+https://opendev.org/x/${pkg}@stable/ussuri#egg=${pkg_renamed}"
+            sudo -H ${PIP} install -e "git+https://opendev.org/x/${pkg}@${NEUTRON_BRANCH}#egg=${pkg_renamed}"
             sudo chown -R ${USER}:${USER} src/${pkg}
         fi
     done
