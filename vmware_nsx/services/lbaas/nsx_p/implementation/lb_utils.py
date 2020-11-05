@@ -23,6 +23,7 @@ from vmware_nsx.common import locking
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.nsx_p.implementation import lb_const as p_const
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsxlib.v3 import exceptions as nsxlib_exc
 from vmware_nsxlib.v3 import load_balancer as nsxlib_lb
 from vmware_nsxlib.v3.policy import constants as p_constants
 from vmware_nsxlib.v3.policy import utils as p_utils
@@ -256,7 +257,7 @@ def setup_session_persistence(nsxpolicy, pool, pool_tags, switch_type,
                    'listener_id': listener['id'],
                    'pool_id': pool['id']})
         if switch_type:
-            # There is aso a persistence profile to remove!
+            # There is also a persistence profile to remove!
             return (pp_id, functools.partial(delete_persistence_profile,
                                              nsxpolicy, profile_path))
 
@@ -276,7 +277,7 @@ def get_router_nsx_lb_service(nsxpolicy, router_id):
         return non_delete_services[0]
 
 
-def get_lb_nsx_lb_service(nsxpolicy, lb_id):
+def get_lb_nsx_lb_service(nsxpolicy, lb_id, try_old=False):
     tags_to_search = [{'scope': SERVICE_LB_TAG_SCOPE, 'tag': lb_id}]
     lb_services = nsxpolicy.search_by_tags(
         tags_to_search,
@@ -286,6 +287,17 @@ def get_lb_nsx_lb_service(nsxpolicy, lb_id):
                            if not srv.get('marked_for_delete')]
     if non_delete_services:
         return non_delete_services[0]
+
+    if try_old:
+        # old Lb service might just have the LB id.
+        try:
+            lb_service = nsxpolicy.load_balancer.lb_service.get(lb_id)
+        except nsxlib_exc.ResourceNotFound:
+            LOG.error("Did not find LB %s service by tags or ID", lb_id)
+        else:
+            LOG.warning("Found LB service by Lb ID %s. Tags are not updated "
+                        "properly", lb_id)
+            return lb_service
 
 
 def get_service_lb_name(lb, router_id=None):

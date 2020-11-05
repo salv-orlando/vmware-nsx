@@ -80,7 +80,7 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         }
 
     def _get_virtual_server_kwargs(self, context, listener, vs_name, tags,
-                                   certificate=None):
+                                   lb_service_id, certificate=None):
         # If loadbalancer vip_port already has floating ip, use floating
         # IP as the virtual server VIP address. Else, use the loadbalancer
         # vip_address directly on virtual server.
@@ -91,14 +91,12 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             lb_vip_address = floating_ips[0]['floating_ip_address']
         else:
             lb_vip_address = listener['loadbalancer']['vip_address']
-        lb_service = lb_utils.get_lb_nsx_lb_service(
-            self.core_plugin.nsxpolicy, listener['loadbalancer_id'])
 
         kwargs = {'virtual_server_id': listener['id'],
                   'ip_address': lb_vip_address,
                   'ports': [listener['protocol_port']],
                   'application_profile_id': listener['id'],
-                  'lb_service_id': lb_service['id'],
+                  'lb_service_id': lb_service_id,
                   'description': listener.get('description')}
         if vs_name:
             kwargs['name'] = vs_name
@@ -173,12 +171,23 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                           listener['id'])
         tags = self._get_listener_tags(context, listener)
         self._validate_default_pool(listener, completor)
+
+        lb_service = lb_utils.get_lb_nsx_lb_service(
+            self.core_plugin.nsxpolicy, listener['loadbalancer_id'],
+            try_old=True)
+        if not lb_service:
+            completor(success=False)
+            msg = (_('Cannot find loadbalancer %(lb_id)s service') %
+                   {'lb_id': listener['loadbalancer_id']})
+            raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
+
         try:
             app_client = self._get_nsxlib_app_profile(nsxlib_lb, listener)
             app_client.create_or_overwrite(
                 lb_app_profile_id=listener['id'], name=vs_name, tags=tags)
             kwargs = self._get_virtual_server_kwargs(
-                context, listener, vs_name, tags, certificate)
+                context, listener, vs_name, tags, lb_service['id'],
+                certificate)
             vs_client.create_or_overwrite(**kwargs)
         except nsxlib_exc.ManagerError:
             completor(success=False)
@@ -255,10 +264,20 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 new_listener['id'])
         tags = self._get_listener_tags(context, new_listener)
 
+        lb_service = lb_utils.get_lb_nsx_lb_service(
+            self.core_plugin.nsxpolicy, new_listener['loadbalancer_id'],
+            try_old=True)
+        if not lb_service:
+            completor(success=False)
+            msg = (_('Cannot find loadbalancer %(lb_id)s service') %
+                   {'lb_id': new_listener['loadbalancer_id']})
+            raise n_exc.BadRequest(resource='lbaas-listener', msg=msg)
+
         try:
             app_profile_id = new_listener['id']
             updated_kwargs = self._get_virtual_server_kwargs(
-                context, new_listener, vs_name, tags, certificate)
+                context, new_listener, vs_name, tags, lb_service['id'],
+                certificate)
             vs_client.update(**updated_kwargs)
             if vs_name:
                 app_client.update(app_profile_id, name=vs_name,
