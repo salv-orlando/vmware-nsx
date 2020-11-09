@@ -92,6 +92,8 @@ DFW_SEQ = 1
 NSX_ROUTER_SECTIONS = []
 SERVICE_UP_RETRIES = 30
 
+END_API_TIMEOUT = 30 * 60
+
 
 def start_migration_process(nsxlib):
     """Notify the manager that the migration process is starting"""
@@ -99,8 +101,10 @@ def start_migration_process(nsxlib):
         "migration/mp-to-policy/workflow?action=INITIATE", None)
 
 
-def end_migration_process(nsxlib):
+def end_migration_process():
     """Notify the manager that the migration process has ended"""
+    # Using a new nsxlib instance to avoid retries, and add a long timeout
+    nsxlib = _get_nsxlib_from_config(verbose=True, for_end_api=True)
     return nsxlib.client.url_post(
         "migration/mp-to-policy/workflow?action=DONE", None)
 
@@ -1249,7 +1253,7 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         migrate_edge_firewalls(nsxlib, nsxpolicy, plugin)
 
         # Finalize the migration (cause policy realization)
-        end_migration_process(nsxlib)
+        end_migration_process()
 
         # Stop the migration service
         change_migration_service_status(start=False)
@@ -1272,7 +1276,7 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
                 send_rollback_request(nsxlib,
                                       {'migration_data': ROLLBACK_DATA})
             # Finalize the migration (Also needed after rollback)
-            end_migration_process(nsxlib)
+            end_migration_process()
             # Stop the migration service
             change_migration_service_status(start=False)
         except Exception as e:
@@ -1496,7 +1500,7 @@ def MP2Policy_pre_migration_check(resource, event, trigger, **kwargs):
             exit(1)
 
 
-def _get_nsxlib_from_config(verbose):
+def _get_nsxlib_from_config(verbose, for_end_api=False):
     """Update the current config and return a working nsxlib
     or exit with error
     """
@@ -1509,6 +1513,12 @@ def _get_nsxlib_from_config(verbose):
 
     retriables = [nsxlib_exc.APITransactionAborted,
                   nsxlib_exc.ServerBusy]
+
+    if for_end_api:
+        # enlarge timeouts and disable retries
+        cfg.CONF.set_override('http_read_timeout', END_API_TIMEOUT, 'nsx_v3')
+        cfg.CONF.set_override('http_retries', 0, 'nsx_v3')
+        cfg.CONF.set_override('retries', 0, 'nsx_v3')
 
     # Initialize the nsxlib objects, using just one of the managers because
     # the migration will be enabled only on one
@@ -1532,7 +1542,8 @@ def _get_nsxlib_from_config(verbose):
         else:
             cfg.CONF.set_override(
                 'nsx_api_password', [nsx_api_password[0]], 'nsx_v3')
-            utils.reset_global_nsxlib()
+
+        utils.reset_global_nsxlib()
         nsxlib = utils.get_connected_nsxlib(verbose=verbose,
                                             allow_overwrite_header=True,
                                             retriable_exceptions=retriables)
