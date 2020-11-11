@@ -118,8 +118,12 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         # Networks & subnets validations:
         networks = plugin.get_networks(admin_context)
         for net in networks:
-            # skip internal networks
+            # Skip internal networks
             if net['project_id'] == nsxv_constants.INTERNAL_TENANT_ID:
+                continue
+
+            # Skip public networks
+            if plugin._network_is_external(admin_context, net['id']):
                 continue
 
             # VXLAN or portgroup provider networks
