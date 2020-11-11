@@ -895,7 +895,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
     def migrate_octavia(self):
         """Migrates Octavia NSX objects to the new neutron driver.
-        The Octavia proccess & DB will remain unchanged.
+        The Octavia process & DB will remain unchanged.
         Using RPC connection to connect directly with the new plugin driver.
         """
         # Read all existing octavia resources
@@ -919,7 +919,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.octavia_rpc_client = messaging.RPCClient(transport, target)
 
         # Initialize RPC listener for getting status updates from the driver
-        # so that the rsource status will not change in the octavia DB
+        # so that the resource status will not change in the octavia DB
         topic = d_const.DRIVER_TO_OCTAVIA_MIGRATION_TOPIC
         server = socket.gethostname()
         target = messaging.Target(topic=topic, server=server,
@@ -929,6 +929,10 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             target = messaging.Target(namespace="control", version='1.0')
 
             def update_loadbalancer_status(self, **kw):
+                # Do nothing
+                pass
+
+            def update_listener_statistics(self, **kw):
                 # Do nothing
                 pass
 
