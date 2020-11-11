@@ -152,9 +152,11 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
                             (rule.get('name') or rule['id']))[:30]
             if rule.get('id'):
                 if is_ingress:
-                    rule['id'] = ('ingress-%s' % rule['id'])[:36]
+                    rule['id'] = ('ingress-%s-%s' % (nsx_port_id,
+                                                     rule['id']))[:36]
                 else:
-                    rule['id'] = ('egress-%s' % rule['id'])[:36]
+                    rule['id'] = ('egress-%s-%s' % (nsx_port_id,
+                                                    rule['id']))[:36]
 
         return translated_rules
 
