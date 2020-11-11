@@ -157,9 +157,11 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
                 # update rules ID to prevent DB duplications in
                 # NsxvEdgeFirewallRuleBinding
                 if is_ingress:
-                    rule['id'] = ('ingress-%s' % rule['id'])[:36]
+                    rule['id'] = ('ingress-%s-%s' % (replace_dest,
+                                                     rule['id']))[:36]
                 else:
-                    rule['id'] = ('egress-%s' % rule['id'])[:36]
+                    rule['id'] = ('egress-%s-%s' % (replace_src,
+                                                    rule['id']))[:36]
             # source & destination should be lists
             if (rule.get('destination_ip_address') and
                 not rule['destination_ip_address'].startswith('0.0.0.0')):
