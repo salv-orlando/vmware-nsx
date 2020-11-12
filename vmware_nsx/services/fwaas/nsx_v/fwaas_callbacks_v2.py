@@ -83,17 +83,22 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
             ctx_elevated, router_id)
 
         fw_rules = []
+        fwg_ids = []
+        router_dict = {}
         # Add firewall rules per port attached to a firewall group
         for port in router_interfaces:
             fwg = self.get_port_fwg(ctx_elevated, port['id'])
             if fwg:
-                router_dict = {}
-                self.core_plugin._extend_nsx_router_dict(
-                    router_dict, router_db)
+                if not router_dict:
+                    self.core_plugin._extend_nsx_router_dict(
+                        router_dict, router_db)
                 if router_dict['distributed']:
                     # The vnic_id is ignored for distributed routers, so
                     # each rule will be applied to all the interfaces.
                     vnic_id = None
+                    # if rules for this fwg where already added skip it
+                    if fwg['id'] in fwg_ids:
+                        continue
                 else:
                     # get the interface vnic
                     edge_vnic_bind = nsxv_db.get_edge_vnic_binding(
@@ -102,6 +107,7 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
                 # Add the FWaaS rules for this port
                 fw_rules.extend(
                     self.get_port_translated_rules(vnic_id, fwg))
+                fwg_ids.append(fwg['id'])
 
         return fw_rules
 
@@ -118,12 +124,14 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
                 firewall_group['ingress_rule_list'],
                 replace_dest=vnic_id,
                 logged=logged,
-                is_ingress=True))
+                is_ingress=True,
+                fwg_id=firewall_group['id']))
             port_rules.extend(self.translate_rules(
                 firewall_group['egress_rule_list'],
                 replace_src=vnic_id,
                 logged=logged,
-                is_ingress=False))
+                is_ingress=False,
+                fwg_id=firewall_group['id']))
 
         # Add ingress/egress block rules for this port
         default_ingress = {'name': "Block port ingress",
@@ -140,7 +148,7 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
         return port_rules
 
     def translate_rules(self, fwaas_rules, replace_dest=None, replace_src=None,
-                        logged=False, is_ingress=True):
+                        logged=False, is_ingress=True, fwg_id=None):
         translated_rules = []
         for rule in fwaas_rules:
             if not rule['enabled']:
@@ -157,10 +165,12 @@ class NsxvFwaasCallbacksV2(com_callbacks.NsxFwaasCallbacksV2):
                 # update rules ID to prevent DB duplications in
                 # NsxvEdgeFirewallRuleBinding
                 if is_ingress:
-                    rule['id'] = ('ingress-%s-%s' % (replace_dest,
+                    rule['id'] = ('ingress-%s-%s' % (replace_dest or
+                                                     fwg_id[:15],
                                                      rule['id']))[:36]
                 else:
-                    rule['id'] = ('egress-%s-%s' % (replace_src,
+                    rule['id'] = ('egress-%s-%s' % (replace_src or
+                                                    fwg_id[:15],
                                                     rule['id']))[:36]
             # source & destination should be lists
             if (rule.get('destination_ip_address') and
