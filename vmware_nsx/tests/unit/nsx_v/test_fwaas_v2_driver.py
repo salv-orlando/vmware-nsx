@@ -121,7 +121,7 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
     def _fake_translated_rules(self, rules_list,
                                nsx_port_id,
                                is_ingress=True,
-                               logged=False):
+                               logged=False, fwg_id=None):
         translated_rules = copy.copy(rules_list)
         for rule in translated_rules:
             if logged:
@@ -152,10 +152,10 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
                             (rule.get('name') or rule['id']))[:30]
             if rule.get('id'):
                 if is_ingress:
-                    rule['id'] = ('ingress-%s-%s' % (nsx_port_id,
+                    rule['id'] = ('ingress-%s-%s' % (nsx_port_id or fwg_id,
                                                      rule['id']))[:36]
                 else:
-                    rule['id'] = ('egress-%s-%s' % (nsx_port_id,
+                    rule['id'] = ('egress-%s-%s' % (nsx_port_id or fwg_id,
                                                     rule['id']))[:36]
 
         return translated_rules
@@ -356,7 +356,7 @@ class NsxvFwaasTestCase(test_v_plugin.NsxVPluginV2TestCase):
                               return_value=self.distributed_router):
             func('nsx', apply_list, firewall)
             expected_rules = self._fake_translated_rules(
-                rule_list, None, is_ingress=is_ingress) + [
+                rule_list, None, is_ingress=is_ingress, fwg_id=FAKE_FW_ID) + [
                 {'name': "Block port ingress",
                  'action': edge_firewall_driver.FWAAS_DENY,
                  'logged': False},
