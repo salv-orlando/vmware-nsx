@@ -1337,6 +1337,18 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+    def test_delete_cascade(self):
+        self.reset_completor()
+        with mock.patch.object(self.pool_client, 'delete'
+                               ) as mock_delete_pool:
+            self.edge_driver.pool.delete_cascade(
+                self.context, self.pool_dict,
+                self.completor)
+
+            mock_delete_pool.assert_called_with(LB_POOL_ID)
+            self.assertTrue(self.last_completor_called)
+            self.assertTrue(self.last_completor_succees)
+
     def test_delete_with_persistency(self):
         with mock.patch.object(self.vs_client, 'get'
                                ) as mock_vs_get, \
