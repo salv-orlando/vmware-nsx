@@ -240,4 +240,9 @@ class EdgePoolManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         completor(success=True)
 
     def delete_cascade(self, context, pool, completor):
+        # Listeners were already deleted
+        pool['listeners'] = []
+        pool['listener'] = None
+        pool['listener_id'] = None
+
         self.delete(context, pool, completor)
