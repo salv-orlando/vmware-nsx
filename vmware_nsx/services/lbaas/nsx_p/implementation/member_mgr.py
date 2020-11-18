@@ -134,6 +134,10 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                           connectivity_path=connectivity_path)
                     p_utils.update_router_lb_vip_advertisement(
                         context, self.core_plugin, router_id)
+                    # Update the LB gateway policy now that we have a router
+                    p_utils.set_allowed_cidrs_fw(self.core_plugin,
+                                                 context, lb, lb['listeners'])
+
                 except Exception as e:
                     with excutils.save_and_reraise_exception():
                         completor(success=False)

@@ -34,6 +34,8 @@ from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.tests.unit.services.lbaas import lb_data_models as lb_models
 from vmware_nsx.tests.unit.services.lbaas import lb_translators
+from vmware_nsxlib.v3 import exceptions as nsxlib_exc
+from vmware_nsxlib.v3.policy import constants as policy_constants
 
 
 # TODO(asarfaty): Use octavia models for those tests
@@ -160,6 +162,7 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
 
         self.lbv2_driver = mock.Mock()
         self.core_plugin = mock.Mock()
+        self.core_plugin._nsx_version = '2.5.0'
         base_mgr.LoadbalancerBaseManager._lbv2_driver = self.lbv2_driver
         base_mgr.LoadbalancerBaseManager._core_plugin = self.core_plugin
         self._patch_lb_plugin(self.lbv2_driver, self._tested_entity)
@@ -177,6 +180,10 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
         self.terminated_https_listener = lb_models.Listener(
             HTTPS_LISTENER_ID, LB_TENANT_ID, 'listener3', '', None, LB_ID,
             'TERMINATED_HTTPS', protocol_port=443, loadbalancer=self.lb)
+        self.allowed_cidr_listener = lb_models.Listener(
+            LISTENER_ID, LB_TENANT_ID, 'listener4', '', None, LB_ID,
+            'HTTP', protocol_port=80, allowed_cidrs=['1.1.1.0/24'],
+            loadbalancer=self.lb)
         self.pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool1', '',
                                    None, 'HTTP', 'ROUND_ROBIN',
                                    loadbalancer_id=LB_ID,
@@ -224,6 +231,8 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
             self.lb)
         self.listener_dict = lb_translators.lb_listener_obj_to_dict(
             self.listener)
+        self.cidr_list_dict = lb_translators.lb_listener_obj_to_dict(
+            self.allowed_cidr_listener)
         self.https_listener_dict = lb_translators.lb_listener_obj_to_dict(
             self.https_listener)
         self.terminated_https_listener_dict = lb_translators.\
@@ -688,7 +697,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
     def _tested_entity(self):
         return 'listener'
 
-    def _create_listener(self, protocol='HTTP'):
+    def _create_listener(self, protocol='HTTP', allowed_cidr=False):
         self.reset_completor()
         with mock.patch.object(self.core_plugin, 'get_floatingips'
                                ) as mock_get_floatingips, \
@@ -698,6 +707,11 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin.nsxpolicy, 'search_by_tags',
                               return_value={'results': [
                                   {'id': LB_SERVICE_ID}]}),\
+            mock.patch.object(self.core_plugin.nsxpolicy.gateway_policy,
+                              'get',
+                              side_effect=nsxlib_exc.ResourceNotFound), \
+            mock.patch.object(self.core_plugin.nsxpolicy.gateway_policy,
+                              'create_with_entries') as create_gw_pol, \
             mock.patch.object(self.vs_client, 'create_or_overwrite'
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
@@ -706,6 +720,8 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             if protocol == 'HTTPS':
                 listener = self.https_listener_dict
                 listener_id = HTTP_LISTENER_ID
+            if allowed_cidr:
+                listener = self.cidr_list_dict
 
             self.edge_driver.listener.create(self.context, listener,
                                              self.completor)
@@ -725,8 +741,28 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
 
+            if not allowed_cidr:
+                create_gw_pol.assert_not_called()
+            else:
+                create_gw_pol.assert_called_once_with(
+                    'LB %s allowed cidrs' % LB_ID,
+                    policy_constants.DEFAULT_DOMAIN,
+                    map_id=LB_ID,
+                    category=policy_constants.CATEGORY_LOCAL_GW,
+                    description=mock.ANY,
+                    entries=[mock.ANY],
+                    tags=mock.ANY)
+
     def test_create_http_listener(self):
         self._create_listener()
+
+    def test_create_allowed_cidr_listener(self):
+        orig_nsx_ver = self.core_plugin._nsx_version
+        self.core_plugin._nsx_version = '3.1.0'
+        with mock.patch.object(lb_utils, 'get_router_from_network',
+                               return_value=ROUTER_ID):
+            self._create_listener(allowed_cidr=True)
+        self.core_plugin._nsx_version = orig_nsx_ver
 
     def test_create_https_listener(self):
         self._create_listener(protocol='HTTPS')
@@ -1068,6 +1104,8 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         self.reset_completor()
         with mock.patch.object(self.service_client, 'get'
                                ) as mock_get_lb_service, \
+            mock.patch.object(self.core_plugin, 'get_floatingips',
+                              return_value=[]), \
             mock.patch.object(self.app_client, 'delete'
                               ) as mock_delete_app_profile, \
             mock.patch.object(self.vs_client, 'delete'
@@ -1089,6 +1127,8 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
         self.reset_completor()
         with mock.patch.object(self.service_client, 'get'
                                ) as mock_get_lb_service, \
+            mock.patch.object(self.core_plugin, 'get_floatingips',
+                              return_value=[]), \
             mock.patch.object(self.app_client, 'delete'
                               ) as mock_delete_app_profile, \
             mock.patch.object(self.vs_client, 'delete'
@@ -1599,6 +1639,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             mock.patch.object(self.core_plugin, 'get_floatingips',
                               return_value=[{
                                   'fixed_ip_address': MEMBER_ADDRESS,
+                                  'floating_ip_address': '1.1.1.1',
                                   'router_id': LB_ROUTER_ID}]),\
             mock.patch.object(self.pool_client,
                               'create_pool_member_and_add_to_pool'

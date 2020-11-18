@@ -139,6 +139,19 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
             lb_dict['vip_port_id'] = db_lb.vip.port_id
             lb_dict['vip_network_id'] = db_lb.vip.network_id
             lb_dict['vip_subnet_id'] = db_lb.vip.subnet_id
+        # Add the listeners to the dictionary
+        listeners = []
+        for listener in db_lb.listeners:
+            db_listener = self.repositories.listener.get(
+                db_apis.get_session(), id=listener.id)
+            listener_obj = oct_utils.db_listener_to_provider_listener(
+                db_listener)
+            listener_dict = listener_obj.to_dict(
+                recurse=False, render_unsets=True)
+            # Add allowed cidrs too
+            listener_dict['allowed_cidrs'] = listener_obj.allowed_cidrs
+            listeners.append(listener_dict)
+        lb_dict['listeners'] = listeners
         return lb_dict
 
     def _get_listener_in_pool_dict(self, pool_dict, is_update):
