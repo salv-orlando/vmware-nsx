@@ -185,7 +185,7 @@ def _mock_nsx_backend_calls():
 
     mock.patch(
         "vmware_nsxlib.v3.NsxLib.get_version",
-        return_value='2.4.0').start()
+        return_value='3.1.0').start()
 
     mock.patch(
         "vmware_nsxlib.v3.load_balancer.Service.get_router_lb_service",
@@ -2721,8 +2721,8 @@ class TestL3NatTestCase(L3NatTest,
 
     def _prepare_external_subnet_on_address_scope(self,
                                                   ext_net,
-                                                  address_scope):
-        as_id = address_scope['address_scope']['id']
+                                                  addr_scope):
+        as_id = addr_scope['address_scope']['id']
         subnet = netaddr.IPNetwork('10.10.10.0/21')
         subnetpool = self._test_create_subnetpool(
             [subnet.cidr], name='sp1',
