@@ -128,7 +128,8 @@ class TestNSXv3ExtendedSGRule(test_nsxv3_plugin.NsxV3PluginTestCaseMixin,
              'port_range_max': None,
              'security_group_id': mock.ANY,
              'remote_group_id': None, 'direction': u'ingress',
-             'description': ''}]
+             'description': '',
+             'standard_attr_id': mock.ANY}]
 
         with mock.patch(
             "vmware_nsxlib.v3.security.NsxLibFirewallSection."
@@ -171,7 +172,8 @@ class TestNSXv3ExtendedSGRule(test_nsxv3_plugin.NsxV3PluginTestCaseMixin,
              'security_group_id': mock.ANY,
              'remote_group_id': None,
              'direction': u'ingress',
-             'description': ''}]
+             'description': '',
+             'standard_attr_id': mock.ANY}]
 
         with mock.patch(
             "vmware_nsxlib.v3.security.NsxLibFirewallSection."
