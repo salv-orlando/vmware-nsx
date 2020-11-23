@@ -19,6 +19,8 @@ from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
 
+from neutron_lib import exceptions as n_exc
+
 from vmware_nsx._i18n import _
 from vmware_nsx.common import exceptions as nsxv_exc
 from vmware_nsx.common import locking
@@ -158,6 +160,14 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         lb_binding = nsxv_db.get_nsxv_lbaas_loadbalancer_binding(
             context.session, lb_id)
         edge_id = lb_binding['edge_id']
+
+        # Validate the listener protocol
+        if (listener.get('protocol') and
+            listener['protocol'] not in lb_const.PROTOCOL_MAP):
+            completor(success=False)
+            msg = (_("Listener protocol %s is not supported") %
+                   listener['protocol'])
+            raise n_exc.BadRequest(resource='edge-lbaas', msg=msg)
 
         if listener.get('default_pool') and listener['default_pool'].get('id'):
             pool_binding = nsxv_db.get_nsxv_lbaas_pool_binding(
