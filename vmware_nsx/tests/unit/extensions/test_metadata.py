@@ -310,6 +310,7 @@ class MetaDataTestCase(object):
     def test_metadata_dhcp_host_route(self):
         self._metadata_setup(config.MetadataModes.INDIRECT)
         subnets = self._list('subnets')['subnets']
+        self.assertEqual(len(subnets), 0)
         with self.subnet() as s:
             with self.port(subnet=s, device_id='1234',
                            device_owner=constants.DEVICE_OWNER_DHCP) as port:
@@ -324,5 +325,6 @@ class MetaDataTestCase(object):
             self._delete('ports', port['port']['id'])
             subnets = self._list('subnets')['subnets']
             # Test that route is deleted after dhcp port is removed.
+            self.assertEqual(len(subnets), 1)
             self.assertEqual(len(subnets[0]['host_routes']), 0)
         self._metadata_teardown()

@@ -165,6 +165,7 @@ class RouterExclusiveDriver(router_driver.RouterBaseDriver):
 
         super(nsx_v.NsxVPluginV2, self.plugin)._update_router_gw_info(
             context, router_id, info, router=router)
+        router = self.plugin._get_router(context, router_id)
 
         new_ext_net_id = router.gw_port_id and router.gw_port.network_id
         new_enable_snat = router.enable_snat

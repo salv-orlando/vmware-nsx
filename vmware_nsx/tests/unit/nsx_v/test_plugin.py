@@ -4211,6 +4211,15 @@ class NsxVTestSecurityGroup(ext_sg.TestSecurityGroups,
                 del_rule.assert_called_once_with(
                     mock.ANY, rule["security_group_rule"]["id"])
 
+    def test_create_security_group_rule_remote_address_group_id(self):
+        self.skipTest('No support for SG address groups')
+
+    def test_delete_address_group_in_use(self):
+        self.skipTest('No support for SG address groups')
+
+    def test_create_security_group_rule_multiple_remotes(self):
+        self.skipTest('No support for SG address groups')
+
 
 class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
                       test_l3_plugin.L3NatDBIntTestCase,

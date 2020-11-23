@@ -103,3 +103,12 @@ class TestSecurityGroups(test_nsxv3.NsxV3PluginTestCaseMixin,
 
             except exc.HTTPClientError:
                 pass
+
+    def test_create_security_group_rule_remote_address_group_id(self):
+        self.skipTest('No support for SG address groups')
+
+    def test_delete_address_group_in_use(self):
+        self.skipTest('No support for SG address groups')
+
+    def test_create_security_group_rule_multiple_remotes(self):
+        self.skipTest('No support for SG address groups')

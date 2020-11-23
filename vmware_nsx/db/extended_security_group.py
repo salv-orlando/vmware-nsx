@@ -28,6 +28,7 @@ from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib import constants as n_constants
+from neutron_lib import context as n_context
 from neutron_lib.db import api as db_api
 from neutron_lib.db import model_base
 from neutron_lib.db import resource_extend
@@ -139,7 +140,8 @@ class ExtendedSecurityGroupPropertiesMixin(object):
         sg_res[provider_sg.PROVIDER] = sg_req.get(provider_sg.PROVIDER, False)
         sg_res[sg_policy.POLICY] = sg_req.get(sg_policy.POLICY)
 
-    def _get_security_group_properties(self, context, security_group_id):
+    @staticmethod
+    def _get_security_group_properties(context, security_group_id):
         with db_api.CONTEXT_READER.using(context):
             try:
                 prop = context.session.query(
@@ -365,13 +367,21 @@ class ExtendedSecurityGroupPropertiesMixin(object):
     @staticmethod
     @resource_extend.extends([port_def.COLLECTION_NAME])
     def _extend_port_dict_provider_security_group(port_res, port_db):
+        context = n_context.get_admin_context()
         # Add the provider sg list to the port.
         # later we will remove those from the regular sg list
         provider_groups = []
         for sec_group_mapping in port_db.security_groups:
-            if (sec_group_mapping.extended_grp and
-                sec_group_mapping.extended_grp.provider is True):
-                provider_groups.append(sec_group_mapping['security_group_id'])
+            sg_id = sec_group_mapping.security_group_id
+            try:
+                sg_ext = ExtendedSecurityGroupPropertiesMixin.\
+                    _get_security_group_properties(context, sg_id)
+            except ext_sg.SecurityGroupNotFound:
+                pass
+            else:
+                if sg_ext.provider:
+                    provider_groups.append(
+                        sec_group_mapping['security_group_id'])
         port_res[provider_sg.PROVIDER_SECURITYGROUPS] = provider_groups
         return port_res
 

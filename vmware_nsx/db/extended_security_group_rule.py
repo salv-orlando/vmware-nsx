@@ -66,6 +66,10 @@ class ExtendedSecurityGroupRuleMixin(object):
         if not rule_specify_local_ip_prefix:
             # remove ATTR_NOT_SPECIFIED
             rule[ext_local_ip.LOCAL_IP_PREFIX] = None
+
+        # remote_address_group_id is not yet supported and might be missing
+        if 'remote_address_group_id' not in rule:
+            rule['remote_address_group_id'] = None
         return rule_specify_local_ip_prefix
 
     def _process_security_group_rule_properties(self, context,

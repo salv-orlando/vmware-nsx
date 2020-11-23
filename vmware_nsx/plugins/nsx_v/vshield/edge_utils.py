@@ -24,6 +24,7 @@ from neutron_lib.api.definitions import extra_dhcp_opt as ext_edo
 from neutron_lib.api import validators
 from neutron_lib import constants
 from neutron_lib import context as q_context
+from neutron_lib.db import api as db_api
 from neutron_lib import exceptions as n_exc
 from neutron_lib.exceptions import l3 as l3_exc
 from oslo_config import cfg
@@ -2643,8 +2644,9 @@ class NsxVCallbacks(object):
             if set_errors and context:
                 # Set the router status to ERROR
                 try:
-                    router_db = self.plugin._get_router(context, router_id)
-                    router_db['status'] = constants.ERROR
+                    with db_api.CONTEXT_WRITER.using(context):
+                        router_db = self.plugin._get_router(context, router_id)
+                        router_db['status'] = constants.ERROR
                 except l3_exc.RouterNotFound:
                     # Router might have been deleted before deploy finished
                     LOG.warning("Router %s not found", router_id)

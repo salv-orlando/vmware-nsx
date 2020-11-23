@@ -1552,7 +1552,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 raise nsx_exc.NsxPluginException(err_msg=msg)
 
         if not cfg.CONF.nsx_v3.native_dhcp_metadata:
-            nsx_rpc.handle_port_metadata_access(self, context, neutron_db)
+            with db_api.CONTEXT_WRITER.using(context):
+                nsx_rpc.handle_port_metadata_access(self, context, neutron_db)
         kwargs = {'context': context, 'port': neutron_db}
         registry.notify(resources.PORT, events.AFTER_CREATE, self, **kwargs)
         return port_data
@@ -1601,8 +1602,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if cfg.CONF.nsx_v3.native_dhcp_metadata:
             self._delete_port_mp_dhcp_binding(context, port)
         else:
-            nsx_rpc.handle_port_metadata_access(self, context, port,
-                                                is_delete=True)
+            with db_api.CONTEXT_WRITER.using(context):
+                nsx_rpc.handle_port_metadata_access(self, context, port,
+                                                    is_delete=True)
         super(NsxV3Plugin, self).delete_port(context, port_id)
 
     def _get_resource_type_for_device_id(self, device_owner, device_id):
@@ -2002,6 +2004,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         # and we need to make a big change so don't touch it at present.
         super(NsxV3Plugin, self)._update_router_gw_info(
             context, router_id, info, router=router)
+        router = self._get_router(context, router_id)
 
         new_tier0_uuid = self._get_tier0_uuid_by_router(context, router)
         new_enable_snat = router.enable_snat

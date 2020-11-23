@@ -2602,6 +2602,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # First update the neutron DB
         super(NsxPolicyPlugin, self)._update_router_gw_info(
             context, router_id, info, router=router)
+        router = self._get_router(context, router_id)
 
         # Get the new tier0 of the updated router (or None if GW was removed)
         new_tier0_uuid = self._get_tier0_uuid_by_router(context, router)

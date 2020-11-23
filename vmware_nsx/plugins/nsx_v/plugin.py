@@ -3773,7 +3773,6 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                                  'network_id': router.gw_port.network_id,
                                  'updated_port': updated_port
                              }))
-        context.session.expire(router.gw_port)
 
     def _update_router_gw_info(self, context, router_id, info,
                                is_routes_update=False,
