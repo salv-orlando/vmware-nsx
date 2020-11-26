@@ -2493,12 +2493,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if not cfg.CONF.nsx_p.allow_passthrough:
             return
 
-        # TODO(asarfaty): Update version or use feature once this is fixed
-        if utils.is_nsx_version_3_1_0(self._nsx_version):
-            LOG.debug("Not waiting for edge cluster realization with NSX %s",
-                      self._nsx_version)
-            return
-
         lr_id = self.nsxpolicy.tier1.get_realized_id(
             router_id, entity_type='RealizedLogicalRouter')
         if not lr_id:
