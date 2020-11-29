@@ -114,9 +114,12 @@ def send_migration_request(nsxlib, body):
     return nsxlib.client.url_post("migration/mp-to-policy", body)
 
 
-def send_rollback_request(nsxlib, body):
+def send_rollback_request(body):
     #TODO(asarfaty): Rollback can take very long, especially for firewall
     # sections. In this case backup-restore might be better
+
+    # Using a new nsxlib instance to avoid retries, and add a long timeout
+    nsxlib = _get_nsxlib_from_config(verbose=True, for_end_api=True)
     return nsxlib.client.url_post("migration/mp-to-policy/rollback", body)
 
 
@@ -1272,8 +1275,8 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
             global ROLLBACK_DATA
             if ROLLBACK_DATA:
                 LOG.info("Rolling migration back %s", ROLLBACK_DATA)
-                send_rollback_request(nsxlib,
-                                      {'migration_data': ROLLBACK_DATA})
+                send_rollback_request({'migration_data': ROLLBACK_DATA})
+                LOG.info("Roll back done.")
             # Finalize the migration (Also needed after rollback)
             end_migration_process()
             # Stop the migration service
