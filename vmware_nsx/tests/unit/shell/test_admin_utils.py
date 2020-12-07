@@ -394,6 +394,7 @@ class TestNsxpAdminUtils(AbstractTestAdminUtils,
         return 'nsxp'
 
     def _init_mock_plugin(self):
+        super(TestNsxpAdminUtils, self)._init_mock_plugin()
         self._plugin = nsxp_utils.NsxPolicyPluginWrapper()
 
     def test_nsxp_resources(self):
