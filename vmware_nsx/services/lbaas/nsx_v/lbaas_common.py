@@ -90,13 +90,16 @@ def get_lb_interface(context, plugin, lb_id, subnet_id):
 
 
 def create_lb_interface(context, plugin, lb_id, subnet_id, tenant_id,
-                        vip_addr=None, subnet=None):
+                        vip_addr=None, subnet=None, internal=False):
     if not subnet:
         subnet = plugin.get_subnet(context, subnet_id)
     network_id = subnet.get('network_id')
     network = plugin.get_network(context.elevated(), network_id)
 
-    port_dict = {'name': 'lb_if-' + lb_id,
+    name = 'lb_if-' + lb_id
+    if internal:
+        name = "internal for V2T migration"
+    port_dict = {'name': name,
                  'admin_state_up': True,
                  'network_id': network_id,
                  'tenant_id': tenant_id,
@@ -131,13 +134,14 @@ def create_lb_interface(context, plugin, lb_id, subnet_id, tenant_id,
             network_id, address_groups)
 
 
-def delete_lb_interface(context, plugin, lb_id, subnet_id):
+def delete_lb_interface(context, plugin, lb_id, subnet_id, internal=False):
     resource_id = get_lb_edge_name(context, lb_id)
     subnet = plugin.get_subnet(context, subnet_id)
     network_id = subnet.get('network_id')
     lb_ports = get_lb_interface(context, plugin, lb_id, subnet_id)
     for lb_port in lb_ports:
-        plugin.delete_port(context, lb_port['id'], allow_delete_lb_if=True)
+        plugin.delete_port(context, lb_port['id'], allow_delete_lb_if=True,
+                           allow_delete_internal=internal)
 
     edge_utils.delete_interface(plugin.nsx_v, context, resource_id, network_id,
                                 dist=False)

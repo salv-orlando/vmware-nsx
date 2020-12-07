@@ -60,6 +60,8 @@ class Operations(enum.Enum):
     NSX_RECREATE = 'nsx-recreate'
     NSX_REDISTRIBURE = 'nsx-redistribute'
     NSX_REORDER = 'nsx-reorder'
+    NSX_DISCONNECT = 'nsx-disconnect'
+    NSX_RECONNECT = 'nsx-reconnect'
     NSX_TAG_DEFAULT = 'nsx-tag-default'
     NSX_MIGRATE_V_V3 = 'nsx-migrate-v-v3'
     MIGRATE_TO_POLICY = 'migrate-to-policy'
@@ -168,7 +170,9 @@ nsxv_resources = {
                               [Operations.NSX_LIST.value,
                                Operations.NEUTRON_LIST.value,
                                Operations.NSX_UPDATE.value,
-                               Operations.NSX_UPDATE_ALL.value]),
+                               Operations.NSX_UPDATE_ALL.value,
+                               Operations.NSX_DISCONNECT.value,
+                               Operations.NSX_RECONNECT.value]),
     constants.BACKUP_EDGES: Resource(constants.BACKUP_EDGES,
                                      [Operations.LIST.value,
                                       Operations.CLEAN.value,

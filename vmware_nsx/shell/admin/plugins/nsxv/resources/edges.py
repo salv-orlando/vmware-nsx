@@ -16,34 +16,34 @@
 import pprint
 import textwrap
 
+from neutron_lib.callbacks import registry
+from neutron_lib import context as n_context
+from neutron_lib import exceptions
+from neutron_lib.exceptions import l3 as l3_exc
+from oslo_config import cfg
+from oslo_log import log as logging
+
 from vmware_nsx.common import config
+from vmware_nsx.common import nsxv_constants
+from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs
+from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
+from vmware_nsx.plugins.nsx_v.vshield.common import (
+    constants as vcns_const)
+from vmware_nsx.plugins.nsx_v.vshield.common import (
+    exceptions as nsxv_exceptions)
 from vmware_nsx.plugins.nsx_v.vshield import edge_utils
 from vmware_nsx.plugins.nsx_v.vshield import vcns_driver
 from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
-
-import vmware_nsx.shell.admin.plugins.common.utils as admin_utils
-import vmware_nsx.shell.admin.plugins.nsxv.resources.utils as utils
-import vmware_nsx.shell.resources as shell
-
-from neutron_lib.callbacks import registry
-from neutron_lib import context as n_context
-from neutron_lib import exceptions
-from oslo_config import cfg
-from oslo_log import log as logging
-
-from vmware_nsx.common import nsxv_constants
-from vmware_nsx.db import nsxv_db
-from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
-from vmware_nsx.plugins.nsx_v.vshield.common import (
-    constants as vcns_const)
-import vmware_nsx.plugins.nsx_v.vshield.common.exceptions as nsxv_exceptions
-
+from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
+from vmware_nsx.shell import resources as shell
 
 LOG = logging.getLogger(__name__)
 nsxv = utils.get_nsxv_client()
+INTERNAL_SUBNET = "169.254"
 
 
 @admin_utils.output_header
@@ -649,6 +649,160 @@ def nsx_update_edges(resource, event, trigger, **kwargs):
                   "to update.", {'result': result, 'total': total})
 
 
+def _update_edge_interface_conectivity(edge_id, interface, disconnect,
+                                       nsxv_manager, distributed,
+                                       router_admin_state_up):
+    # keep the 169.254 interfaces connected and disable all the rest
+    primary_ip = None
+    addr_grp = interface.get('addressGroups', {}).get('addressGroups', [])
+    if len(addr_grp):
+        primary_ip = addr_grp[0]['primaryAddress']
+    else:
+        # Skip interfaces with no IPs
+        if (not interface.get('subInterfaces') or
+            not interface['subInterfaces'].get('subInterfaces')):
+            LOG.debug("Interface %s has no addressGroups and will not be "
+                      "modified", interface.get('name'))
+            return
+
+    # skip interfaces on 169.254 subnet
+    if primary_ip and primary_ip.startswith(INTERNAL_SUBNET):
+        LOG.debug("Interface %s is on the %s.0.0 network and will not be "
+                  "modified", interface.get('name'), INTERNAL_SUBNET)
+        return
+
+    # skip interfaces that are already connected/disconnected
+    if ((disconnect and not interface['isConnected']) or
+        (not disconnect and interface['isConnected'])):
+        LOG.debug("Interface %s already %s: %s", interface.get('name'),
+                  'disconnected' if disconnect else 'connected', interface)
+        return
+
+    # if the router admin state is down, skip internal interfaces
+    if not router_admin_state_up and interface.get('type') == 'internal':
+        LOG.debug("Skipping internal interface %s as router admin state "
+                  "is down", interface.get('name'))
+        return
+
+    if interface.get('portgroupId') or interface.get('connectedToId'):
+        # Its an active interface
+        interface['isConnected'] = not disconnect
+        try:
+            if distributed:
+                nsxv_manager.vcns.update_vdr_internal_interface(
+                    edge_id, interface['index'], {'interface': interface})
+            else:
+                nsxv_manager.vcns.update_interface(edge_id, interface)
+            LOG.info("%s interface %s of %s %s",
+                     'Disconneted' if disconnect else 'Connected',
+                     interface['name'], edge_id,
+                     '(distributed)' if distributed else '')
+        except Exception as e:
+            LOG.error("Failed with %s", e)
+
+
+def _update_edges_connectivity(disconnect=True):
+    edges = utils.get_nsxv_backend_edges()
+    context = n_context.get_admin_context()
+    internal_subnet = None
+
+    with utils.NsxVPluginWrapper() as plugin:
+        nsxv_manager = vcns_driver.VcnsDriver(
+            edge_utils.NsxVCallbacks(plugin))
+        for edge in edges:
+            edge_id = edge.get('id')
+            # check that this is a neutron edge
+            bindings = nsxv_db.get_nsxv_router_binding_by_edge(
+                context.session, edge_id)
+            if not bindings:
+                LOG.info("Skipping non-neutron %s %s",
+                         edge_id, edge.get('name'))
+                continue
+            router_id = bindings.router_id
+            router_admin_state_up = True
+            try:
+                rtr_obj = plugin.get_router(context, router_id)
+            except l3_exc.RouterNotFound:
+                pass
+            else:
+                router_admin_state_up = rtr_obj.get('admin_state_up', True)
+
+            # skip backup edges
+            if not edge.get('name') or edge['name'].startswith('backup-'):
+                LOG.info("Skipping backup %s %s",
+                         edge_id, edge['name'])
+                continue
+
+            LOG.error("%s interfaces of %s %s",
+                      'Disconnecting' if disconnect else 'Connecting',
+                      edge_id, edge['name'])
+
+            if edge.get('type') == 'distributedRouter':
+                header, response = nsxv_manager.vcns.get_edge_interfaces(
+                    edge_id)
+                for interface in response['interfaces']:
+                    _update_edge_interface_conectivity(
+                        edge_id, interface, disconnect, nsxv_manager,
+                        True, router_admin_state_up)
+            elif edge['name'].startswith('lbaas-'):
+                # if the uplink interface has no ip - keep it, and disconnect
+                # all the rest.
+                # else - add/delete a dummy interface and disconnect all others
+                uplink_ip = None
+                h, uplink_if = nsxv_manager.vcns.query_interface(edge_id, 0)
+                if uplink_if:
+                    addr_grp = uplink_if.get('addressGroups', {}).get(
+                        'addressGroups', [])
+                    uplink_ip = None
+                    if len(addr_grp):
+                        uplink_ip = addr_grp[0]['primaryAddress']
+                    if uplink_ip:
+                        # create/delete an interface on the inter-edge network
+                        if not internal_subnet:
+                            int_net = nsxv_db.get_nsxv_internal_network_for_az(
+                                context.session, "inter_edge_net", "default")
+                            subnets = plugin.get_subnets(
+                                context, fields=['id'],
+                                filters={'network_id': [int_net.network_id]})
+                            internal_subnet = subnets[0]['id']
+                        lb_id = edge['name'][6:]
+                        if disconnect:
+                            lb_common.create_lb_interface(
+                                context, plugin, lb_id, internal_subnet,
+                                "internal", internal=True)
+
+                header, response = nsxv_manager.vcns.get_interfaces(edge_id)
+                for interface in response['vnics']:
+                    if not uplink_ip and interface['index'] == 0:
+                        # change the connectivity of the uplink only if it
+                        # does not have ip
+                        continue
+                    _update_edge_interface_conectivity(
+                        edge_id, interface, disconnect, nsxv_manager,
+                        False, router_admin_state_up)
+                if uplink_ip and not disconnect:
+                    # Remove the dummy interface
+                    lb_common.delete_lb_interface(context, plugin, lb_id,
+                                                  internal_subnet,
+                                                  internal=True)
+            else:
+                header, response = nsxv_manager.vcns.get_interfaces(edge_id)
+                for interface in response['vnics']:
+                    _update_edge_interface_conectivity(
+                        edge_id, interface, disconnect, nsxv_manager,
+                        False, router_admin_state_up)
+
+
+@admin_utils.output_header
+def nsx_disconnect_edges(resource, event, trigger, **kwargs):
+    return _update_edges_connectivity(disconnect=True)
+
+
+@admin_utils.output_header
+def nsx_reconnect_edges(resource, event, trigger, **kwargs):
+    return _update_edges_connectivity(disconnect=False)
+
+
 registry.subscribe(nsx_list_edges,
                    constants.EDGES,
                    shell.Operations.NSX_LIST.value)
@@ -676,3 +830,9 @@ registry.subscribe(list_orphaned_router_bindings,
 registry.subscribe(clean_orphaned_router_bindings,
                    constants.ORPHANED_BINDINGS,
                    shell.Operations.CLEAN.value)
+registry.subscribe(nsx_disconnect_edges,
+                   constants.EDGES,
+                   shell.Operations.NSX_DISCONNECT.value)
+registry.subscribe(nsx_reconnect_edges,
+                   constants.EDGES,
+                   shell.Operations.NSX_RECONNECT.value)
