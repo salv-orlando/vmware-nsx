@@ -204,7 +204,7 @@ class FakeVcns(object):
         header = {
             'status': 200
         }
-        response = ''
+        response = {'vnics': {}}
         return (header, response)
 
     def update_interface(self, edge_id, vnic):

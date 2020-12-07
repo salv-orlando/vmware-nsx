@@ -79,6 +79,14 @@ Edges
 
     nsxadmin -o nsx-update -r edges --property hostgroup=clean
 
+- Disconnect edges interfaces (for V2T migration)::
+
+    nsxadmin -o nsx-disconnect -r edges
+
+- Reconnect edges interfaces (for V2T migration rollback)::
+
+    nsxadmin -o nsx-reconnect -r edges
+
 Orphaned Edges
 ~~~~~~~~~~~~~~
 
