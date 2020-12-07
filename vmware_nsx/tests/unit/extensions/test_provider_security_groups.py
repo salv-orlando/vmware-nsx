@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 from unittest import mock
+
 import webob.exc
 
 from neutron.db import db_base_plugin_v2
@@ -20,7 +21,7 @@ from neutron.db import securitygroups_db
 from neutron.extensions import securitygroup as ext_sg
 from neutron.tests.unit.db import test_db_base_plugin_v2
 from neutron.tests.unit.extensions import test_securitygroup
-from neutron_lib import context
+from neutron_lib import context as neutron_context
 from neutron_lib.db import api as db_api
 
 from vmware_nsx.db import extended_security_group
@@ -250,7 +251,7 @@ class ProviderSecurityGroupExtTestCase(
             body = {'port': {'provider_security_groups': [
                 pvd_sg['security_group']['id']]}}
 
-            ctx = context.Context('', self._tenant_id)
+            ctx = neutron_context.Context('', self._tenant_id)
             req = self.new_update_request('ports', body,
                                           p['port']['id'], context=ctx)
             res = req.get_response(self.api)
@@ -294,7 +295,7 @@ class ProviderSecurityGroupExtTestCase(
 
         # Try deleting the request as the normal tenant returns forbidden
         # as a tenant is not allowed to delete this.
-        ctx = context.Context('', self._tenant_id)
+        ctx = neutron_context.Context('', self._tenant_id)
         self._delete('security-groups', pvd_sg_id,
                      expected_code=webob.exc.HTTPForbidden.code,
                      neutron_context=ctx)
@@ -319,7 +320,7 @@ class ProviderSecurityGroupExtTestCase(
 
         # Try deleting the request as the normal tenant returns forbidden
         # as a tenant is not allowed to delete this.
-        ctx = context.Context('', self._tenant_id)
+        ctx = neutron_context.Context('', self._tenant_id)
         self._delete('security-group-rules', sg_rule_id,
                      expected_code=webob.exc.HTTPForbidden.code,
                      neutron_context=ctx)
@@ -339,7 +340,8 @@ class ProviderSecurityGroupExtTestCase(
 
         req = self.new_create_request(
             'security-group-rules', data)
-        req.environ['neutron.context'] = context.Context('', self._tenant_id)
+        req.environ['neutron.context'] = neutron_context.Context(
+            '', self._tenant_id)
         res = req.get_response(self.ext_api)
         self.assertEqual(webob.exc.HTTPForbidden.code, res.status_int)
 

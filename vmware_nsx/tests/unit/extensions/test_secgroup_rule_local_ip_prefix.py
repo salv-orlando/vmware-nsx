@@ -14,6 +14,7 @@
 #    under the License.
 
 from unittest import mock
+
 import webob.exc
 
 from oslo_utils import uuidutils
