@@ -14,9 +14,6 @@
 #    under the License.
 
 from unittest import mock
-import webob.exc
-
-from oslo_utils import uuidutils
 
 from neutron.db import db_base_plugin_v2
 from neutron.db import securitygroups_db
@@ -25,6 +22,8 @@ from neutron.tests.unit.extensions import test_securitygroup
 from neutron_lib import constants as const
 from neutron_lib.db import api as db_api
 from neutron_lib.plugins import directory
+from oslo_utils import uuidutils
+import webob.exc
 
 from vmware_nsx.db import extended_security_group_rule as ext_rule_db
 from vmware_nsx.extensions import secgroup_rule_local_ip_prefix as ext_loip

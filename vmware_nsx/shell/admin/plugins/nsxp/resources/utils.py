@@ -13,13 +13,13 @@
 #    under the License.
 
 import logging
-from oslo_config import cfg
 
 from neutron.db import l3_dvr_db  # noqa
 from neutron import manager
 from neutron_lib import context
 from neutron_lib.plugins import constants as const
 from neutron_lib.plugins import directory
+from oslo_config import cfg
 
 from vmware_nsx.common import config
 from vmware_nsx.plugins.common_v3 import utils as v3_utils

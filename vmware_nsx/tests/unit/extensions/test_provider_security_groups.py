@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 from unittest import mock
-import webob.exc
 
 from neutron.db import db_base_plugin_v2
 from neutron.db import securitygroups_db
@@ -22,6 +21,7 @@ from neutron.tests.unit.db import test_db_base_plugin_v2
 from neutron.tests.unit.extensions import test_securitygroup
 from neutron_lib import context
 from neutron_lib.db import api as db_api
+import webob.exc
 
 from vmware_nsx.db import extended_security_group
 from vmware_nsx.extensions import providersecuritygroup as provider_sg

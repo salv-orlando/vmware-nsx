@@ -13,18 +13,17 @@
 #    under the License.
 
 import copy
+import logging
 import sys
 import time
-
-import logging
-import paramiko
-import tenacity
 
 from neutron.extensions import securitygroup as ext_sg
 from neutron_fwaas.db.firewall.v2 import firewall_db_v2
 from neutron_lib.callbacks import registry
 from neutron_lib import context
 from oslo_config import cfg
+import paramiko
+import tenacity
 
 from vmware_nsx.common import utils as nsx_utils
 from vmware_nsx.db import db
