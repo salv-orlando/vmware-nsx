@@ -23,7 +23,8 @@ from vmware_nsx.shell import resources as shell
 @admin_utils.output_header
 def cleanup_db_mappings(resource, event, trigger, **kwargs):
     """Delete all entries from nsx-t mapping tables in DB"""
-    return migration.cleanup_db_mappings(resource, event, trigger, **kwargs)
+    return migration. MP2Policy_cleanup_db_mappings(
+         resource, event, trigger, **kwargs)
 
 
 registry.subscribe(cleanup_db_mappings,

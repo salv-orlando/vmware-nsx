@@ -1,7 +1,7 @@
 [run]
 branch = True
 source = vmware_nsx
-omit = vmware_nsx/tests/*,vmware_nsx/*dvs*,vmware_nsx/api_replay/*,vmware_nsx/dhcp_meta/*,vmware_nsx/nsxlib/*,vmware_nsx/*lsn*,vmware_nsx/*tv*,vmware_nsx/api_client/*,vmware_nsx/common/profile*,vmware_nsx/shell/nsx_instance_if_migrate*,vmware_nsx/plugins/nsx_v/vshield/vcns.*,vmware_nsx/db/migration/alembic_migrations/*,vmware_nsx/shell/admin/plugins*,vmware_nsx/shell/admin/plugins/nsxv3/resources/migration*
+omit = vmware_nsx/tests/*,vmware_nsx/*dvs*,vmware_nsx/api_replay/*,vmware_nsx/dhcp_meta/*,vmware_nsx/nsxlib/*,vmware_nsx/*lsn*,vmware_nsx/*tv*,vmware_nsx/api_client/*,vmware_nsx/common/profile*,vmware_nsx/shell/nsx_instance_if_migrate*,vmware_nsx/plugins/nsx_v/vshield/vcns.*,vmware_nsx/db/migration/alembic_migrations/*,vmware_nsx/shell/admin/plugins/nsxv3/resources/migration*
 
 [report]
 ignore_errors = True
