@@ -1,5 +1,4 @@
 amqp==2.1.1
-bandit==1.1.0
 coverage==4.0
 decorator==4.3.0
 eventlet==0.24.1
@@ -38,7 +37,7 @@ pika==0.10.0
 prettytable==0.7.2
 psycopg2==2.7
 PyMySQL==0.7.6
-pylint==1.7.1
+pylint==1.9.2
 python-openstackclient==4.0.0
 reno==2.5.0
 requests==2.14.2
