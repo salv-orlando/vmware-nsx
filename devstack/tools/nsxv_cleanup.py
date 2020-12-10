@@ -53,14 +53,21 @@ import base64
 import optparse
 import sys
 
+import httplib2
 from oslo_serialization import jsonutils
-import requests
 import sqlalchemy as sa
 
 from vmware_nsx.db import nsx_models
 from vmware_nsx.db import nsxv_models
 
-requests.packages.urllib3.disable_warnings()
+
+class Response:
+    def __init__(self, httplib_response):
+        self.response = httplib_response
+        self.status_code = int(self.response[0]['status'])
+
+    def json(self):
+        return jsonutils.loads(self.response[1].decode())
 
 
 class NeutronNsxDB(object):
@@ -106,7 +113,6 @@ class VSMClient(object):
         self.endpoint = None
         self.content_type = "application/json"
         self.accept_type = "application/json"
-        self.verify = False
         self.secure = True
         self.interface = "json"
         self.url = None
@@ -115,6 +121,7 @@ class VSMClient(object):
         self.neutron_db = (NeutronNsxDB(db_connection) if db_connection
                            else None)
         self.__set_headers()
+        self.http = httplib2.Http(disable_ssl_certificate_validation=True)
 
     def __set_endpoint(self, endpoint):
         self.endpoint = endpoint
@@ -162,23 +169,31 @@ class VSMClient(object):
         headers['Accept'] = accept_type
         self.headers = headers
 
+    def _do_request(self, method, params=None, body=None):
+        param_list = []
+        if params:
+            for param in params.items():
+                param_list.append('%s=%s' % param)
+
+            self.url += '?%s' % '&'.join(param_list)
+
+        response = self.http.request(
+            self.url, method, headers=self.headers, body=body)
+        return Response(response)
+
     def get(self, endpoint=None, params=None):
         """
         Basic query method for json API request
         """
         self.__set_url(endpoint=endpoint)
-        response = requests.get(self.url, headers=self.headers,
-                                verify=self.verify, params=params)
-        return response
+        return self._do_request('GET', params=params)
 
     def delete(self, endpoint=None, params=None):
         """
         Basic delete API method on endpoint
         """
         self.__set_url(endpoint=endpoint)
-        response = requests.delete(self.url, headers=self.headers,
-                                   verify=self.verify, params=params)
-        return response
+        return self._do_request('DELETE', params=params)
 
     def post(self, endpoint=None, body=None):
         """
@@ -186,10 +201,7 @@ class VSMClient(object):
         """
         self.__set_url(endpoint=endpoint)
         self.__set_headers()
-        response = requests.post(self.url, headers=self.headers,
-                                 verify=self.verify,
-                                 data=jsonutils.dumps(body))
-        return response
+        return self._do_request('POST', body=jsonutils.dumps(body))
 
     def get_vdn_scope_id(self):
         """
