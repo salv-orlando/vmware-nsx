@@ -27,6 +27,7 @@ from neutron_lib.api.definitions import address_scope as ext_address_scope
 from neutron_lib.api.definitions import availability_zone as az_def
 from neutron_lib.api.definitions import network as net_def
 from neutron_lib.api.definitions import port as port_def
+from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api.definitions import subnet as subnet_def
 from neutron_lib.api import validators
 from neutron_lib.api.validators import availability_zone as az_validator
@@ -381,6 +382,16 @@ class NsxPluginBase(db_base_plugin_v2.NeutronDbPluginV2,
             LOG.info("_ensure_default_security_group fail for project %s. "
                      "Default security group already created", tenant_id)
             return self._get_default_sg_id(context, tenant_id)
+
+    def _raise_if_updates_provider_attributes(self, attrs):
+        """Raise exception if provider attributes are present.
+
+        This method is used for plugins that do not support
+        updating provider networks.
+        """
+        if any(validators.is_attr_set(attrs.get(a)) for a in pnet.ATTRIBUTES):
+            msg = _("Plugin does not support updating provider attributes")
+            raise n_exc.InvalidInput(error_message=msg)
 
 
 # Register the callback

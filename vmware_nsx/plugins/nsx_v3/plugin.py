@@ -59,7 +59,6 @@ from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
 from neutron.db import securitygroups_db
 from neutron.db import vlantransparent_db
-from neutron.extensions import providernet
 from neutron.extensions import securitygroup as ext_sg
 from neutron.plugins.common import utils as n_utils
 from neutron.plugins.ml2 import models as pbin_model
@@ -1440,7 +1439,7 @@ class NsxV3Plugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         original_net = super(NsxV3Plugin, self).get_network(context, id)
         net_data = network['network']
         # Neutron does not support changing provider network values
-        providernet._raise_if_updates_provider_attributes(net_data)
+        self._raise_if_updates_provider_attributes(net_data)
         self._validate_qos_policy_id(
             context, net_data.get(qos_consts.QOS_POLICY_ID))
         extern_net = self._network_is_external(context, id)

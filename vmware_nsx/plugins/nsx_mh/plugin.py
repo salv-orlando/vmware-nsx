@@ -60,7 +60,6 @@ from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
 from neutron.db import quota_db  # noqa
 from neutron.db import securitygroups_db
-from neutron.extensions import providernet
 from neutron.extensions import securitygroup as ext_sg
 from neutron.plugins.common import utils
 from neutron.quota import resource_registry
@@ -1068,8 +1067,18 @@ class NsxPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                 [db_utils.resource_fields(network,
                                           fields) for network in networks])
 
+    def _raise_if_updates_provider_attributes(self, attrs):
+        """Raise exception if provider attributes are present.
+
+        This method is used for plugins that do not support
+        updating provider networks.
+        """
+        if any(validators.is_attr_set(attrs.get(a)) for a in pnet.ATTRIBUTES):
+            msg = _("Plugin does not support updating provider attributes")
+            raise n_exc.InvalidInput(error_message=msg)
+
     def update_network(self, context, id, network):
-        providernet._raise_if_updates_provider_attributes(network['network'])
+        self._raise_if_updates_provider_attributes(network['network'])
         if network["network"].get("admin_state_up") is False:
             raise NotImplementedError(_("admin_state_up=False networks "
                                         "are not supported."))
