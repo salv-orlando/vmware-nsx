@@ -67,6 +67,7 @@ class Operations(enum.Enum):
     SHOW = 'show'
     VALIDATE = 'validate'
 
+
 ops = [op.value for op in Operations]
 
 

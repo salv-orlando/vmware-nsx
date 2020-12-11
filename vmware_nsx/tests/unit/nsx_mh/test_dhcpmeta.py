@@ -354,9 +354,9 @@ class LsnManagerTestCase(base.BaseTestCase):
 
     def _test_lsn_delete_by_network_with_exc(self, exc):
         self.mock_lsn_api.lsn_for_network_get.side_effect = exc
-        with mock.patch.object(lsn_man.LOG, 'warning') as l:
+        with mock.patch.object(lsn_man.LOG, 'warning') as log_mock:
             self.manager.lsn_delete_by_network(mock.ANY, self.net_id)
-            self.assertEqual(1, l.call_count)
+            self.assertEqual(1, log_mock.call_count)
 
     def test_lsn_delete_by_network_with_not_found(self):
         self._test_lsn_delete_by_network_with_exc(n_exc.NotFound)
@@ -430,10 +430,10 @@ class LsnManagerTestCase(base.BaseTestCase):
 
     def _test_lsn_port_delete_with_exc(self, exc):
         self.mock_lsn_api.lsn_port_delete.side_effect = exc
-        with mock.patch.object(lsn_man.LOG, 'warning') as l:
+        with mock.patch.object(lsn_man.LOG, 'warning') as log_mock:
             self.manager.lsn_port_delete(mock.ANY, mock.ANY, mock.ANY)
             self.assertEqual(1, self.mock_lsn_api.lsn_port_delete.call_count)
-            self.assertEqual(1, l.call_count)
+            self.assertEqual(1, log_mock.call_count)
 
     def test_lsn_port_delete_with_not_found(self):
         self._test_lsn_port_delete_with_exc(n_exc.NotFound)
@@ -658,9 +658,9 @@ class LsnManagerTestCase(base.BaseTestCase):
     def test_lsn_port_dispose_api_error(self):
         self.mock_lsn_api.lsn_port_delete.side_effect = (
             exception.NsxApiException)
-        with mock.patch.object(lsn_man.LOG, 'warning') as l:
+        with mock.patch.object(lsn_man.LOG, 'warning') as log_mock:
             self.manager.lsn_port_dispose(mock.ANY, self.net_id, self.mac)
-            self.assertEqual(1, l.call_count)
+            self.assertEqual(1, log_mock.call_count)
 
     def test_lsn_port_host_conf(self):
         with mock.patch.object(self.manager,

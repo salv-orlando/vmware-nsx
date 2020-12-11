@@ -271,10 +271,10 @@ class TestQosNsxV3Notification(base.BaseQosTestCase,
                         return_value=_policy),\
             mock.patch('neutron.objects.db.api.update_object',
                        return_value=rule_data):
-                self.assertRaises(
-                    exceptions.DriverCallError,
-                    self.qos_plugin.update_policy_bandwidth_limit_rule,
-                    self.ctxt, rule.id, _policy.id, rule_data)
+            self.assertRaises(
+                exceptions.DriverCallError,
+                self.qos_plugin.update_policy_bandwidth_limit_rule,
+                self.ctxt, rule.id, _policy.id, rule_data)
 
     @mock.patch.object(policy_object.QosPolicy, '_reload_rules')
     def test_dscp_rule_create_profile(self, *mocks):

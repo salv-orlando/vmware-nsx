@@ -84,9 +84,9 @@ def format_exception(etype, e, exception_locals):
     """
     msg = [_("Error. %(type)s exception: %(exc)s.") %
            {'type': etype, 'exc': e}]
-    l = dict((k, v) for k, v in six.iteritems(exception_locals)
+    data = dict((k, v) for k, v in six.iteritems(exception_locals)
              if k != 'request')
-    msg.append(_("locals=[%s]") % str(l))
+    msg.append(_("locals=[%s]") % str(data))
     return ' '.join(msg)
 
 

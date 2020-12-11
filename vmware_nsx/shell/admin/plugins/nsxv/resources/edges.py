@@ -327,7 +327,7 @@ def change_edge_ha(ha, edge_id):
         'enabled': ha}
     try:
         nsxv.enable_ha(edge_id, request)
-    except nsxv_exceptions.ResourceNotFound as e:
+    except nsxv_exceptions.ResourceNotFound:
         LOG.error("Edge %s not found", edge_id)
     except exceptions.NeutronException as e:
         LOG.error("%s", str(e))
@@ -353,7 +353,7 @@ def change_edge_syslog(properties):
     edge_id = properties.get('edge-id')
     try:
         nsxv.update_edge_syslog(edge_id, request)
-    except nsxv_exceptions.ResourceNotFound as e:
+    except nsxv_exceptions.ResourceNotFound:
         LOG.error("Edge %s not found", edge_id)
     except exceptions.NeutronException as e:
         LOG.error("%s", str(e))
@@ -362,7 +362,7 @@ def change_edge_syslog(properties):
 def delete_edge_syslog(edge_id):
     try:
         nsxv.delete_edge_syslog(edge_id)
-    except nsxv_exceptions.ResourceNotFound as e:
+    except nsxv_exceptions.ResourceNotFound:
         LOG.error("Edge %s not found", edge_id)
     except exceptions.NeutronException as e:
         LOG.error("%s", str(e))
@@ -404,7 +404,7 @@ def change_edge_loglevel(properties):
         try:
             edge_utils.update_edge_loglevel(nsxv, edge_id, module, level)
 
-        except nsxv_exceptions.ResourceNotFound as e:
+        except nsxv_exceptions.ResourceNotFound:
             LOG.error("Edge %s not found", edge_id)
         except exceptions.NeutronException as e:
             LOG.error("%s", str(e))
@@ -422,7 +422,7 @@ def change_edge_appliance_size(properties):
     try:
         nsxv.change_edge_appliance_size(
             properties.get('edge-id'), size)
-    except nsxv_exceptions.ResourceNotFound as e:
+    except nsxv_exceptions.ResourceNotFound:
         LOG.error("Edge %s not found", properties.get('edge-id'))
     except exceptions.NeutronException as e:
         LOG.error("%s", str(e))
@@ -462,7 +462,7 @@ def change_edge_appliance(edge_id):
     request = {'appliances': appliances, 'applianceSize': size}
     try:
         nsxv.change_edge_appliance(edge_id, request)
-    except nsxv_exceptions.ResourceNotFound as e:
+    except nsxv_exceptions.ResourceNotFound:
         LOG.error("Edge %s not found", edge_id)
     except exceptions.NeutronException as e:
         LOG.error("%s", str(e))
@@ -503,7 +503,7 @@ def change_edge_appliance_reservations(properties):
     request = {'appliances': appliances}
     try:
         nsxv.change_edge_appliance(edge_id, request)
-    except nsxv_exceptions.ResourceNotFound as e:
+    except nsxv_exceptions.ResourceNotFound:
         LOG.error("Edge %s not found", edge_id)
     except exceptions.NeutronException as e:
         LOG.error("%s", str(e))

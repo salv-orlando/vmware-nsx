@@ -991,8 +991,8 @@ class FakeVcns(object):
         _section = self._sections[section_id]
         if (_section['name'] != section_name and
             section_name in self._sections['names']):
-                # Theres a section with this name already
-                headers, response = self._unknown_error()
+            # Theres a section with this name already
+            headers, response = self._unknown_error()
         else:
             # Different Etag every successful update
             _section['etag'] = ('Etag-1' if _section['etag'] == 'Etag-0'

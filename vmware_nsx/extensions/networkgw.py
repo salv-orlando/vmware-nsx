@@ -49,6 +49,7 @@ class NetworkTypes(object):
     VLAN = 'vlan'
     BRIDGE = 'bridge'
 
+
 # Attribute Map for Network Gateway Resource
 # TODO(salvatore-orlando): add admin state as other neutron resources
 RESOURCE_ATTRIBUTE_MAP = {

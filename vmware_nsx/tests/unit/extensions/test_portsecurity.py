@@ -45,7 +45,7 @@ class PortSecurityTestCaseNSXv2(psec.PortSecurityDBTestCase):
 
 
 class TestPortSecurityNSXv2(PortSecurityTestCaseNSXv2, psec.TestPortSecurity):
-        pass
+    pass
 
 
 class TestPortSecurityNSXv3(psec.TestPortSecurity,

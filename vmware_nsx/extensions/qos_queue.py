@@ -108,6 +108,7 @@ def convert_to_unsigned_int_or_none_max_63(val):
 # compatibility perspective to change the default value for DSCP in order to
 # avoid this peculiar behaviour
 
+
 RESOURCE_ATTRIBUTE_MAP = {
     'qos_queues': {
         'id': {'allow_post': False, 'allow_put': False,

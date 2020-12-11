@@ -933,7 +933,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         if self._vcm:
             try:
                 h, switch = self.nsx_v.vcns.get_vdn_switch(dvs_id)
-            except Exception as e:
+            except Exception:
                 LOG.warning('DVS %s not registered on NSX. Unable to '
                             'update teaming for network %s',
                             dvs_id, net_id)
@@ -1767,10 +1767,10 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                     self._update_vnic_assigned_addresses(context.session, port,
                                                          vnic_id)
             except Exception as e:
-                    msg = _('Unable to add port to spoofguard policy error '
-                            '%s') % e
-                    raise n_exc.BadRequest(resource='spoofguard policy',
-                                           msg=msg)
+                msg = _('Unable to add port to spoofguard policy error '
+                        '%s') % e
+                raise n_exc.BadRequest(resource='spoofguard policy',
+                                       msg=msg)
 
     def update_network(self, context, id, network):
         net_attrs = network['network']
@@ -1969,10 +1969,10 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         # Check that the MAC address is the same as the port
         for ap in attrs[addr_apidef.ADDRESS_PAIRS]:
             if ('mac_address' in ap and
-                    ap['mac_address'] != db_port['mac_address']):
-                    msg = _('Address pairs should have same MAC as the '
-                            'port')
-                    raise n_exc.BadRequest(resource='address_pairs', msg=msg)
+                ap['mac_address'] != db_port['mac_address']):
+                msg = _('Address pairs should have same MAC as the '
+                        'port')
+                raise n_exc.BadRequest(resource='address_pairs', msg=msg)
 
     def _is_mac_in_use(self, context, network_id, mac_address):
         # Override this method as the backed doesn't support using the same

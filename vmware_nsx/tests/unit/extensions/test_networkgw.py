@@ -743,19 +743,19 @@ class NetworkGatewayDbTestCase(test_db_plugin.NeutronDbPluginV2TestCase):
 
     def test_connect_invalid_network_returns_400(self):
         with self._network_gateway() as gw:
-                self._gateway_action('connect',
-                                     gw[self.gw_resource]['id'],
-                                     'hohoho',
-                                     'vlan', 555,
-                                     expected_status=exc.HTTPBadRequest.code)
+            self._gateway_action('connect',
+                                 gw[self.gw_resource]['id'],
+                                 'hohoho',
+                                 'vlan', 555,
+                                 expected_status=exc.HTTPBadRequest.code)
 
     def test_connect_unspecified_network_returns_400(self):
         with self._network_gateway() as gw:
-                self._gateway_action('connect',
-                                     gw[self.gw_resource]['id'],
-                                     None,
-                                     'vlan', 555,
-                                     expected_status=exc.HTTPBadRequest.code)
+            self._gateway_action('connect',
+                                 gw[self.gw_resource]['id'],
+                                 None,
+                                 'vlan', 555,
+                                 expected_status=exc.HTTPBadRequest.code)
 
     def test_disconnect_network_ambiguous_returns_409(self):
         with self._network_gateway() as gw:

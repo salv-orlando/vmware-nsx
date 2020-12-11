@@ -5,7 +5,6 @@
       - openstack-python35-jobs-neutron
     check:
       jobs:
-        - vmware-tox-lower-constraints
         - openstack-tox-pep8:
             required-projects:
               - openstack/neutron
@@ -44,7 +43,6 @@
     gate:
       queue: vmware-nsx
       jobs:
-        - vmware-tox-lower-constraints
         - openstack-tox-pep8:
             required-projects:
               - openstack/neutron
@@ -80,18 +78,3 @@
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
               - x/tap-as-a-service
-
-- job:
-    name: vmware-tox-lower-constraints
-    parent: openstack-tox-lower-constraints
-    timeout: 5400
-    required-projects:
-      - openstack/neutron
-      - x/networking-l2gw
-      - openstack/networking-sfc
-      - openstack/neutron-lbaas
-      - x/vmware-nsxlib
-      - openstack/neutron-fwaas
-      - openstack/neutron-dynamic-routing
-      - openstack/neutron-vpnaas
-      - x/tap-as-a-service

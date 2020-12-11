@@ -527,9 +527,9 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                 'port_security_enabled': False}}
         with mock_ens, mock_tz, mock_tt,\
             mock.patch.object(self.plugin, '_validate_qos_policy_id'):
-                self.assertRaises(n_exc.InvalidInput,
-                                  self.plugin.create_network,
-                                  context.get_admin_context(), data)
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.create_network,
+                              context.get_admin_context(), data)
 
     def test_update_ens_network_with_qos(self):
         cfg.CONF.set_override('ens_support', True, 'nsx_v3')
@@ -639,7 +639,7 @@ class TestNetworksV2(test_plugin.TestNetworksV2, NsxV3PluginTestCaseMixin):
                               arg_list=(pnet.NETWORK_TYPE,
                                         pnet.PHYSICAL_NETWORK)) as net:
                 for k, v in expected:
-                        self.assertEqual(net['network'][k], v)
+                    self.assertEqual(net['network'][k], v)
 
     def test_create_phys_vlan_generate(self):
         cfg.CONF.set_override('network_vlan_ranges',
@@ -937,26 +937,25 @@ class TestPortsV2(test_plugin.TestPortsV2, NsxV3PluginTestCaseMixin,
 
     def test_fail_create_allowed_address_pairs_over_limit(self):
         with self.network() as network,\
-                self.subnet(network=network, enable_dhcp=True) as s1:
-                    data = {'port': {
-                        'network_id': network['network']['id'],
-                        'tenant_id': self._tenant_id,
-                        'name': 'pair_port',
-                        'admin_state_up': True,
-                        'device_id': 'fake_device',
-                        'device_owner': 'fake_owner',
-                        'fixed_ips': [{'subnet_id': s1['subnet']['id']}]
-                                }
-                            }
-                    count = 1
-                    address_pairs = []
-                    while count < 129:
-                        address_pairs.append({'ip_address': '10.0.0.%s' %
-                                                            count})
-                        count += 1
-                    data['port']['allowed_address_pairs'] = address_pairs
-                    self.assertRaises(n_exc.InvalidInput,
-                                      self.plugin.create_port, self.ctx, data)
+             self.subnet(network=network, enable_dhcp=True) as s1:
+            data = {'port': {
+                'network_id': network['network']['id'],
+                'tenant_id': self._tenant_id,
+                'name': 'pair_port',
+                'admin_state_up': True,
+                'device_id': 'fake_device',
+                'device_owner': 'fake_owner',
+                'fixed_ips': [{'subnet_id': s1['subnet']['id']}]
+            }}
+            count = 1
+            address_pairs = []
+            while count < 129:
+                address_pairs.append({'ip_address': '10.0.0.%s' %
+                                                    count})
+                count += 1
+            data['port']['allowed_address_pairs'] = address_pairs
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.create_port, self.ctx, data)
 
     def test_fail_update_lb_port_with_fixed_ip(self):
         with self.network() as network:

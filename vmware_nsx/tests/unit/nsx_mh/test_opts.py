@@ -41,7 +41,6 @@ class NSXClusterTest(base.BaseTestCase):
 
     cluster_opts = {'default_tz_uuid': uuidutils.generate_uuid(),
                     'default_l2_gw_service_uuid': uuidutils.generate_uuid(),
-                    'default_l2_gw_service_uuid': uuidutils.generate_uuid(),
                     'nsx_user': 'foo',
                     'nsx_password': 'bar',
                     'http_timeout': 25,

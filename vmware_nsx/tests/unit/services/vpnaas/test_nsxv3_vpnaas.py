@@ -226,21 +226,21 @@ class TestDriverValidation(base.BaseTestCase):
             mock.patch.object(self.validator.vpn_plugin,
                               'get_ipsec_site_connections',
                               side_effect=mock_get_connections):
-                ipsec_sitecon = {'id': '1',
-                                 'vpnservice_id': '1',
-                                 'mtu': 1500,
-                                 'peer_address': self.peer_address,
-                                 'peer_cidrs': [self.peer_cidr]}
-                if conn_params:
-                    ipsec_sitecon.update(conn_params)
-                if success:
-                    self.validator.validate_ipsec_site_connection(
-                        self.context, ipsec_sitecon)
-                else:
-                    self.assertRaises(
-                        nsx_exc.NsxVpnValidationError,
-                        self.validator.validate_ipsec_site_connection,
-                        self.context, ipsec_sitecon)
+            ipsec_sitecon = {'id': '1',
+                             'vpnservice_id': '1',
+                             'mtu': 1500,
+                             'peer_address': self.peer_address,
+                             'peer_cidrs': [self.peer_cidr]}
+            if conn_params:
+                ipsec_sitecon.update(conn_params)
+            if success:
+                self.validator.validate_ipsec_site_connection(
+                    self.context, ipsec_sitecon)
+            else:
+                self.assertRaises(
+                    nsx_exc.NsxVpnValidationError,
+                    self.validator.validate_ipsec_site_connection,
+                    self.context, ipsec_sitecon)
 
     def test_dpd_validation(self):
         params = {'dpd': {'action': 'hold',

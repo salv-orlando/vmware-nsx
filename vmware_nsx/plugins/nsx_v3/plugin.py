@@ -4776,9 +4776,9 @@ class NsxV3Plugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
         if self.nsxlib.feature_supported(
             nsxlib_consts.FEATURE_DYNAMIC_CRITERIA):
-                tag_expression = (
-                    self.nsxlib.ns_group.get_port_tag_expression(
-                        security.PORT_SG_SCOPE, secgroup['id']))
+            tag_expression = (
+                self.nsxlib.ns_group.get_port_tag_expression(
+                    security.PORT_SG_SCOPE, secgroup['id']))
         else:
             tag_expression = None
 

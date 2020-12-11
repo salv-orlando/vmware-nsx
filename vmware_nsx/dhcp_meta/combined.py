@@ -48,8 +48,8 @@ class DhcpAgentNotifyAPI(dhcp_rpc_agent_api.DhcpAgentNotifyAPI):
                 const.DEVICE_OWNER_DHCP not in plugin.port_special_owners):
                 # network/subnet provisioned in the new model have a plain
                 # nsx lswitch port, no vif attachment
-                    plugin.port_special_owners.append(const.DEVICE_OWNER_DHCP)
-                    treat_dhcp_owner_specially = True
+                plugin.port_special_owners.append(const.DEVICE_OWNER_DHCP)
+                treat_dhcp_owner_specially = True
             if (resource == 'port' and action == 'update' or
                 resource == 'subnet'):
                 self.agentless_notifier.notify(context, data, methodname)
