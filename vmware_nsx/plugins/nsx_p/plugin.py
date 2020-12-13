@@ -1319,7 +1319,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 if_subnet = interface_ports[0]['fixed_ips'][0]['subnet_id']
                 if subnet_data.get('id') != if_subnet:
                     msg = (_("Can not create a DHCP subnet on network %(net)s "
-                             "as another %(ver)s subnet is attached to a "
+                             "as another IPv%(ver)s subnet is attached to a "
                              "router") % {'net': net_id, 'ver': ip_ver})
                     LOG.error(msg)
                     raise n_exc.InvalidInput(error_message=msg)
@@ -3847,10 +3847,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if cfg.CONF.api_replay_mode:
                 self._handle_api_replay_default_sg(context, secgroup_db)
 
-        if cfg.CONF.api_replay_mode:
-            # Do not create backend resources for SG with api_replay
-            return secgroup_db
-
         try:
             # create all the rule entries
             sg_rules = secgroup_db['security_group_rules']
@@ -3971,10 +3967,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             for i, r in enumerate(sg_rules):
                 self._process_security_group_rule_properties(
                     context, rules_db[i], r['security_group_rule'])
-
-        if cfg.CONF.api_replay_mode:
-            # Do not create backend resources for SG with api_replay
-            return rules_db
 
         is_provider_sg = sg.get(provider_sg.PROVIDER)
         secgroup_logging = self._is_security_group_logged(context, sg_id)
