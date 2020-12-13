@@ -22,6 +22,18 @@ class ApiReplayCli(object):
 
     def __init__(self):
         args = self._setup_argparse()
+
+        # args validation
+        if not args.dest_os_endpoint_url:
+            # auth params are mandatory
+            if (not args.dest_os_project_name or
+                not args.dest_os_username or
+                not args.dest_os_password or
+                not args.dest_os_username or
+                not args.dest_os_auth_url):
+                print("missing destination mandatory auth parameters")
+                return
+
         client.ApiReplayClient(
             source_os_tenant_name=args.source_os_project_name,
             source_os_tenant_domain_id=args.source_os_project_domain_id,
@@ -35,6 +47,7 @@ class ApiReplayCli(object):
             dest_os_user_domain_id=args.dest_os_user_domain_id,
             dest_os_password=args.dest_os_password,
             dest_os_auth_url=args.dest_os_auth_url,
+            dest_os_endpoint_url=args.dest_os_endpoint_url,
             dest_plugin=args.dest_plugin,
             use_old_keystone=args.use_old_keystone,
             octavia_os_tenant_name=args.octavia_os_project_name,
@@ -46,7 +59,8 @@ class ApiReplayCli(object):
             neutron_conf=args.neutron_conf,
             ext_net_map=args.external_networks_map,
             logfile=args.logfile,
-            max_retry=args.max_retry)
+            max_retry=args.max_retry,
+            cert_file=args.cert_file)
 
     def _setup_argparse(self):
         parser = argparse.ArgumentParser()
@@ -86,7 +100,6 @@ class ApiReplayCli(object):
         # we will recreate all of these resources over.
         parser.add_argument(
             "--dest-os-username",
-            required=True,
             help="The dest os-username to use to"
                  "gather neutron resources with.")
         parser.add_argument(
@@ -96,7 +109,6 @@ class ApiReplayCli(object):
                  "gather neutron resources with.")
         parser.add_argument(
             "--dest-os-project-name",
-            required=True,
             help="The dest os-project-name to use to "
                  "gather neutron resource with.")
         parser.add_argument(
@@ -106,12 +118,14 @@ class ApiReplayCli(object):
                  "gather neutron resource with.")
         parser.add_argument(
             "--dest-os-password",
-            required=True,
             help="The password for this user.")
         parser.add_argument(
             "--dest-os-auth-url",
-            required=True,
             help="The keystone api endpoint for this user.")
+        parser.add_argument(
+            "--dest-os-endpoint-url",
+            help="The destination neutron api endpoint. If provided noauth "
+                 "calls will be made")
         parser.add_argument(
             "--dest-plugin",
             default='nsx-p',
@@ -122,6 +136,10 @@ class ApiReplayCli(object):
             default=False,
             action='store_true',
             help="Use old keystone client for source authentication.")
+        parser.add_argument(
+            "--cert-file",
+            default="",
+            help="certificate file for the authentication.")
 
         # Arguments required to connect to the octavia client (read only)
         parser.add_argument(
