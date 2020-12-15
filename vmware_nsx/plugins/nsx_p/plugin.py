@@ -1529,9 +1529,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                               {'net': net_id, 'ver': ip_version})
                         LOG.error(msg)
                         raise n_exc.InvalidInput(error_message=msg)
-
+                    updated_data = orig_subnet
+                    updated_data.update(subnet_data)
                     self._validate_segment_subnets_num(
-                        context, net_id, subnet_data)
+                        context, net_id, updated_data)
 
                 updated_subnet = super(NsxPolicyPlugin, self).update_subnet(
                     context, subnet_id, subnet)
