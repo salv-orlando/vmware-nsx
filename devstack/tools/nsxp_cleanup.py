@@ -162,6 +162,8 @@ class NSXClient(object):
         routers = self.get_os_nsx_tier1_routers()
         print("Number of OS Tier1 routers to be deleted: %s" % len(routers))
         for rtr in routers:
+            # remove all fwaas resources
+            self.cleanup_fwaas_router_resources(rtr['id'])
             # remove all nat rules from this router before deletion
             self.cleanup_tier1_nat_rules(rtr['id'])
             try:
@@ -207,11 +209,15 @@ class NSXClient(object):
 
         for rtr in routers:
             # Disassociate VLAN interfaces from tier1 routers
-            interfaces = self.nsxpolicy.tier1.list_segment_interface(
-                rtr['id'])
-            for intf in interfaces:
-                self.nsxpolicy.tier1.remove_segment_interface(
-                    rtr['id'], intf['id'])
+            try:
+                interfaces = self.nsxpolicy.tier1.list_segment_interface(
+                    rtr['id'])
+            except Exception:
+                pass
+            else:
+                for intf in interfaces:
+                    self.nsxpolicy.tier1.remove_segment_interface(
+                        rtr['id'], intf['id'])
 
     def cleanup_segments(self):
         """Delete all OS created NSX Policy segments & ports"""
@@ -431,6 +437,34 @@ class NSXClient(object):
         self.cleanup_lb_server_pools()
         self.cleanup_lb_monitors()
 
+    def cleanup_fwaas_router_resources(self, rtr_id):
+        # delete the GW policy
+        try:
+            # remove fwaas gw policy
+            self.nsxpolicy.gateway_policy.delete(
+                policy_constants.DEFAULT_DOMAIN,
+                map_id=rtr_id)
+        except exceptions.ManagerError:
+            # Not always exists
+            pass
+        else:
+            # Also delete all groups & services
+            tags_to_search = [{'scope': 'os-router-firewall',
+                               'tag': rtr_id}]
+            # Delete per rule & per network groups
+            groups = self.nsxpolicy.search_by_tags(
+                tags_to_search,
+                self.nsxpolicy.group.entry_def.resource_type())['results']
+            for group in groups:
+                self.nsxpolicy.group.delete(policy_constants.DEFAULT_DOMAIN,
+                                            group['id'])
+
+            services = self.nsxpolicy.search_by_tags(
+                tags_to_search,
+                self.nsxpolicy.service.parent_entry_def.resource_type())
+            for srv in services['results']:
+                self.nsxpolicy.service.delete(srv['id'])
+
     def cleanup_all(self):
         """
         Per domain cleanup steps:
@@ -446,9 +480,9 @@ class NSXClient(object):
         self.cleanup_segments_interfaces()
         self.cleanup_segments()
         self.cleanup_load_balancers()
+        self.cleanup_fwaas()
         self.cleanup_nsx_logical_dhcp_servers()
         self.cleanup_tier1_routers()
-        self.cleanup_rules_services()
 
 
 if __name__ == "__main__":
