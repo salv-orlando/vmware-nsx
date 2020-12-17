@@ -83,7 +83,8 @@ class PrepareObjectForMigration(object):
         'binding:vif_type',
         'binding:host_id',
         'vnic_index',
-        'dns_assignment']
+        'dns_assignment',
+        'resource_request']
 
     drop_network_fields = basic_ignore_fields + [
         'status',
@@ -174,7 +175,8 @@ class PrepareObjectForMigration(object):
         # neutron doesn't like some fields being None even though its
         # what it returns to us.
         for field in ['provider:physical_network',
-                      'provider:segmentation_id']:
+                      'provider:segmentation_id',
+                      'vlan_transparent']:
             if field in body and body[field] is None:
                 del body[field]
 

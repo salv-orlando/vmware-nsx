@@ -28,6 +28,7 @@ from oslo_serialization import jsonutils
 from oslo_utils import excutils
 
 from neutron.common import config as neutron_config
+from neutron_lib import constants as nl_constants
 from octavia_lib.api.drivers import driver_lib
 
 from vmware_nsx.api_replay import utils
@@ -40,6 +41,9 @@ LOG.setLevel(logging.INFO)
 # For internal testing only
 use_old_keystone_on_dest = False
 
+# Error counter for the migration
+n_errors = 0
+
 
 class ApiReplayClient(utils.PrepareObjectForMigration):
 
@@ -49,12 +53,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  source_os_password, source_os_auth_url,
                  dest_os_username, dest_os_user_domain_id,
                  dest_os_tenant_name, dest_os_tenant_domain_id,
-                 dest_os_password, dest_os_auth_url, dest_plugin,
-                 use_old_keystone,
+                 dest_os_password, dest_os_auth_url, dest_os_endpoint_url,
+                 dest_plugin, use_old_keystone,
                  octavia_os_username, octavia_os_user_domain_id,
                  octavia_os_tenant_name, octavia_os_tenant_domain_id,
                  octavia_os_password, octavia_os_auth_url,
-                 neutron_conf, ext_net_map, logfile, max_retry):
+                 neutron_conf, ext_net_map, logfile, max_retry,
+                 cert_file):
 
         # Init config and logging
         if neutron_conf:
@@ -71,7 +76,6 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         # connect to both clients
         if use_old_keystone:
-            LOG.info("Using old keystone for source neutron")
             # Since we are not sure what keystone version will be used on the
             # source setup, we add an option to use the v2 client
             self.source_neutron = client.Client(
@@ -86,15 +90,18 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_name=source_os_tenant_name,
                 tenant_domain_id=source_os_tenant_domain_id,
                 password=source_os_password,
-                auth_url=source_os_auth_url)
+                auth_url=source_os_auth_url,
+                cert_file=cert_file)
 
         if use_old_keystone_on_dest:
-            LOG.info("Using old keystone for destination neutron")
             self.dest_neutron = client.Client(
                 username=dest_os_username,
                 tenant_name=dest_os_tenant_name,
                 password=dest_os_password,
                 auth_url=dest_os_auth_url)
+        elif dest_os_endpoint_url:
+            self.dest_neutron = self.connect_to_local_client(
+                endpoint_url=dest_os_endpoint_url)
         else:
             self.dest_neutron = self.connect_to_client(
                 username=dest_os_username,
@@ -102,7 +109,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_name=dest_os_tenant_name,
                 tenant_domain_id=dest_os_tenant_domain_id,
                 password=dest_os_password,
-                auth_url=dest_os_auth_url)
+                auth_url=dest_os_auth_url,
+                cert_file=cert_file)
 
         if octavia_os_auth_url:
             self.octavia = self.connect_to_octavia(
@@ -111,7 +119,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_name=octavia_os_tenant_name,
                 tenant_domain_id=octavia_os_tenant_domain_id,
                 password=octavia_os_password,
-                auth_url=octavia_os_auth_url)
+                auth_url=octavia_os_auth_url,
+                cert_file=cert_file)
         else:
             self.octavia = None
 
@@ -135,34 +144,43 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.migrate_fwaas()
         if self.octavia:
             self.migrate_octavia()
-        LOG.info("NSX migration is Done.")
+        global n_errors
+        LOG.info("NSX migration is Done with %s errors.", n_errors)
+        exit(n_errors)
 
     def _get_session(self, username, user_domain_id,
                      tenant_name, tenant_domain_id,
-                     password, auth_url):
+                     password, auth_url, cert_file):
         auth = identity.Password(username=username,
                                  user_domain_id=user_domain_id,
                                  password=password,
                                  project_name=tenant_name,
                                  project_domain_id=tenant_domain_id,
                                  auth_url=auth_url)
-        return session.Session(auth=auth)
+        return session.Session(auth=auth, verify=cert_file)
 
     def connect_to_client(self, username, user_domain_id,
                           tenant_name, tenant_domain_id,
-                          password, auth_url):
+                          password, auth_url, cert_file):
         sess = self._get_session(username, user_domain_id,
                                  tenant_name, tenant_domain_id,
-                                 password, auth_url)
+                                 password, auth_url, cert_file)
         neutron = client.Client(session=sess)
+        return neutron
+
+    def connect_to_local_client(self, endpoint_url):
+        neutron = client.Client(endpoint_url=endpoint_url,
+                                insecure=True,
+                                auth_strategy='noauth')
+        # test the connection:
         return neutron
 
     def connect_to_octavia(self, username, user_domain_id,
                            tenant_name, tenant_domain_id,
-                           password, auth_url):
+                           password, auth_url, cert_file):
         sess = self._get_session(username, user_domain_id,
                                  tenant_name, tenant_domain_id,
-                                 password, auth_url)
+                                 password, auth_url, cert_file)
         endpoint = sess.get_endpoint(service_type='load-balancer')
         client = octavia.OctaviaAPI(
             session=sess,
@@ -198,6 +216,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         If there is already a rule of that type, skip it since
         the QoS policy can have only one rule of each type
         """
+        global n_errors
         #TODO(asarfaty) also take rule direction into account once
         #ingress support is upstream
         rule_type = source_rule.get('type')
@@ -223,9 +242,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         except Exception as e:
             LOG.error("Failed to create QoS rule for policy %(pol)s: %(e)s",
                       {'pol': pol_id, 'e': e})
+            n_errors = n_errors + 1
 
     def migrate_qos_policies(self):
         """Migrates QoS policies from source to dest neutron."""
+        global n_errors
 
         # first fetch the QoS policies from both the
         # source and destination neutron server
@@ -263,6 +284,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     LOG.error("Failed to create QoS policy %(pol)s: %(e)s",
                               {'pol': pol['id'], 'e': e})
+                    n_errors = n_errors + 1
                     continue
                 else:
                     LOG.info("Created QoS policy %s", new_pol)
@@ -271,6 +293,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
     def migrate_security_groups(self):
         """Migrates security groups from source to dest neutron."""
+        global n_errors
 
         # first fetch the security groups from both the
         # source and dest neutron server
@@ -319,6 +342,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     LOG.error("Failed to create security group (%(sg)s): "
                               "%(e)s",
                               {'sg': sg, 'e': e})
+                    n_errors = n_errors + 1
 
                 # Note - policy security groups will have no rules, and will
                 # be created on the destination with the default rules only
@@ -349,6 +373,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         ports are set.
         And return a dictionary of external gateway info per router
         """
+        global n_errors
         try:
             source_routers = self.source_neutron.list_routers()['routers']
         except Exception:
@@ -387,10 +412,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     LOG.error("Failed to create router %(rtr)s: %(e)s",
                               {'rtr': router, 'e': e})
+                    n_errors = n_errors + 1
         return update_routes, gw_info
 
     def migrate_routers_routes(self, routers_routes):
         """Add static routes to the created routers."""
+        global n_errors
         total_num = len(routers_routes)
         LOG.info("Migrating %s routers routes", total_num)
         for count, (router_id, routes) in enumerate(
@@ -405,8 +432,10 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 LOG.error("Failed to add routes %(routes)s to router "
                           "%(rtr)s: %(e)s",
                           {'routes': routes, 'rtr': router_id, 'e': e})
+                n_errors = n_errors + 1
 
     def migrate_subnetpools(self):
+        global n_errors
         subnetpools_map = {}
         try:
             source_subnetpools = self.source_neutron.list_subnetpools()[
@@ -442,10 +471,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     LOG.error("Failed to create subnetpool %(pool)s: %(e)s",
                               {'pool': pool, 'e': e})
+                    n_errors = n_errors + 1
         return subnetpools_map
 
     def migrate_networks_subnets_ports(self, routers_gw_info):
         """Migrates networks/ports/router-uplinks from src to dest neutron."""
+        global n_errors
         source_ports = self.source_neutron.list_ports()['ports']
         source_subnets = self.source_neutron.list_subnets()['subnets']
         source_networks = self.source_neutron.list_networks()['networks']
@@ -500,7 +531,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 # Print the network and exception to help debugging
                 with excutils.save_and_reraise_exception():
                     LOG.error("Failed to create network %s", body)
-                    LOG.error("Source network: %s", network)
+                    n_errors = n_errors + 1
                     raise e
 
             subnets_map = {}
@@ -556,6 +587,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except n_exc.BadRequest as e:
                     LOG.error("Failed to create subnet: %(subnet)s: %(e)s",
                               {'subnet': subnet, 'e': e})
+                    n_errors = n_errors + 1
 
             # create the ports on the network
             ports = self.get_ports_on_network(network['id'], source_ports)
@@ -607,6 +639,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                             LOG.error("Failed to add router gateway with port "
                                       "(%(port)s): %(e)s",
                                       {'port': port, 'e': e})
+                            n_errors = n_errors + 1
                         continue
 
                     # Let the neutron dhcp-agent recreate this on its own
@@ -649,6 +682,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                             LOG.error("Failed to add router interface port"
                                       "(%(port)s): %(e)s",
                                       {'port': port, 'e': e})
+                            n_errors = n_errors + 1
                         continue
 
                     try:
@@ -659,6 +693,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                         # script multiple times as we don't track this.
                         LOG.error("Failed to create port (%(port)s) : %(e)s",
                                   {'port': port, 'e': e})
+                        n_errors = n_errors + 1
                     else:
                         ip_addr = None
                         if created_port.get('fixed_ips'):
@@ -680,9 +715,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     LOG.error("Failed to enable DHCP on subnet %(subnet)s: "
                               "%(e)s",
                               {'subnet': subnet['id'], 'e': e})
+                    n_errors = n_errors + 1
 
     def migrate_floatingips(self):
         """Migrates floatingips from source to dest neutron."""
+        global n_errors
         try:
             source_fips = self.source_neutron.list_floatingips()['floatingips']
         except Exception:
@@ -699,9 +736,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             except Exception as e:
                 LOG.error("Failed to create floating ip (%(fip)s) : %(e)s",
                           {'fip': source_fip, 'e': e})
+                n_errors = n_errors + 1
 
     def _migrate_fwaas_resource(self, resource_type, source_objects,
                                 dest_objects, prepare_method, create_method):
+        global n_errors
         total_num = len(source_objects)
         for count, source_obj in enumerate(source_objects, 1):
             # Check if the object already exists
@@ -709,6 +748,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 LOG.info("Skipping %s %s as it already exists on the "
                          "destination server", resource_type, source_obj['id'])
                 continue
+            if (source_obj.get('status') and
+                source_obj['status'] not in [nl_constants.ACTIVE,
+                                             nl_constants.INACTIVE]):
+                LOG.info("Skipping %s %s %s",
+                         source_obj['status'], resource_type, source_obj['id'])
+                continue
+
             body = prepare_method(source_obj)
             try:
                 new_obj = create_method({resource_type: body})
@@ -719,6 +765,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 LOG.error("Failed to create %(resource)s (%(obj)s) : %(e)s",
                           {'resource': resource_type, 'obj': source_obj,
                            'e': e})
+                n_errors = n_errors + 1
 
     def migrate_fwaas(self):
         """Migrates FWaaS V2 objects from source to dest neutron."""
@@ -772,6 +819,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
     def _migrate_octavia_lb(self, lb, orig_map):
         # Creating all loadbalancers resources on the new nsx driver
         # using RPC calls to the plugin listener.
+        global n_errors
 
         # Create the loadbalancer:
         lb_body = self.prepare_lb_loadbalancer(lb)
@@ -798,6 +846,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 LOG.error("Failed to create loadbalancer %(lb)s listener "
                           "(%(list)s)", {'list': listener, 'lb': lb_id})
                 self._delete_octavia_lb(lb_body_for_deletion)
+                n_errors = n_errors + 1
                 return
             listeners_map[listener_id] = body
             lb_body_for_deletion['listeners'].append(body)
@@ -816,6 +865,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 LOG.error("Failed to create loadbalancer %(lb)s pool "
                           "(%(pool)s)", {'pool': pool, 'lb': lb_id})
                 self._delete_octavia_lb(lb_body_for_deletion)
+                n_errors = n_errors + 1
                 return
             lb_body_for_deletion['pools'].append(pool)
 
@@ -834,6 +884,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                               "(%(member)s)",
                               {'member': member, 'pool': pool_id})
                     self._delete_octavia_lb(lb_body_for_deletion)
+                    n_errors = n_errors + 1
                     return
 
             # Add pool health monitor
@@ -849,6 +900,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     LOG.error("Failed to create pool %(pool)s healthmonitor "
                               "(%(hm)s)", {'hm': hm, 'pool': pool_id})
                     self._delete_octavia_lb(lb_body_for_deletion)
+                    n_errors = n_errors + 1
                     return
                 lb_body_for_deletion['pools'][-1]['healthmonitor'] = body
 
@@ -873,6 +925,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                         LOG.error("Failed to create l7policy (%(l7pol)s)",
                                   {'l7pol': l7pol})
                         self._delete_octavia_lb(lb_body_for_deletion)
+                        n_errors = n_errors + 1
                         return
 
         LOG.info("Created loadbalancer %s", lb_id)
