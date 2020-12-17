@@ -4762,8 +4762,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             r = rule.get('security_group_rule')
 
             # remote_address_group_id is not yet supported and might be missing
-            if 'remote_address_group_id' not in rule:
-                rule['remote_address_group_id'] = None
+            if 'remote_address_group_id' not in r:
+                r['remote_address_group_id'] = None
 
             port_based_proto = (self._get_ip_proto_number(r['protocol'])
                                 in PROTOCOLS_SUPPORTING_PORTS)
