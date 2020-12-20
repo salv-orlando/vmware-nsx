@@ -373,15 +373,15 @@ def get_lb_rtr_lock(router_id):
 
 
 def _get_negated_allowed_cidrs(allowed_cidrs, is_ipv4=True):
+    # Add the zero-ip so it will not be in the negated list as NSX will fail
+    allowed_cidrs.append('0.0.0.0/32' if is_ipv4 else '::/128')
     allowed_set = netaddr.IPSet(allowed_cidrs)
     all_cidr = '0.0.0.0/0' if is_ipv4 else '::/0'
     all_set = netaddr.IPSet([all_cidr])
     negate_set = all_set - allowed_set
 
     # Translate to cidr, ignoring unsupported cidrs.
-    negate_cidrs = [str(cidr) for cidr in negate_set.iter_cidrs()
-                    if (not str(cidr).startswith('0.0.0.0/') and
-                        not str(cidr).startswith('::/'))]
+    negate_cidrs = [str(cidr) for cidr in negate_set.iter_cidrs()]
     # split into max len (128) lists.(%s)
     negated_list = [negate_cidrs[i:i + MAX_SOURCES_IN_RULE]
                     for i in range(0, len(negate_cidrs), MAX_SOURCES_IN_RULE)]
