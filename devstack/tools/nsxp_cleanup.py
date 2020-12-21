@@ -480,7 +480,6 @@ class NSXClient(object):
         self.cleanup_segments_interfaces()
         self.cleanup_segments()
         self.cleanup_load_balancers()
-        self.cleanup_fwaas()
         self.cleanup_nsx_logical_dhcp_servers()
         self.cleanup_tier1_routers()
 
