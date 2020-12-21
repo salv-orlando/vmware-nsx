@@ -21,14 +21,42 @@ from neutron.db.models import l3
 from neutron.db.models import securitygroup
 from neutron.db.models import segment  # noqa
 from neutron.db import models_v2
+from neutron_lib.db import model_base
+from oslo_db.sqlalchemy import models
 
-from vmware_nsx.db import nsx_models
 from vmware_nsxlib import v3
 from vmware_nsxlib.v3 import config
 from vmware_nsxlib.v3 import exceptions
 from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3 import policy
 from vmware_nsxlib.v3.policy import constants as policy_constants
+
+
+# Copy db models here to avoid importing from vmware_nsx, which cause
+# recursive issue in requests
+class NeutronNsxServiceBinding(model_base.BASEV2, models.TimestampMixin):
+    """Represents a binding of a Neutron network with enabled NSX services."""
+    __tablename__ = 'neutron_nsx_service_bindings'
+    network_id = sa.Column(sa.String(36),
+                           sa.ForeignKey('networks.id', ondelete='CASCADE'),
+                           nullable=False, primary_key=True)
+    port_id = sa.Column(sa.String(36), nullable=True)
+    nsx_service_type = sa.Column(
+        sa.Enum(nsx_constants.SERVICE_DHCP,
+                name='neutron_nsx_service_bindings_service_type'),
+        nullable=False, primary_key=True)
+    nsx_service_id = sa.Column(sa.String(36), nullable=False)
+
+
+class NeutronNsxPortMapping(model_base.BASEV2, models.TimestampMixin):
+    """Represents the mapping between neutron and nsx port uuids."""
+
+    __tablename__ = 'neutron_nsx_port_mappings'
+    neutron_id = sa.Column(sa.String(36),
+                           sa.ForeignKey('ports.id', ondelete="CASCADE"),
+                           primary_key=True)
+    nsx_switch_id = sa.Column(sa.String(36))
+    nsx_port_id = sa.Column(sa.String(36), nullable=False)
 
 
 class NeutronNsxDB(object):
@@ -59,12 +87,10 @@ class NeutronNsxDB(object):
         """The policy plugin still has mapping for the dhcp servers
         because it uses the passthrough api
         """
-        return self.query_all('nsx_service_id',
-                              nsx_models.NeutronNsxServiceBinding)
+        return self.query_all('nsx_service_id', NeutronNsxServiceBinding)
 
     def get_logical_ports(self):
-        return self.query_all('nsx_port_id',
-                              nsx_models.NeutronNsxPortMapping)
+        return self.query_all('nsx_port_id', NeutronNsxPortMapping)
 
 
 class NSXClient(object):
@@ -480,7 +506,6 @@ class NSXClient(object):
         self.cleanup_segments_interfaces()
         self.cleanup_segments()
         self.cleanup_load_balancers()
-        self.cleanup_fwaas()
         self.cleanup_nsx_logical_dhcp_servers()
         self.cleanup_tier1_routers()
 
