@@ -1309,12 +1309,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         interface_ports = self._get_network_interface_ports(
             context, net_id)
-        if interface_ports:
-            # Should have max 1 router interface per network
-            if_port = interface_ports[0]
+        for if_port in interface_ports:
             if if_port['fixed_ips']:
-                if_subnet = interface_ports[0]['fixed_ips'][0]['subnet_id']
-                if subnet_data.get('id') != if_subnet:
+                # skip subnets of the wrong version
+                interface_ip = if_port['fixed_ips'][0].get('ip_address', '')
+                if ip_ver == 4 and ':' in interface_ip:
+                    continue
+                if ip_ver == 6 and ':' not in interface_ip:
+                    continue
+                interface_sub = if_port['fixed_ips'][0]['subnet_id']
+                if subnet_data.get('id') != interface_sub:
                     msg = (_("Can not create a DHCP subnet on network %(net)s "
                              "as another IPv%(ver)s subnet is attached to a "
                              "router") % {'net': net_id, 'ver': ip_ver})
@@ -2913,7 +2917,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         for subnet in network.subnets:
             if subnet.enable_dhcp and subnet.ip_version == 4:
                 msg = (_("Can not add router interface on network %(net)s "
-                         "as another %(ver)s subnet has enabled DHCP") %
+                         "as another IPv%(ver)s subnet has enabled DHCP") %
                        {'net': network_id, 'ver': subnet.ip_version})
                 LOG.error(msg)
                 raise n_exc.InvalidInput(error_message=msg)
