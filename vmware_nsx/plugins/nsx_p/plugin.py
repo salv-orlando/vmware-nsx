@@ -599,8 +599,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                        network['id'])
 
     def _create_network_on_backend(self, context, net_data,
-                                   transparent_vlan,
-                                   provider_data, az):
+                                   transparent_vlan, provider_data, az,
+                                   request_data):
         net_data['id'] = net_data.get('id') or uuidutils.generate_uuid()
 
         # update the network name to indicate the neutron id too.
@@ -639,6 +639,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         if az.use_policy_md:
             kwargs['metadata_proxy_id'] = az._native_md_proxy_uuid
+
+        # Set the segment vni for nsx-v portgroups migration
+        if request_data.get('vni') and cfg.CONF.api_replay_mode:
+            kwargs['overlay_id'] = request_data['vni']
 
         self.nsxpolicy.segment.create_or_overwrite(
             net_name, **kwargs)
@@ -753,7 +757,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if is_backend_network:
             try:
                 self._create_network_on_backend(
-                    context, created_net, vlt, provider_data, az)
+                    context, created_net, vlt, provider_data, az, net_data)
             except Exception as e:
                 LOG.exception("Failed to create NSX network network: %s", e)
                 with excutils.save_and_reraise_exception():

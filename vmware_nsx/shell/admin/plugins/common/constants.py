@@ -68,6 +68,7 @@ BGP_GW_EDGE = 'bgp-gw-edge'
 ROUTING_REDIS_RULE = 'routing-redistribution-rule'
 BGP_NEIGHBOUR = 'bgp-neighbour'
 NSX_PORTGROUPS = 'nsx-portgroups'
+NSX_VIRTUALWIRES = 'nsx-virtualwires'
 NSX_MIGRATE_V_T = 'nsx-migrate-v2t'
 
 # NSXTV only Resource Constants
