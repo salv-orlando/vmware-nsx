@@ -42,6 +42,17 @@ def get_networks_from_backend():
     return et.fromstring(so_list)
 
 
+def get_virtual_wires():
+    """Return a hash of the backend virtual wires by their id"""
+    nsxv = utils.get_nsxv_client()
+    h, res = nsxv.get_virtual_wires()
+    vw_list = res['dataPage']['data']
+    vw_hash = {}
+    for vw in vw_list:
+        vw_hash[vw['objectId']] = vw
+    return vw_hash
+
+
 def get_networks():
     """Create an array of all the backend networks and their data
     """
@@ -295,6 +306,41 @@ def get_dvs_id_from_backend_name(backend_name):
 
 
 @admin_utils.output_header
+def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
+    filename = None
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        filename = properties.get('map-file')
+
+    vws = get_virtual_wires()
+    table_results = []
+    map_results = {}
+    admin_context = context.get_admin_context()
+    with utils.NsxVPluginWrapper() as plugin:
+        neutron_networks = plugin.get_networks(admin_context, fields=['id'])
+        for net in neutron_networks:
+            # get the nsx id:
+            net_morefs = nsx_db.get_nsx_switch_ids(admin_context.session,
+                                                   net['id'])
+            for moref in net_morefs:
+                if not moref.startswith('virtualwire'):
+                    continue
+                vni = vws.get(moref, {}).get('vdnId')
+                table_results.append({'neutron_id': net['id'],
+                                'nsx_id': moref,
+                                'vni': vni})
+                map_results[net['id']] = vni
+    LOG.info(formatters.output_formatter(constants.NSX_VIRTUALWIRES,
+                                         table_results,
+                                         ['neutron_id', 'nsx_id', 'vni']))
+    if filename:
+        f = open(filename, "a")
+        f.write("%s" % map_results)
+        f.close()
+        LOG.info("Mapping data saved into %s", filename)
+
+
+@admin_utils.output_header
 def delete_backend_network(resource, event, trigger, **kwargs):
     """Delete a backend network by its moref
     """
@@ -366,3 +412,6 @@ registry.subscribe(list_nsx_portgroups,
 registry.subscribe(delete_nsx_portgroups,
                    constants.NSX_PORTGROUPS,
                    shell.Operations.NSX_CLEAN.value)
+registry.subscribe(list_nsx_virtual_wires,
+                   constants.NSX_VIRTUALWIRES,
+                   shell.Operations.LIST.value)
