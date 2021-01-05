@@ -98,7 +98,7 @@ class PrepareObjectForMigration(object):
         'status', 'router_id', 'id', 'revision']
 
     drop_qos_rule_fields = ['revision', 'type', 'qos_policy_id', 'id']
-    drop_qos_policy_fields = ['revision']
+    drop_qos_policy_fields = basic_ignore_fields
 
     drop_fwaas_rule_fields = ['firewall_policy_id']
     drop_fwaas_policy_fields = []
@@ -283,8 +283,10 @@ class PrepareObjectForMigration(object):
         self.fix_description(fip)
         return self.drop_fields(fip, self.drop_fip_fields)
 
-    def prepare_qos_rule(self, rule, direct_call=False):
+    def prepare_qos_rule(self, rule, tenant_id=None, direct_call=False):
         self.fix_description(rule)
+        if tenant_id and not rule.get('tenant_id'):
+            rule['tenant_id'] = tenant_id
         return self.drop_fields(rule, self.drop_qos_rule_fields)
 
     def prepare_qos_policy(self, policy, direct_call=False):
