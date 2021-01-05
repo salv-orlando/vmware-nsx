@@ -165,7 +165,7 @@ class PrepareObjectForMigration(object):
 
     def prepare_network(self, net, dest_default_public_net=True,
                         remove_qos=False, dest_azs=None, direct_call=False,
-                        ext_net_map=None):
+                        ext_net_map=None, net_vni_map=None):
         self.fix_description(net)
         body = self.drop_fields(net, self.drop_network_fields)
 
@@ -229,6 +229,10 @@ class PrepareObjectForMigration(object):
                     body['availability_zone_hints'] = []
         elif direct_call:
             body['availability_zone_hints'] = []
+
+        if net_vni_map and body['id'] in net_vni_map:
+            body['vni'] = net_vni_map[body['id']]
+
         return body
 
     def prepare_subnet(self, subnet, direct_call=False):

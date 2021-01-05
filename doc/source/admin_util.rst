@@ -237,6 +237,12 @@ Portgroups
 
     nsxadmin -r nsx-portgroups -o nsx-cleanup <--force>
 
+VirtualWires
+~~~~~~~~~~~~
+- List all NSX virtual wires with their neutron id and vni::
+
+    nsxadmin -r nsx-virtualwires -o list (--property map-file=<filename>)
+
 Security Groups, Firewall and Spoofguard
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

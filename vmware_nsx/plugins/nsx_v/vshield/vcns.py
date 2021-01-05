@@ -521,6 +521,11 @@ class Vcns(object):
         uri = '/api/2.0/vdn/virtualwires/%s' % virtualwire_id
         return self.do_request(HTTP_DELETE, uri, format='xml')
 
+    def get_virtual_wires(self):
+        """Deletes a virtual wire."""
+        uri = '/api/2.0/vdn/virtualwires'
+        return self.do_request(HTTP_GET, uri)
+
     def create_port_group(self, dvs_id, request):
         """Creates a port group on a DVS
 

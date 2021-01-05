@@ -213,6 +213,8 @@ nsxv_resources = {
     constants.NSX_PORTGROUPS: Resource(constants.NSX_PORTGROUPS,
                                        [Operations.LIST.value,
                                         Operations.NSX_CLEAN.value]),
+    constants.NSX_VIRTUALWIRES: Resource(constants.NSX_VIRTUALWIRES,
+                                         [Operations.LIST.value]),
     constants.SECURITY_GROUPS: Resource(constants.SECURITY_GROUPS,
                                         [Operations.LIST.value,
                                          Operations.FIX_MISMATCH.value,

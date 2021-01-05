@@ -15,7 +15,9 @@
 #    under the License.
 #
 
+from neutron_lib.api import converters
 from neutron_lib.api import extensions
+from neutron_lib import constants
 from neutron_lib.db import constants as db_const
 
 
@@ -36,6 +38,10 @@ RESOURCE_ATTRIBUTE_MAP = {
     },
     'networks': {
         'id': ID_WITH_POST,
+        'vni': {'allow_post': True, 'allow_put': False,
+                'default': constants.ATTR_NOT_SPECIFIED,
+                'convert_to': converters.convert_to_int_if_not_none,
+                'is_visible': True},
     },
     'subnets': {
         'id': ID_WITH_POST,
