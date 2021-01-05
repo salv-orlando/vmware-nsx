@@ -226,7 +226,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 if dest_rule['type'] == rule_type:
                     return
         pol_id = dest_policy['id']
-        body = self.prepare_qos_rule(source_rule)
+        tenant_id = dest_policy.get('tenant_id')
+        body = self.prepare_qos_rule(source_rule, tenant_id=tenant_id)
         try:
             if rule_type == 'bandwidth_limit':
                 rule = self.dest_neutron.create_bandwidth_limit_rule(
@@ -240,8 +241,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                          {'rule': rule_type, 'pol': pol_id})
             LOG.info("created QoS policy %s rule %s", pol_id, rule)
         except Exception as e:
-            LOG.error("Failed to create QoS rule for policy %(pol)s: %(e)s",
-                      {'pol': pol_id, 'e': e})
+            LOG.error("Failed to create QoS rule %(rule)s for policy %(pol)s: "
+                      "%(e)s", {'rule': body, 'pol': pol_id, 'e': e})
             n_errors = n_errors + 1
 
     def migrate_qos_policies(self):
@@ -742,6 +743,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                 dest_objects, prepare_method, create_method):
         global n_errors
         total_num = len(source_objects)
+        LOG.info("Migrating %s %ss", total_num, resource_type)
         for count, source_obj in enumerate(source_objects, 1):
             # Check if the object already exists
             if self.have_id(source_obj['id'], dest_objects):
