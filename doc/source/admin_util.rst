@@ -716,6 +716,11 @@ Client Certificate
 
     nsxadmin -r certificate -o nsx-list
 
+- Cleanup redundant migrated objects post V2T migration::
+
+    nsxadmin -r nsx-migrate-v2t -o clean-all
+
+
 Upgrade Steps (NSX-T Version 1.0.0 to Version 1.1.0)
 ----------------------------------------------------
 

@@ -294,6 +294,8 @@ nsxp_resources = {
                                [Operations.SET.value]),
     constants.NSX_MIGRATE_T_P: Resource(constants.NSX_MIGRATE_T_P,
                                         [Operations.CLEAN_ALL.value]),
+    constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
+                                        [Operations.CLEAN_ALL.value]),
 }
 
 nsxv3_resources_names = list(nsxv3_resources.keys())
