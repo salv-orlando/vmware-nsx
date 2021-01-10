@@ -565,6 +565,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
                 # Handle DHCP enabled subnets
                 enable_dhcp = False
+                sub_host_routes = None
                 if body['enable_dhcp']:
                     count_dhcp_subnet = count_dhcp_subnet + 1
                     # disable dhcp on subnet: we will enable it after creating
@@ -586,13 +587,17 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                         enable_dhcp = False
                     else:
                         enable_dhcp = True
+                        if body.get('host_routes'):
+                            # Should be added when dhcp is enabled
+                            sub_host_routes = body.pop('host_routes')
                 try:
                     created_subnet = self.dest_neutron.create_subnet(
                         {'subnet': body})['subnet']
                     LOG.info("Created subnet: %s", created_subnet['id'])
                     subnets_map[subnet_id] = created_subnet['id']
                     if enable_dhcp:
-                        dhcp_subnets.append(created_subnet)
+                        dhcp_subnets.append({'id': created_subnet['id'],
+                                             'host_routes': sub_host_routes})
                 except n_exc.BadRequest as e:
                     LOG.error("Failed to create subnet: %(subnet)s: %(e)s",
                               {'subnet': subnet, 'e': e})
@@ -715,11 +720,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                   'ip': ip_addr,
                                   'mac': created_port['mac_address']})
 
-            # Enable dhcp on the relevant subnets:
+            # Enable dhcp on the relevant subnets, and re-add host routes:
             for subnet in dhcp_subnets:
                 try:
+                    data = {'enable_dhcp': True}
+                    if subnet['host_routes']:
+                        data['host_routes'] = subnet['host_routes']
                     self.dest_neutron.update_subnet(subnet['id'],
-                        {'subnet': {'enable_dhcp': True}})
+                                                    {'subnet': data})
                 except Exception as e:
                     LOG.error("Failed to enable DHCP on subnet %(subnet)s: "
                               "%(e)s",

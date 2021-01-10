@@ -315,18 +315,21 @@ class PrepareObjectForMigration(object):
     def prepare_lb_listener(self, listener_obj, lb_body):
         body = self.drop_fields(listener_obj, self.drop_lb_listener_fields)
         body['loadbalancer'] = lb_body
+        body['loadbalancer']['listeners'] = []
         body['loadbalancer_id'] = lb_body['id']
         return body
 
     def prepare_lb_pool(self, pool_obj, lb_body):
         body = self.drop_fields(pool_obj, self.drop_lb_pool_fields)
         body['loadbalancer'] = lb_body
+        body['loadbalancer']['listeners'] = []
         body['loadbalancer_id'] = lb_body['id']
         return body
 
     def prepare_lb_member(self, mem_obj, lb_body):
         body = self.drop_fields(mem_obj, self.drop_lb_member_fields)
         body['loadbalancer'] = lb_body
+        body['loadbalancer']['listeners'] = []
         body['loadbalancer_id'] = lb_body['id']
         return body
 
