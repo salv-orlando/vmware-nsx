@@ -4788,6 +4788,19 @@ class NsxV3Plugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             ns_group, secgroup.get(provider_sg.PROVIDER))
         return ns_group, firewall_section
 
+    def _fix_sg_rule_dict_ips(self, sg_rule):
+        # 0.0.0.0/# and ::/ are not valid entries for local and remote so we
+        # need to change this to None
+        if (sg_rule.get('remote_ip_prefix') and
+            (sg_rule['remote_ip_prefix'].startswith('0.0.0.0/') or
+             sg_rule['remote_ip_prefix'].startswith('::/'))):
+            sg_rule['remote_ip_prefix'] = None
+        if (sg_rule.get('local_ip_prefix') and
+            validators.is_attr_set(sg_rule['local_ip_prefix']) and
+            (sg_rule['local_ip_prefix'].startswith('0.0.0.0/') or
+             sg_rule['local_ip_prefix'].startswith('::/'))):
+            sg_rule['local_ip_prefix'] = None
+
     def _create_firewall_rules(self, context, section_id, nsgroup_id,
                                logging_enabled, action, sg_rules):
         # since the nsxlib does not have access to the nsx db,
@@ -4804,14 +4817,7 @@ class NsxV3Plugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 remote_nsgroup_id = nsx_db.get_nsx_security_group_id(
                     context.session, remote_group_id)
             ruleid_2_remote_nsgroup_map[sg_rule['id']] = remote_nsgroup_id
-            # 0.0.0.0/# is not a valid entry for local and remote so we need
-            # to change this to None
-            if (sg_rule.get('remote_ip_prefix') and
-                sg_rule['remote_ip_prefix'].startswith('0.0.0.0/')):
-                sg_rule['remote_ip_prefix'] = None
-            if (sg_rule.get('local_ip_prefix') and
-                sg_rule['local_ip_prefix'].startswith('0.0.0.0/')):
-                sg_rule['local_ip_prefix'] = None
+            self._fix_sg_rule_dict_ips(sg_rule)
 
         return self.nsxlib.firewall_section.create_rules(
             context, section_id, nsgroup_id,
