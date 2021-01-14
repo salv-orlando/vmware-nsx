@@ -1568,9 +1568,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 context, subnet_data, updated_subnet)
 
         # Check if needs to update DHCP related NSX resources
-        # (only if the subnet changed, but dhcp was already enabled)
-        if (enable_dhcp and orig_enable_dhcp and
-            ('dns_nameservers' in subnet_data or
+        if (enable_dhcp and
+            (not orig_enable_dhcp or
+             'dns_nameservers' in subnet_data or
              'gateway_ip' in subnet_data or
              'host_routes' in subnet_data)):
             self._update_nsx_net_dhcp(context, network, net_az, updated_subnet)
