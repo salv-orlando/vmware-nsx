@@ -2624,19 +2624,22 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             if port.get('fixed_ips'):
                 for fip in port['fixed_ips']:
                     subnet_id = fip['subnet_id']
+                    subnet_obj = self._get_subnet_object(context, subnet_id)
+                    subnet = self._make_subnet_dict(subnet_obj, fields=None,
+                                                    context=context)
                     self._confirm_router_interface_not_in_use(
-                        context, router_id, subnet_id)
+                        context, router_id, subnet)
             if not (port['device_owner'] in const.ROUTER_INTERFACE_OWNERS and
                     port['device_id'] == router_id):
                 raise l3_exc.RouterInterfaceNotFound(
                     router_id=router_id, port_id=port_id)
         elif 'subnet_id' in interface_info:
             subnet_id = interface_info['subnet_id']
-            self._confirm_router_interface_not_in_use(
-                context, router_id, subnet_id)
             subnet_obj = self._get_subnet_object(context, subnet_id)
             subnet = self._make_subnet_dict(subnet_obj, fields=None,
                                             context=context)
+            self._confirm_router_interface_not_in_use(
+                context, router_id, subnet)
             network_id = subnet['network_id']
             ports = self._get_router_interface_ports_by_network(
                 context, router_id, network_id)
