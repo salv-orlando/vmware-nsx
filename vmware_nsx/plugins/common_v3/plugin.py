@@ -2080,6 +2080,11 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         dhcp_profile = az._native_dhcp_profile_uuid
         dhcp_obj = self.nsxlib.native_dhcp_profile.get(dhcp_profile)
         ec_id = dhcp_obj['edge_cluster_id']
+        if not ec_id:
+            LOG.warning("DHCP profile %s is missing an edge cluster",
+                        dhcp_profile)
+            return
+
         ec_nodes = self.nsxlib.edge_cluster.get_transport_nodes(ec_id)
         ec_tzs = []
         for tn_uuid in ec_nodes:
