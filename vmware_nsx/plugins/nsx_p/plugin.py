@@ -1018,6 +1018,10 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         net_tz = self._get_net_tz(context, network['id'])
         dhcp_ec_path = self.nsxpolicy.dhcp_server_config.get(
             az._policy_dhcp_server_config).get('edge_cluster_path')
+        if not dhcp_ec_path:
+            LOG.warning("DHCP server config %s is missing an edge cluster",
+                        az._policy_dhcp_server_config)
+            return
         ec_id = p_utils.path_to_id(dhcp_ec_path)
 
         try:
@@ -4250,12 +4254,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Policy obj
             md_ec_path = self.nsxpolicy.md_proxy.get(
                 mdproxy_uuid).get('edge_cluster_path')
+            if not md_ec_path:
+                LOG.warning("MDProxy %s is missing an edge cluster",
+                            mdproxy_uuid)
+                return True
             md_ec = p_utils.path_to_id(md_ec_path)
         else:
             # MP obj
             md_ec = self.nsxlib.native_md_proxy.get(
                 mdproxy_uuid).get('edge_cluster_id')
-
+            if not md_ec:
+                LOG.warning("MDProxy %s is missing an edge cluster",
+                            mdproxy_uuid)
+                return True
         try:
             ec_tzs = plugin_utils.get_edge_cluster_tzs(
                 self.nsxpolicy, self.nsxlib, md_ec)
