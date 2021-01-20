@@ -58,7 +58,7 @@ class Operations(enum.Enum):
     NSX_UPDATE_TAGS = 'nsx-update-tags'
     NSX_UPDATE_FW = 'nsx-update-fw'
     NSX_RECREATE = 'nsx-recreate'
-    NSX_REDISTRIBURE = 'nsx-redistribute'
+    NSX_REDISTRIBUTE = 'nsx-redistribute'
     NSX_REORDER = 'nsx-reorder'
     NSX_DISCONNECT = 'nsx-disconnect'
     NSX_RECONNECT = 'nsx-reconnect'
@@ -200,7 +200,7 @@ nsxv_resources = {
     constants.DHCP_BINDING: Resource(constants.DHCP_BINDING,
                                      [Operations.LIST.value,
                                       Operations.NSX_UPDATE.value,
-                                      Operations.NSX_REDISTRIBURE.value,
+                                      Operations.NSX_REDISTRIBUTE.value,
                                       Operations.NSX_RECREATE.value]),
     constants.NETWORKS: Resource(constants.NETWORKS,
                                  [Operations.LIST.value,
@@ -240,7 +240,7 @@ nsxv_resources = {
                              Operations.STATUS.value]),
     constants.ROUTERS: Resource(constants.ROUTERS,
                                 [Operations.NSX_RECREATE.value,
-                                 Operations.NSX_REDISTRIBURE.value,
+                                 Operations.NSX_REDISTRIBUTE.value,
                                  Operations.MIGRATE_VDR_DHCP.value,
                                  Operations.NSX_UPDATE_FW.value]),
     constants.ORPHANED_VNICS: Resource(constants.ORPHANED_VNICS,
@@ -295,7 +295,8 @@ nsxp_resources = {
     constants.NSX_MIGRATE_T_P: Resource(constants.NSX_MIGRATE_T_P,
                                         [Operations.CLEAN_ALL.value]),
     constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
-                                        [Operations.CLEAN_ALL.value]),
+                                        [Operations.CLEAN_ALL.value,
+                                         Operations.NSX_REDISTRIBUTE.value]),
 }
 
 nsxv3_resources_names = list(nsxv3_resources.keys())

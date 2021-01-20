@@ -409,7 +409,7 @@ registry.subscribe(migrate_distributed_routers_dhcp,
 
 registry.subscribe(redistribute_routers,
                    constants.ROUTERS,
-                   shell.Operations.NSX_REDISTRIBURE.value)
+                   shell.Operations.NSX_REDISTRIBUTE.value)
 
 registry.subscribe(update_edge_firewalls,
                    constants.ROUTERS,

@@ -335,8 +335,8 @@ def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
                                          table_results,
                                          ['neutron_id', 'nsx_id', 'vni']))
     if filename:
-        f = open(filename, "a")
-        f.write("%s" % map_results)
+        f = open(filename, "w")
+        f.write("%s" % jsonutils.dumps(map_results))
         f.close()
         LOG.info("Mapping data saved into %s", filename)
 
