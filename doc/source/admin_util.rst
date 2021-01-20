@@ -708,6 +708,8 @@ Client Certificate
 
     nsxadmin -r nsx-migrate-v2t -o clean-all
 
+- Disable/Restore Tier0 redistribution of tier1 routes during the migration::
+    nsxadmin -r nsx-migrate-v2t -o nsx-redistribute --property action=disable/restore --property tier0s=a,b,c
 
 Steps to create a TVD admin user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
