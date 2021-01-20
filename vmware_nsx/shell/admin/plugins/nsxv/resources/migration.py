@@ -13,6 +13,7 @@
 #    under the License.
 
 import netaddr
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from networking_l2gw.db.l2gateway import l2gateway_models
@@ -23,6 +24,7 @@ from neutron_lib.callbacks import registry
 from neutron_lib import constants as nl_constants
 from neutron_lib import context as n_context
 
+from vmware_nsx.common import config
 from vmware_nsx.common import nsxv_constants
 from vmware_nsx.common import utils as c_utils
 from vmware_nsx.db import nsxv_db
@@ -70,6 +72,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
     n_errors = 0
 
     # General config options / per AZ which are unsupported
+    config.register_nsxv_azs(cfg.CONF, cfg.CONF.nsxv.availability_zones)
     zones = nsx_az.NsxVAvailabilityZones()
     unsupported_configs = ['edge_ha', 'edge_host_groups']
     for az in zones.list_availability_zones_objects():
