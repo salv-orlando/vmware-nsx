@@ -352,4 +352,4 @@ registry.subscribe(nsx_recreate_dhcp_edge,
                    shell.Operations.NSX_RECREATE.value)
 registry.subscribe(nsx_redistribute_dhcp_edges,
                    constants.DHCP_BINDING,
-                   shell.Operations.NSX_REDISTRIBURE.value)
+                   shell.Operations.NSX_REDISTRIBUTE.value)
