@@ -1478,7 +1478,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
     def _update_qos_on_created_network(self, context, net_data, new_net):
         qos_policy_id = qos_com_utils.set_qos_policy_on_new_net(
-            context, net_data, new_net)
+            context, net_data, new_net, allow_external=True)
 
         if qos_policy_id:
             # update the QoS data on the backend

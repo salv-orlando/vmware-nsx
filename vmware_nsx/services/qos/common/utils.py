@@ -14,6 +14,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from neutron_lib.api.definitions import external_net
+from neutron_lib.api import validators
 from neutron_lib.exceptions import qos as qos_exc
 from neutron_lib.objects import registry as obj_reg
 from neutron_lib.services.qos import constants as qos_consts
@@ -76,18 +78,23 @@ def get_network_policy_id(context, net_id):
         return policy.id
 
 
-def set_qos_policy_on_new_net(context, net_data, created_net):
+def set_qos_policy_on_new_net(context, net_data, created_net,
+                              allow_external=False):
     """Update the network with the assigned or default QoS policy
 
     Update the network-qos binding table, and the new network structure
     """
     qos_policy_id = net_data.get(qos_consts.QOS_POLICY_ID)
     if not qos_policy_id:
-        # try and get the default one
-        qos_obj = obj_reg.load_class('QosPolicyDefault').get_object(
-            context, project_id=created_net['project_id'])
-        if qos_obj:
-            qos_policy_id = qos_obj.qos_policy_id
+        # try and get the default qos policy. If the plugin does not allow
+        # qos on external networks, check it.
+        external = net_data.get(external_net.EXTERNAL)
+        is_external_net = validators.is_attr_set(external) and external
+        if allow_external or not is_external_net:
+            qos_obj = obj_reg.load_class('QosPolicyDefault').get_object(
+                context, project_id=created_net['project_id'])
+            if qos_obj:
+                qos_policy_id = qos_obj.qos_policy_id
 
     if qos_policy_id:
         # attach the policy to the network in the neutron DB
