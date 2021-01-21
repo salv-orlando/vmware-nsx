@@ -40,6 +40,7 @@ SERVICE_LB_TAG_MAX = 20
 
 VIP_GRP_ID = '%s-vip'
 MAX_SOURCES_IN_RULE = 128
+MAX_DESC_LEN = 1024
 
 
 def get_rule_match_conditions(policy):
@@ -520,6 +521,8 @@ def set_allowed_cidrs_fw(core_plugin, context, loadbalancer, listeners):
                     rule_index, len(listener['negate_cidrs']))
                 rule_id = rule_id + "-%s" % rule_index
             description = "Allow only %s" % listener['allowed_cidrs']
+            if len(description) >= MAX_DESC_LEN:
+                description = "Allow only configured allowed-cidrs"
             rules.append(nsxpolicy.gateway_policy.build_entry(
                 rule_name,
                 p_constants.DEFAULT_DOMAIN, loadbalancer['id'],
