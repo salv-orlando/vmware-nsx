@@ -2495,6 +2495,32 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                 if_subnet['subnet']['id'], None,
                 expected_code=exc.HTTPBadRequest.code)
 
+    def test_router_interface_with_ipv6_no_gateway_subnet(self):
+        # Policy DHCP does not allow 1 dhcp subnet without gw
+        # and another router interface subnet on the same overlay network
+        # even on different ip-version
+        with self.router() as r,\
+            self.network() as net,\
+            self.subnet(cidr='20.0.0.0/24', network=net),\
+            self.subnet(cidr='60::/64', ip_version=6, network=net,
+                        enable_dhcp=False, gateway_ip=None) as if_subnet:
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None,
+                expected_code=exc.HTTPBadRequest.code)
+
+    def test_router_interface_with_ipv6_dhcp_subnet(self):
+        # Policy DHCP allow s1 dhcp subnet and another router
+        # interface subnet on the same overlay network with different ip-ver
+        with self.router() as r,\
+            self.network() as net,\
+            self.subnet(cidr='20.0.0.0/24', network=net),\
+            self.subnet(cidr='60::/64', ip_version=6, network=net,
+                        enable_dhcp=False) as if_subnet:
+            self._router_interface_action(
+                'add', r['router']['id'],
+                if_subnet['subnet']['id'], None)
+
     def test_router_interface_ndprofile_ipv4(self):
         with self.router() as r,\
             self.network() as net,\
