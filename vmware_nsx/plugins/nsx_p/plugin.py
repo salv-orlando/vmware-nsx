@@ -1307,11 +1307,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             return
 
         ip_ver = subnet_data.get('ip_version', 4)
-        if ip_ver == 6:
-            # Since the plugin does not allow multiple ipv6 subnets,
-            # this can be ignored.
-            return
-
         overlay_net = self._is_overlay_network(context, net_id)
         if not overlay_net:
             # Since the plugin allows only 1 DHCP subnet, if this is not an
@@ -1322,14 +1317,21 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             context, net_id)
         for if_port in interface_ports:
             if if_port['fixed_ips']:
-                # skip subnets of the wrong version
                 interface_ip = if_port['fixed_ips'][0].get('ip_address', '')
-                if ip_ver == 4 and ':' in interface_ip:
-                    continue
-                if ip_ver == 6 and ':' not in interface_ip:
-                    continue
                 interface_sub = if_port['fixed_ips'][0]['subnet_id']
                 if subnet_data.get('id') != interface_sub:
+                    # Cannot add a subnet with no GW on a routed segment
+                    if not subnet_data.get('gateway_ip'):
+                        msg = (_("Can not create a DHCP subnet without a "
+                                 "gateway on routed network %(net)s") %
+                               {'net': net_id})
+                        LOG.error(msg)
+                        raise n_exc.InvalidInput(error_message=msg)
+                    # skip subnets of the wrong version
+                    if ip_ver == 4 and ':' in interface_ip:
+                        continue
+                    if ip_ver == 6 and ':' not in interface_ip:
+                        continue
                     msg = (_("Can not create a DHCP subnet on network %(net)s "
                              "as another IPv%(ver)s subnet is attached to a "
                              "router") % {'net': net_id, 'ver': ip_ver})
@@ -2908,28 +2910,31 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # Only interfaces for overlay networks create segment subnets
             return
 
-        if subnet.get('ip_version', 4) != 4:
-            # IPv6 is not relevant here since plugin allow only 1 ipv6 subnet
-            # per network
-            return
-
-        if subnet['enable_dhcp']:
-            # This subnet is with dhcp, so there cannot be any other with dhcp
-            return
+        ip_version = subnet.get('ip_version', 4)
 
         if not self.use_policy_dhcp:
             # Only policy DHCP creates segment subnets
             return
 
-        # Look for another subnet with DHCP
         network = self._get_network(context.elevated(), network_id)
-        for subnet in network.subnets:
-            if subnet.enable_dhcp and subnet.ip_version == 4:
-                msg = (_("Can not add router interface on network %(net)s "
-                         "as another IPv%(ver)s subnet has enabled DHCP") %
-                       {'net': network_id, 'ver': subnet.ip_version})
-                LOG.error(msg)
-                raise n_exc.InvalidInput(error_message=msg)
+        for net_subnet in network.subnets:
+            if net_subnet.enable_dhcp:
+                if net_subnet.id == subnet['id']:
+                    continue
+                # Look for another subnet with DHCP and the same ip-ver
+                if net_subnet.ip_version == ip_version:
+                    msg = (_("Can not add router interface on network %(net)s "
+                             "as another IPv%(ver)s subnet has enabled DHCP") %
+                           {'net': network_id, 'ver': ip_version})
+                    LOG.error(msg)
+                    raise n_exc.InvalidInput(error_message=msg)
+                # Look for another subnet with DHCP and no gw
+                if not net_subnet.gateway_ip:
+                    msg = (_("Can not add router interface on network %(net)s "
+                             "as another subnet has DHCP and no gateway") %
+                           {'net': network_id})
+                    LOG.error(msg)
+                    raise n_exc.InvalidInput(error_message=msg)
 
     def _get_subnet_ndra_profile(self, subnet):
         ndra_profile_id = NO_SLAAC_NDRA_PROFILE_ID
