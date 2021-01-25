@@ -2625,12 +2625,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         sr_currently_exists = self.verify_sr_at_backend(context, router_id)
         fw_exist = self._router_has_edge_fw_rules(context, router)
         vpn_exist = self.service_router_has_vpnaas(context, router_id)
+        vlan_interfaces = self._get_router_vlan_interfaces(
+                context.elevated(), router_id)
         lb_exist = False
-        if not (fw_exist or vpn_exist):
+        if not (fw_exist or vpn_exist or vlan_interfaces):
             # This is a backend call, so do it only if must
             lb_exist = self.service_router_has_loadbalancers(
                 context, router_id)
-        tier1_services_exist = fw_exist or vpn_exist or lb_exist
+        tier1_services_exist = (fw_exist or vpn_exist or lb_exist or
+                                vlan_interfaces)
 
         actions = self._get_update_router_gw_actions(
             org_tier0_uuid, orgaddr, org_enable_snat,
