@@ -1481,14 +1481,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     # Enable the network DHCP on the NSX
                     self._enable_subnet_dhcp(
                         context, network, created_subnet, net_az)
-                except (nsx_lib_exc.ManagerError, nsx_exc.NsxPluginException):
-                    # revert the subnet creation
-                    with excutils.save_and_reraise_exception():
-                        # Try to delete the DHCP port, and the neutron subnet
-                        self._delete_subnet_dhcp_port(
-                            context, net_id, subnet_id=created_subnet['id'])
-                        super(NsxPolicyPlugin, self).delete_subnet(
-                            context, created_subnet['id'])
+                except (nsx_lib_exc.ManagerError,
+                        nsx_exc.NsxPluginException) as e:
+                    # Revert the subnet creation: ry to delete the DHCP port
+                    # and the neutron subnet
+                    self._delete_subnet_dhcp_port(
+                        context, net_id, subnet_id=created_subnet['id'])
+                    super(NsxPolicyPlugin, self).delete_subnet(
+                        context, created_subnet['id'])
+                    self.raise_nsxlib_error(e)
 
         return created_subnet
 
@@ -1574,11 +1575,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     else:
                         self._disable_network_dhcp(context, network,
                                                    subnet_id=subnet_id)
-                except (nsx_lib_exc.ManagerError, nsx_exc.NsxPluginException):
+                except (nsx_lib_exc.ManagerError,
+                        nsx_exc.NsxPluginException) as e:
                     # revert the subnet update
-                    with excutils.save_and_reraise_exception():
-                        super(NsxPolicyPlugin, self).update_subnet(
-                            context, subnet_id, {'subnet': orig_subnet})
+                    super(NsxPolicyPlugin, self).update_subnet(
+                        context, subnet_id, {'subnet': orig_subnet})
+                    self.raise_nsxlib_error(e)
 
         else:
             # No dhcp changes - just call super update
@@ -1593,7 +1595,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
              'dns_nameservers' in subnet_data or
              'gateway_ip' in subnet_data or
              'host_routes' in subnet_data)):
-            self._update_nsx_net_dhcp(context, network, net_az, updated_subnet)
+            try:
+                self._update_nsx_net_dhcp(
+                    context, network, net_az, updated_subnet)
+            except (nsx_lib_exc.ManagerError,
+                    nsx_exc.NsxPluginException) as e:
+                self.raise_nsxlib_error(e)
 
         return updated_subnet
 
@@ -2039,7 +2046,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 LOG.error(err_msg)
                 raise n_exc.InvalidInput(error_message=err_msg)
 
-    def raise_port_error(self, e):
+    def raise_nsxlib_error(self, e):
         """Raise the proper error when segment port PATCH fails"""
         if isinstance(e, nsx_lib_exc.ManagerError):
             if e.status_code == 400:
@@ -2125,7 +2132,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                           {'id': neutron_db['id'], 'e': e})
                 super(NsxPolicyPlugin, self).delete_port(
                     context, neutron_db['id'])
-                self.raise_port_error(e)
+                self.raise_nsxlib_error(e)
 
         # Attach the QoS policy to the port in the neutron DB
         if qos_policy_id:
@@ -2332,7 +2339,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     self._revert_neutron_port_update(
                         context, port_id, original_port, updated_port,
                         port_security, sec_grp_updated)
-                self.raise_port_error(e)
+                self.raise_nsxlib_error(e)
         else:
             # if this port changed ownership to router interface, it should
             # be deleted from policy, since policy handles router connectivity
