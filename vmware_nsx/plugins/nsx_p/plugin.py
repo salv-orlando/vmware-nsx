@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import re
 import time
 
 import netaddr
@@ -595,8 +596,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         self.endpoints = [agents_db.AgentExtRpcCallback()]
 
     def _net_nsx_name(self, network):
-        return utils.get_name_and_uuid(network['name'] or 'network',
+        name = utils.get_name_and_uuid(network.get('name') or 'network',
                                        network['id'])
+        LOG.error("DEBUG ADIT orig name = %s", name)
+        # remove illegal characters in segment names: ;|=,~@'
+        name = re.sub("[;|=,~@\']", '', name)
+        LOG.error("DEBUG ADIT fixed name = %s", name)
+        return name
 
     def _create_network_on_backend(self, context, net_data,
                                    transparent_vlan, provider_data, az,
@@ -905,9 +911,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if (not extern_net and not is_nsx_net and
             ('name' in net_data or 'description' in net_data or
              'admin_state_up' in net_data)):
-            net_name = utils.get_name_and_uuid(
-                updated_net['name'] or 'network', network_id)
-
+            net_name = self._net_nsx_name(updated_net)
             kwargs = {'name': net_name,
                       'description': updated_net.get('description', '')}
 
