@@ -734,7 +734,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 tags=mock.ANY,
                 name=mock.ANY,
                 ports=[listener['protocol_port']],
-                max_concurrent_connections=None,
                 virtual_server_id=listener_id,
                 pool_id='',
                 lb_persistence_profile_id='')
@@ -794,7 +793,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 tags=mock.ANY,
                 name=mock.ANY,
                 ports=[self.terminated_https_listener_dict['protocol_port']],
-                max_concurrent_connections=None,
                 virtual_server_id=HTTPS_LISTENER_ID,
                 pool_id='',
                 lb_persistence_profile_id='')
@@ -821,6 +819,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                               ) as mock_add_virtual_server:
             mock_get_floatingips.return_value = []
 
+            listener_dict['connection_limit'] = 7
             self.edge_driver.listener.create(self.context, listener_dict,
                                              self.completor)
 
@@ -832,7 +831,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 tags=mock.ANY,
                 name=mock.ANY,
                 ports=[listener_dict['protocol_port']],
-                max_concurrent_connections=None,
+                max_concurrent_connections=7,
                 virtual_server_id=LISTENER_ID,
                 pool_id=POOL_ID)
             self.assertTrue(self.last_completor_called)
@@ -886,7 +885,7 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             mock.patch.object(self.pp_cookie_client, 'create_or_overwrite'
                               ) as mock_create_pp:
             mock_get_floatingips.return_value = []
-
+            listener_dict['connection_limit'] = -1  # Should be ignored
             self.edge_driver.listener.create(self.context, listener_dict,
                                              self.completor)
             mock_add_virtual_server.assert_called_with(
@@ -897,7 +896,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 tags=mock.ANY,
                 name=mock.ANY,
                 ports=[listener_dict['protocol_port']],
-                max_concurrent_connections=None,
                 virtual_server_id=LISTENER_ID,
                 pool_id=listener_dict['default_pool_id'])
             mock_create_pp.assert_called_once()
@@ -955,7 +953,6 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
                 tags=mock.ANY,
                 name=mock.ANY,
                 ports=[listener['protocol_port']],
-                max_concurrent_connections=None,
                 virtual_server_id=listener_id,
                 pool_id='',
                 lb_persistence_profile_id='')
