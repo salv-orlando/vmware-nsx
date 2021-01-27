@@ -95,8 +95,14 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             kwargs['name'] = vs_name
         if tags:
             kwargs['tags'] = tags
-        if listener['connection_limit'] != -1:
-            kwargs['max_concurrent_connections'] = listener['connection_limit']
+        if (listener['connection_limit'] is not None and
+            listener['connection_limit'] != -1):
+            val = listener['connection_limit']
+            if val >= 1:
+                kwargs['max_concurrent_connections'] = val
+            else:
+                LOG.warning("Ignoring illegal listener connection_limit %s",
+                            val)
         if 'default_pool_id' in listener:
             if listener['default_pool_id']:
                 kwargs['pool_id'] = listener['default_pool_id']
