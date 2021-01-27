@@ -598,10 +598,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _net_nsx_name(self, network):
         name = utils.get_name_and_uuid(network.get('name') or 'network',
                                        network['id'])
-        LOG.error("DEBUG ADIT orig name = %s", name)
         # remove illegal characters in segment names: ;|=,~@'
         name = re.sub("[;|=,~@\']", '', name)
-        LOG.error("DEBUG ADIT fixed name = %s", name)
         return name
 
     def _create_network_on_backend(self, context, net_data,
@@ -1598,7 +1596,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         psec_on, has_ip = self._determine_port_security_and_has_ip(context,
                                                                    port_data)
         if not psec_on:
-            return None
+            # returning an empty list will delete all existing bindings
+            return []
 
         address_bindings = []
         for fixed_ip in port_data['fixed_ips']:
