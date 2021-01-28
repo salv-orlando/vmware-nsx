@@ -335,8 +335,14 @@ class NSXOctaviaListenerEndpoint(object):
                 listener_dict[listener['id']] = listener
                 for policy in listener.get('l7policies', []):
                     for rule in policy.get('rules', []):
+                        LOG.info("Delete cascade: deleting l7 rule of lb %s",
+                                 loadbalancer['id'])
                         self.l7rule.delete_cascade(ctx, rule, dummy_completor)
+                    LOG.info("Delete cascade: deleting l7 policy of lb %s",
+                             loadbalancer['id'])
                     self.l7policy.delete_cascade(ctx, policy, dummy_completor)
+                LOG.info("Delete cascade: deleting listener of lb %s",
+                         loadbalancer['id'])
                 self.listener.delete_cascade(ctx, listener, dummy_completor)
             for pool in loadbalancer.get('pools', []):
                 if not pool.get('loadbalancer'):
@@ -352,11 +358,17 @@ class NSXOctaviaListenerEndpoint(object):
                 for member in pool.get('members', []):
                     if not member.get('pool'):
                         member['pool'] = pool
+                    LOG.info("Delete cascade: deleting old_member of lb %s",
+                             loadbalancer['id'])
                     self.member.delete_cascade(ctx, member, dummy_completor)
                 if pool.get('healthmonitor'):
                     pool['healthmonitor']['pool'] = pool
+                    LOG.info("Delete cascade: deleting HM of lb %s",
+                             loadbalancer['id'])
                     self.healthmonitor.delete_cascade(
                         ctx, pool['healthmonitor'], dummy_completor)
+                LOG.info("Delete cascade: deleting pool of lb %s",
+                         loadbalancer['id'])
                 self.pool.delete_cascade(ctx, pool, dummy_completor)
         except Exception as e:
             LOG.error('NSX driver loadbalancer_delete_cascade failed to '
