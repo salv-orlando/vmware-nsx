@@ -147,6 +147,13 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         lb_id = hm['pool']['loadbalancer_id']
         lb_binding = nsxv_db.get_nsxv_lbaas_loadbalancer_binding(
             context.session, lb_id)
+        if not lb_binding:
+            # Don't fail deletion if the resource is already gone
+            LOG.warning("Couldn't find LB %s binding during HM deletion",
+                        lb_id)
+            completor(success=True)
+            return
+
         edge_id = lb_binding['edge_id']
 
         pool_binding = nsxv_db.get_nsxv_lbaas_pool_binding(

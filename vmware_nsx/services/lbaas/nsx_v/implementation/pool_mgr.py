@@ -157,14 +157,19 @@ class EdgePoolManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
         lb_binding = nsxv_db.get_nsxv_lbaas_loadbalancer_binding(
             context.session, lb_id)
+        if not lb_binding:
+            # Don't fail deletion if the resource is already gone
+            LOG.warning("Couldn't find LB %s binding during pool deletion",
+                        lb_id)
+            completor(success=True)
+            return
+        edge_id = lb_binding['edge_id']
+
         pool_binding = nsxv_db.get_nsxv_lbaas_pool_binding(
             context.session, lb_id, pool['id'])
-
-        edge_id = lb_binding['edge_id']
         if not pool_binding:
             completor(success=True)
             return
-
         edge_pool_id = pool_binding['edge_pool_id']
 
         listeners_to_update = []
