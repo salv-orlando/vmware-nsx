@@ -599,10 +599,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _net_nsx_name(self, network):
         name = utils.get_name_and_uuid(network.get('name') or 'network',
                                        network['id'])
-        LOG.error("DEBUG ADIT orig name = %s", name)
         # remove illegal characters in segment names: ;|=,~@'
         name = re.sub("[;|=,~@\']", '', name)
-        LOG.error("DEBUG ADIT fixed name = %s", name)
         return name
 
     def _create_network_on_backend(self, context, net_data,
