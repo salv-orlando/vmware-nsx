@@ -168,6 +168,9 @@ class VcnsApiHelper(object):
         except requests.exceptions.Timeout:
             raise exceptions.ResourceTimedOut(uri=uri)
 
+        except requests.exceptions.ConnectionError:
+            raise exceptions.ResourceConnectionError(uri=uri)
+
         status = response.status_code
 
         if 200 <= status < 300:
