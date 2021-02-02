@@ -90,6 +90,7 @@ FWAAS_TABLES = {
     'firewall_router_associations',
     'cisco_firewall_associations',
     'firewall_rules_v2',
+    'firewall_group_port_associations_v2',
 }
 
 VPNAAS_TABLES = {
