@@ -2220,10 +2220,10 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         return port_data
 
     def _make_port_dict(self, port, fields=None,
-                        process_extensions=True):
+                        process_extensions=True, bulk=False):
         port_data = super(NsxVPluginV2, self)._make_port_dict(
             port, fields=fields,
-            process_extensions=process_extensions)
+            process_extensions=process_extensions, bulk=bulk)
         self._remove_provider_security_groups_from_list(port_data)
         return port_data
 
