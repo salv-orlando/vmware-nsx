@@ -416,7 +416,6 @@ def stats_getter(context, core_plugin, ignore_list=None):
 
             # Go over each virtual server in the response
             for vs in rsp.get('virtual_servers', []):
-                # look up the virtual server in the DB
                 if vs.get('statistics'):
                     vs_stats = vs['statistics']
                     stats = copy.copy(lb_const.LB_EMPTY_STATS)
