@@ -573,6 +573,21 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
             status_socket, stats_socket, **kwargs)
         self.repositories = repositories.Repositories()
 
+    def _removed_not_in_db(self, status, status_type, db_type):
+        if not status.get(status_type):
+            return
+
+        fixed_data = []
+        for obj in status[status_type]:
+            db_rep = getattr(self.repositories, db_type)
+            db_obj = db_rep.get(self.db_session, id=obj['id'])
+            if db_obj:
+                fixed_data.append(obj)
+            else:
+                LOG.warning("Skipping update of %s %s - not in DB",
+                            db_type, obj['id'])
+        status[status_type] = fixed_data
+
     @log_helpers.log_method_call
     def update_loadbalancer_status(self, ctxt, status):
         # refresh the driver lib session
@@ -602,6 +617,14 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
                                     "find the ID of member %s of pool %s",
                                     member['member_ip'], member['pool_id'])
             status['members'] = fixed_members
+
+        # Remove resources that are missing from the octavia DB. This could be
+        # a result of old/other deployments or neutron-lbaas loadbalancers not
+        # yet migrated to octavia
+        self._removed_not_in_db(status, 'loadbalancers', 'load_balancer')
+        self._removed_not_in_db(status, 'listeners', 'listener')
+        self._removed_not_in_db(status, 'pools', 'pool')
+
         try:
             return super(NSXOctaviaDriverEndpoint,
                          self).update_loadbalancer_status(status)
@@ -613,6 +636,12 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
     def update_listener_statistics(self, ctxt, statistics):
         # refresh the driver lib session
         self.db_session = db_apis.get_session()
+        # Remove listeners that are missing from the octavia DB. This could be
+        # a result of old/other deployments or neutron-lbaas loadbalancers not
+        # yet migrated to octavia
+        self._removed_not_in_db(statistics, 'listeners', 'listener')
+        if not statistics.get('listeners'):
+            return
         try:
             return super(NSXOctaviaDriverEndpoint,
                          self).update_listener_statistics(statistics)
