@@ -134,3 +134,11 @@ class NsxPolicyPluginWrapper(plugin.NsxPolicyPlugin):
                         fwaas_callbacks_v2.NsxpFwaasCallbacksV2,
                         None)
                 return
+
+
+def is_neutron_resource(resource):
+    # Return True if the resource has the neutron marking tag
+    for tag in resource.get('tags', []):
+        if tag.get('scope') == 'os-api-version':
+            return True
+    return False
