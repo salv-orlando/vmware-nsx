@@ -534,6 +534,8 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
         lb_service = {'id': LB_SERVICE_ID}
         with mock.patch.object(lb_utils, 'get_router_from_network',
                                return_value=ROUTER_ID),\
+            mock.patch.object(self.core_plugin, 'get_floatingips'
+                              ) as mock_get_floatingips, \
             mock.patch.object(self.service_client, 'update_customized',
                               side_effect=n_exc.BadRequest(resource='', msg='')
                               ) as service_update,\
@@ -542,6 +544,7 @@ class TestEdgeLbaasV2Loadbalancer(BaseTestEdgeLbaasV2):
             mock.patch.object(self.service_client, 'delete'
                               ) as mock_delete_lb_service:
 
+            mock_get_floatingips.return_value = []
             self.edge_driver.loadbalancer.delete_cascade(
                 self.context, self.lb_dict, self.completor)
 

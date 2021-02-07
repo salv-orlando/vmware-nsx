@@ -222,6 +222,8 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
 
     def delete_cascade(self, context, lb, completor):
         """Delete all backend and DB resources of this loadbalancer"""
+        p_utils.set_allowed_cidrs_fw(self.core_plugin,
+                                     context, lb, [])
         self.delete(context, lb, completor)
 
     def refresh(self, context, lb):
