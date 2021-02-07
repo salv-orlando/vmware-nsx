@@ -57,6 +57,7 @@ LB_NETWORK = {'router:external': False,
 LISTENER_ID = 'listener-x'
 HTTP_LISTENER_ID = 'listener-http'
 HTTPS_LISTENER_ID = 'listener-https'
+UDP_LISTENER_ID = 'listener-udp'
 APP_PROFILE_ID = 'appp-x'
 LB_VS_ID = 'vs-x'
 LB_APP_PROFILE = {
@@ -197,6 +198,9 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
         self.terminated_https_listener = lb_models.Listener(
             HTTPS_LISTENER_ID, LB_TENANT_ID, 'listener3', '', None, LB_ID,
             'TERMINATED_HTTPS', protocol_port=443, loadbalancer=self.lb)
+        self.udp_listener = lb_models.Listener(
+            UDP_LISTENER_ID, LB_TENANT_ID, 'listener4', '', None, LB_ID,
+            'UDP', protocol_port=443, loadbalancer=self.lb)
         self.pool = lb_models.Pool(POOL_ID, LB_TENANT_ID, 'pool1', '',
                                    None, 'HTTP', 'ROUND_ROBIN',
                                    loadbalancer_id=LB_ID,
@@ -248,6 +252,8 @@ class BaseTestEdgeLbaasV2(base.BaseTestCase):
             self.https_listener)
         self.terminated_https_listener_dict = lb_translators.\
             lb_listener_obj_to_dict(self.terminated_https_listener)
+        self.udp_listener_dict = lb_translators.lb_listener_obj_to_dict(
+            self.udp_listener)
         self.pool_dict = lb_translators.lb_pool_obj_to_dict(
             self.pool)
         self.pool_persistency_dict = lb_translators.lb_pool_obj_to_dict(
@@ -486,6 +492,8 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
             listener = self.listener_dict
             if protocol == 'HTTPS':
                 listener = self.https_listener_dict
+            elif protocol == 'UDP':
+                listener = self.udp_listener_dict
 
             self.edge_driver.listener.create(self.context, listener,
                                              self.completor)
@@ -503,6 +511,9 @@ class TestEdgeLbaasV2Listener(BaseTestEdgeLbaasV2):
 
     def test_create_https_listener(self):
         self._create_listener(protocol='HTTPS')
+
+    def test_create_udp_listener(self):
+        self._create_listener(protocol='UDP')
 
     def test_create_terminated_https(self):
         with mock.patch.object(self.core_plugin, 'get_floatingips'

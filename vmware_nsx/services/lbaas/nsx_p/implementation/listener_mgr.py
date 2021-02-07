@@ -136,6 +136,8 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         elif (listener['protocol'] == lb_const.LB_PROTOCOL_TCP or
               listener['protocol'] == lb_const.LB_PROTOCOL_HTTPS):
             app_client = nsxlib_lb.lb_fast_tcp_profile
+        elif listener['protocol'] == lb_const.LB_PROTOCOL_UDP:
+            app_client = nsxlib_lb.lb_fast_udp_profile
         else:
             msg = (_('Cannot create listener %(listener)s with '
                      'protocol %(protocol)s') %
