@@ -443,6 +443,7 @@ def set_allowed_cidrs_fw(core_plugin, context, loadbalancer, listeners):
             fw_listeners.append({
                 'id': listener.get('listener_id', listener.get('id')),
                 'port': listener['protocol_port'],
+                'protocol': listener['protocol'],
                 'allowed_cidrs': listener['allowed_cidrs'],
                 'negate_cidrs': _get_negated_allowed_cidrs(
                     listener['allowed_cidrs'],
@@ -503,11 +504,14 @@ def set_allowed_cidrs_fw(core_plugin, context, loadbalancer, listeners):
             'scope': lb_const.LB_LISTENER_TYPE,
             'tag': listener['id']})
         srv_name = "LB Listener %s" % listener['id']
+        protocol = (nsx_constants.UDP if
+                    listener['protocol'] == lb_const.LB_PROTOCOL_UDP
+                    else nsx_constants.TCP)
         nsxpolicy.service.create_or_overwrite(
                 srv_name,
                 service_id=listener['id'],
                 description="Service for listener %s" % listener['id'],
-                protocol=nsx_constants.TCP,
+                protocol=protocol,
                 dest_ports=[listener['port']],
                 tags=srv_tags)
 
