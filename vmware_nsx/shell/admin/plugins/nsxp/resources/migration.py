@@ -13,6 +13,7 @@
 #    under the License.
 
 import copy
+import netaddr
 
 from neutron_lib.callbacks import registry
 from oslo_log import log as logging
@@ -154,6 +155,56 @@ def migration_tier0_redistribute(resource, event, trigger, **kwargs):
         LOG.error("%s", errmsg)
 
 
+def _cidrs_overlap(cidr0, cidr1):
+    return cidr0.first <= cidr1.last and cidr1.first <= cidr0.last
+
+
+@admin_utils.output_header
+def migration_validate_external_cidrs(resource, event, trigger, **kwargs):
+    """Before V2T migration, validate that the external subnets cidrs
+    do not overlap the tier0 uplinks
+    """
+    errmsg = ("Need to specify --property ext-net=<path> --property "
+              "ext-cidr=<path>")
+    if not kwargs.get('property'):
+        LOG.error("%s", errmsg)
+        return
+
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    ext_net_file = properties.get('ext-net')
+    ext_cidr_file = properties.get('ext-cidr')
+    if not ext_net_file or not ext_cidr_file:
+        LOG.error("%s", errmsg)
+        return
+
+    with open(ext_net_file, 'r') as myfile:
+        # maps external network neutron id to tier0
+        data = myfile.read()
+        external_networks = jsonutils.loads(data)
+    with open(ext_cidr_file, 'r') as myfile:
+        # maps external network neutron id to its cidr
+        data = myfile.read()
+        external_cidrs = jsonutils.loads(data)
+
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+
+    for net_id in external_cidrs:
+        net_cidr = netaddr.IPNetwork(external_cidrs[net_id]).cidr
+        tier0 = external_networks.get(net_id)
+        if not tier0:
+            LOG.warning("Could not find network %s in %s",
+                        net_id, ext_net_file)
+        else:
+            tier0_cidrs = nsxpolicy.tier0.get_uplink_cidrs(tier0)
+            for cidr in tier0_cidrs:
+                tier0_subnet = netaddr.IPNetwork(cidr).cidr
+                if _cidrs_overlap(tier0_subnet, net_cidr):
+                    LOG.error("External subnet of network %s cannot overlap "
+                              "with T0 %s uplink cidr %s", net_id, tier0, cidr)
+                    exit(1)
+    exit(0)
+
+
 registry.subscribe(cleanup_db_mappings,
                    constants.NSX_MIGRATE_T_P,
                    shell.Operations.CLEAN_ALL.value)
@@ -165,3 +216,7 @@ registry.subscribe(post_v2t_migration_cleanups,
 registry.subscribe(migration_tier0_redistribute,
                    constants.NSX_MIGRATE_V_T,
                    shell.Operations.NSX_REDISTRIBUTE.value)
+
+registry.subscribe(migration_validate_external_cidrs,
+                   constants.NSX_MIGRATE_V_T,
+                   shell.Operations.VALIDATE.value)

@@ -296,6 +296,7 @@ nsxp_resources = {
                                         [Operations.CLEAN_ALL.value]),
     constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
                                         [Operations.CLEAN_ALL.value,
+                                         Operations.VALIDATE.value,
                                          Operations.NSX_REDISTRIBUTE.value]),
 }
 
