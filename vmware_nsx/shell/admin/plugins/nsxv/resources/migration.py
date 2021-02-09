@@ -270,9 +270,9 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     elif router_id not in lb_routers:
                         lb_routers.append(router_id)
                 if len(lb_routers) > 1:
-                    LOG.error("ERROR: Found members uplinked to different "
-                              "routers on loadbalancer %s. This is not "
-                              "supported.", lb_id)
+                    LOG.error("ERROR: Found members/vips from different "
+                              "subnets or uplinks to different routers on "
+                              "loadbalancer %s. This is not supported.", lb_id)
                     n_errors = n_errors + 1
                     break
 
