@@ -680,6 +680,16 @@ NSX Policy Plugin
 
     nsxadmin -r nsx-migrate-t2p -o clean-all
 
+- Cleanup redundant migrated objects post V2T migration::
+
+    nsxadmin -r nsx-migrate-v2t -o clean-all
+
+- Disable/Restore Tier0 redistribution of tier1 routes during the V2T migration::
+    nsxadmin -r nsx-migrate-v2t -o nsx-redistribute --property action=disable/restore --property tier0s=a,b,c
+
+- Validate external subnets cidrs before V2T migration::
+
+    nsxadmin -r nsx-migrate-v2t -o validate --property ext-net=<path> --property ext-cidr=<path>
 
 Client Certificate
 ~~~~~~~~~~~~~~~~~~
@@ -704,12 +714,6 @@ Client Certificate
 
     nsxadmin -r certificate -o nsx-list
 
-- Cleanup redundant migrated objects post V2T migration::
-
-    nsxadmin -r nsx-migrate-v2t -o clean-all
-
-- Disable/Restore Tier0 redistribution of tier1 routes during the migration::
-    nsxadmin -r nsx-migrate-v2t -o nsx-redistribute --property action=disable/restore --property tier0s=a,b,c
 
 Steps to create a TVD admin user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
