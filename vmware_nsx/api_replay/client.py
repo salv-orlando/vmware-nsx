@@ -58,8 +58,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  octavia_os_username, octavia_os_user_domain_id,
                  octavia_os_tenant_name, octavia_os_tenant_domain_id,
                  octavia_os_password, octavia_os_auth_url,
-                 neutron_conf, ext_net_map, net_vni_map, logfile, max_retry,
-                 cert_file):
+                 neutron_conf, ext_net_map, net_vni_map, int_vni_map,
+                 logfile, max_retry, cert_file):
 
         # Init config and logging
         if neutron_conf:
@@ -139,6 +139,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             self.net_vni_map = jsonutils.loads(data)
         else:
             self.net_vni_map = None
+
+        if int_vni_map:
+            with open(int_vni_map, 'r') as myfile:
+                data = myfile.read()
+            self.int_vni_map = jsonutils.loads(data)
+        else:
+            self.int_vni_map = None
 
         LOG.info("Starting NSX migration to %s.", self.dest_plugin)
         # Migrate all the objects
@@ -408,6 +415,22 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                          router['id'])
                 continue
 
+            # If its a distributed router, we may also need to create its
+            # internal network
+            if self.int_vni_map and router['id'] in self.int_vni_map:
+                net_name = ("Internal network for distributed router %s" %
+                            router['id'])
+                net_body = {'tenant_id': nsxv_constants.INTERNAL_TENANT_ID,
+                            'id': router['id'],
+                            'name': net_name,
+                            'vni': self.int_vni_map[router['id']]}
+                try:
+                    self.dest_neutron.create_network({'network': net_body})
+                except Exception as e:
+                    LOG.error("Failed to create internal network for router "
+                              "%(rtr)s: %(e)s",
+                              {'rtr': router['id'], 'e': e})
+                    n_errors = n_errors + 1
             dest_router = self.have_id(router['id'], dest_routers)
             if dest_router is False:
                 body = self.prepare_router(router, dest_azs=dest_azs)
