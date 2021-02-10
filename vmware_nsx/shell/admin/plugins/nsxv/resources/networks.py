@@ -23,6 +23,7 @@ from oslo_serialization import jsonutils
 from oslo_vmware import vim_util
 
 from vmware_nsx.db import db as nsx_db
+from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs
 from vmware_nsx.plugins.nsx_v.vshield.common import exceptions
 from vmware_nsx.shell.admin.plugins.common import constants
@@ -305,14 +306,30 @@ def get_dvs_id_from_backend_name(backend_name):
         return reg.group(0)
 
 
-@admin_utils.output_header
-def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
-    filename = None
-    if kwargs.get('property'):
-        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
-        filename = properties.get('map-file')
+def list_intenrnal_virtual_wires(vws):
+    # List the virtualwires matching plr-dlr connection with their vni
+    table_results = []
+    map_results = {}
+    admin_context = context.get_admin_context()
 
-    vws = get_virtual_wires()
+    # Get all the plr-dlr virtual wires
+    like_filters = {'lswitch_id': 'virtualwire-%'}
+    edge_bindings = nsxv_db.get_nsxv_router_bindings(
+        admin_context.session, like_filters=like_filters)
+
+    for binding in edge_bindings:
+        # get the nsx id:
+        moref = binding.lswitch_id
+        vni = vws.get(moref, {}).get('vdnId')
+        table_results.append({'neutron_id': binding['router_id'],
+                              'nsx_id': moref,
+                              'vni': vni})
+        map_results[binding['router_id']] = vni
+    return table_results, map_results
+
+
+def list_neutron_virtual_wires(vws):
+    # List the virtualwires matching neutron networks with their vni
     table_results = []
     map_results = {}
     admin_context = context.get_admin_context()
@@ -330,6 +347,24 @@ def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
                                 'nsx_id': moref,
                                 'vni': vni})
                 map_results[net['id']] = vni
+    return table_results, map_results
+
+
+@admin_utils.output_header
+def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
+    filename = None
+    internal = False
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        filename = properties.get('map-file')
+        internal = bool(properties.get('internal', 'false').lower() == 'true')
+
+    vws = get_virtual_wires()
+    if internal:
+        table_results, map_results = list_intenrnal_virtual_wires(vws)
+    else:
+        table_results, map_results = list_neutron_virtual_wires(vws)
+
     LOG.info(formatters.output_formatter(constants.NSX_VIRTUALWIRES,
                                          table_results,
                                          ['neutron_id', 'nsx_id', 'vni']))

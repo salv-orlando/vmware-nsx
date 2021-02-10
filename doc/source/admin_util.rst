@@ -239,9 +239,9 @@ Portgroups
 
 VirtualWires
 ~~~~~~~~~~~~
-- List all NSX virtual wires with their neutron id and vni::
+- List all NSX virtual wires with their neutron id and vni. Adding map-fole property will also save the results as a json file. Adding the internal flag will instead log only internal plr-dlr networks with their neutron router id::
 
-    nsxadmin -r nsx-virtualwires -o list (--property map-file=<filename>)
+    nsxadmin -r nsx-virtualwires -o list (--property map-file=<filename>) (--property internal=true)
 
 Security Groups, Firewall and Spoofguard
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
