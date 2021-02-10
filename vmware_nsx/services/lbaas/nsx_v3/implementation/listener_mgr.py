@@ -74,6 +74,8 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         if (listener['protocol'] == lb_const.LB_PROTOCOL_TERMINATED_HTTPS and
             ssl_profile_binding):
             kwargs.update(ssl_profile_binding)
+        elif listener['protocol'] == lb_const.LB_PROTOCOL_UDP:
+            kwargs['ip_protocol'] = lb_const.LB_PROTOCOL_UDP
         return kwargs
 
     def _get_ssl_profile_binding(self, tags, certificate=None):
@@ -207,6 +209,8 @@ class EdgeListenerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
         elif (listener['protocol'] == lb_const.LB_PROTOCOL_TCP or
               listener['protocol'] == lb_const.LB_PROTOCOL_HTTPS):
             profile_type = lb_const.LB_TCP_PROFILE
+        elif listener['protocol'] == lb_const.LB_PROTOCOL_UDP:
+            profile_type = lb_const.LB_UDP_PROFILE
         else:
             completor(success=False)
             msg = (_('Cannot create listener %(listener)s with '
