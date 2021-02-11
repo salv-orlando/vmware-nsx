@@ -13,6 +13,7 @@
 #    under the License.
 
 import copy
+
 import netaddr
 
 from neutron_lib.callbacks import registry

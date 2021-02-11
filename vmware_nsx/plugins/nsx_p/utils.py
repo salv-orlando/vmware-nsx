@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+
 def get_edge_cluster_tzs(nsxpolicy, nsxlib, ec_uuid):
     ec_nodes = nsxpolicy.edge_cluster.get_edge_node_nsx_ids(ec_uuid)
     ec_tzs = []

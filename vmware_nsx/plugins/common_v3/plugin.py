@@ -2840,9 +2840,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     tags=tags, name=name,
                     attachment_type=nsxlib_consts.ATTACHMENT_MDPROXY)
             except nsx_lib_exc.ResourceNotFound:
-                err_msg = (_('Logical switch %s or MD proxy %s do '
-                             'not exist') % (nsx_net_id,
-                                             az._native_md_proxy_uuid))
+                err_msg = (_('Logical switch %(net)s or MD proxy %(md)s do '
+                             'not exist') % {'net': nsx_net_id,
+                                             'md': az._native_md_proxy_uuid})
                 LOG.error(err_msg)
                 raise nsx_exc.NsxPluginException(err_msg=err_msg)
 

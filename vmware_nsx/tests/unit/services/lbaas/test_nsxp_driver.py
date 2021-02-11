@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import copy
+
 import mock
 
 from neutron.tests import base

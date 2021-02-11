@@ -13,6 +13,7 @@
 #    under the License.
 
 import logging
+
 from oslo_config import cfg
 
 from neutron.db import l3_dvr_db  # noqa

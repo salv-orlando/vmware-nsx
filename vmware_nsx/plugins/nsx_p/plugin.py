@@ -1400,13 +1400,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         gw_ip = netaddr.IPAddress(raw_gw_ip)
         cidr = netaddr.IPNetwork(raw_cidr)
         if gw_ip.version != cidr.version:
-            err_msg = (_("Subnet gateway ip version %s does not match subnet "
-                         "cidr %s") % (gw_ip.version, raw_cidr))
+            err_msg = (_("Subnet gateway ip version %(ver)s does not match "
+                         "subnet cidr %(cidr)s") %
+                       {'ver': gw_ip.version, 'cidr': raw_cidr})
             raise n_exc.InvalidInput(error_message=err_msg)
 
         if gw_ip not in cidr:
-            err_msg = (_("Subnet gateway ip %s does not belong to subnet "
-                         "cidr %s") % (raw_gw_ip, raw_cidr))
+            err_msg = (_("Subnet gateway ip %(ip)s does not belong to subnet "
+                         "cidr %(cidr)s") %
+                       {'ip': raw_gw_ip, 'cidr': raw_cidr})
             raise n_exc.InvalidInput(error_message=err_msg)
 
         if gw_ip.version == const.IP_VERSION_6:

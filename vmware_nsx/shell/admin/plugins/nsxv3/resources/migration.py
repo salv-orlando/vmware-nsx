@@ -16,6 +16,7 @@ import copy
 import time
 
 import logging
+
 import paramiko
 import tenacity
 
@@ -164,8 +165,8 @@ def change_migration_service_status(start=True, nsxlib=None):
         try:
             get_migration_status_with_retry(nsxlib)
         except Exception:
-            raise Exception("The migration service did not get up after %s "
-                            "retries" % SERVICE_UP_RETRIES)
+            raise Exception(_("The migration service did not get up after %s "
+                              "retries") % SERVICE_UP_RETRIES)
 
         elapsed_time = time.time() - start_time
         LOG.info("The service is up (waited %s seconds)", elapsed_time)
@@ -204,8 +205,8 @@ def verify_component_status(nsxlib, component_number):
             # Success that indicates resource migration is already done
             return COMPONENT_STATUS_ALREADY_MIGRATED
         # bad state. abort, mark as fail, and go to next request
-        raise Exception("The migration server returned with FAILURE status. "
-                        "Details: %s", status)
+        raise Exception(_("The migration server returned with FAILURE status. "
+                          "Details: %s"), status)
     # Success
     return COMPONENT_STATUS_OK
 
@@ -298,11 +299,12 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
         # Make sure not to migrate multiple resources to the same policy-id
         if policy_id:
             if policy_id in policy_ids:
-                msg = (_("Cannot migrate %s %s to policy-id %s: Another %s "
+                msg = (_("Cannot migrate %(res)s %(name)s to policy-id "
+                         "%(id)s: Another %(res)s "
                          "has the same designated policy-id. One of those is "
                          "probably a neutron orphaned. Please delete it and "
-                         "try migration again.") % (printable_name,
-                         name_and_id, policy_id, printable_name))
+                         "try migration again.") % {'res': printable_name,
+                         'name': name_and_id, 'id': policy_id})
                 raise Exception(msg)
             policy_ids.append(policy_id)
 
@@ -319,7 +321,7 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
 
 def migrate_objects(nsxlib, data, use_admin=False):
     if not ensure_migration_state_ready(nsxlib):
-        raise Exception("The migration server is not ready")
+        raise Exception(_("The migration server is not ready"))
 
     migration_body = {"migration_data": [data]}
 
@@ -395,8 +397,9 @@ def migrate_resource(nsxlib, resource_type, entries,
                 addition_size = 1 + len(entries[index].get('linked_ids', []))
                 if addition_size > limit:
                     # Unsupported size of resource
-                    raise Exception("%s size is over the allowed limit of "
-                                    "%s" % (resource_type, limit))
+                    raise Exception(_("%(res)s size is over the allowed limit "
+                                      "of %(lim)s") % {'res': resource_type,
+                                                       'lim': limit})
                 if counter + addition_size > limit:
                     # Migrate what was accumulated so far
                     migrate_objects(nsxlib,

@@ -14,6 +14,7 @@
 #    under the License.
 
 import functools
+
 import netaddr
 
 from neutron_lib import exceptions as n_exc

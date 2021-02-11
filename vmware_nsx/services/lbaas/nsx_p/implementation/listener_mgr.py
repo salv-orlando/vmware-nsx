@@ -158,8 +158,9 @@ class EdgeListenerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 pool_id = p_utils.path_to_id(vs.get('pool_path', ''))
                 if pool_id == def_pool_id:
                     completor(success=False)
-                    msg = (_('Default pool %s is already used by another '
-                             'listener %s') % (def_pool_id, vs.get('id')))
+                    msg = (_("Default pool %(pool)s is already used by "
+                             "another listener %(listener)s") %
+                           {'pool': def_pool_id, 'listener': vs.get('id')})
                     raise n_exc.BadRequest(resource='lbaas-pool', msg=msg)
 
             lb_common.validate_session_persistence(
