@@ -60,6 +60,11 @@ class PrepareObjectForMigration(object):
 
     drop_sg_rule_fields = basic_ignore_fields
     drop_sg_fields = basic_ignore_fields + ['policy']
+    drop_quota_fields = basic_ignore_fields + [
+        'tenant_id',
+        'project_id',
+        'housekeeper',
+        'l2-gateway-connection']
     drop_router_fields = basic_ignore_fields + [
         'status',
         'routes',
@@ -143,6 +148,10 @@ class PrepareObjectForMigration(object):
     def prepare_security_group(self, sg, direct_call=False):
         self.fix_description(sg)
         return self.drop_fields(sg, self.drop_sg_fields)
+
+    def prepare_quota(self, quota):
+        body = self.drop_fields(quota, self.drop_quota_fields)
+        return body
 
     def prepare_router(self, rtr, dest_azs=None, direct_call=False):
         self.fix_description(rtr)
