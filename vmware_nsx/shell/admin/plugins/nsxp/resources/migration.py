@@ -94,7 +94,11 @@ def migration_tier0_redistribute(resource, event, trigger, **kwargs):
                     tier0)
             except Exception:
                 LOG.error("Did not find Tier0 %s", tier0)
-                return
+                continue
+            if not orig_conf:
+                LOG.info("Tier0 %s does not have route redistribution config",
+                         tier0)
+                continue
             fixed_conf = copy.deepcopy(orig_conf)
             if ((not orig_conf['bgp_enabled'] and
                  not orig_conf['ospf_enabled']) or
