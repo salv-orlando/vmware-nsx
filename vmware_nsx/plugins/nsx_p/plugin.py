@@ -646,7 +646,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             kwargs['metadata_proxy_id'] = az._native_md_proxy_uuid
 
         # Set the segment vni for nsx-v portgroups migration
-        if request_data.get('vni') and cfg.CONF.api_replay_mode:
+        if (cfg.CONF.api_replay_mode and
+            validators.is_attr_set(request_data.get('vni'))):
             kwargs['overlay_id'] = request_data['vni']
 
         self.nsxpolicy.segment.create_or_overwrite(

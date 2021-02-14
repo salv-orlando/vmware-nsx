@@ -193,6 +193,12 @@ class PrepareObjectForMigration(object):
             if 'provider:physical_network' in body:
                 del body['provider:physical_network']
 
+        # For VLAN network we are removing the physical_network so the default
+        # vlan TAZ will be used by the plugin
+        if (body.get('provider:network_type') == 'vlan'):
+            if 'provider:physical_network' in body:
+                del body['provider:physical_network']
+
         # external networks needs some special care
         if body.get('router:external'):
             fields_reset = False
