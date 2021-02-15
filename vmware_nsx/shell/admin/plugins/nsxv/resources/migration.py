@@ -279,8 +279,8 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
     # L2GW is not supported with the policy plugin
     l2gws = admin_context.session.query(l2gateway_models.L2Gateway).all()
     if len(l2gws):
-        LOG.error("ERROR: Found %s L2Gws. Networking-l2gw is not supported.",
-                  len(l2gws))
+        LOG.error("ERROR: Found %s L2Gws: %s. Networking-l2gw is not "
+                  "supported.", len(l2gws), [l2gw.id for l2gw in l2gws])
         n_errors = n_errors + 1
 
     if n_errors > 0:
