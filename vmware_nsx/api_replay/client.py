@@ -359,14 +359,17 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                               {'sg': sg, 'e': e})
                     n_errors = n_errors + 1
 
-                # Note - policy security groups will have no rules, and will
-                # be created on the destination with the default rules only
-                for sg_rule in sg_rules:
-                    try:
+                # Use bulk rules creation for the rules of the SG
+                if sg_rules:
+                    rules = []
+                    for sg_rule in sg_rules:
                         body = self.prepare_security_group_rule(sg_rule)
-                        rule = self.dest_neutron.create_security_group_rule(
-                            {'security_group_rule': body})
-                        LOG.debug("created security group rule %s", rule['id'])
+                        rules.append({'security_group_rule': body})
+                    try:
+                        rules = self.dest_neutron.create_security_group_rule(
+                            {'security_group_rules': rules})
+                        LOG.debug("created %s security group rules for SG %s",
+                                  len(rules), sg['id'])
                     except Exception:
                         # NOTE(arosen): when you create a default
                         # security group it is automatically populated
