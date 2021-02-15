@@ -521,10 +521,27 @@ class Vcns(object):
         uri = '/api/2.0/vdn/virtualwires/%s' % virtualwire_id
         return self.do_request(HTTP_DELETE, uri, format='xml')
 
+    def _get_virtual_wires(self, startindex=0):
+        uri_prefix = '/api/2.0/vdn/virtualwires'
+        uri = '%s?startIndex=%d' % (uri_prefix, startindex)
+        return self.do_request(HTTP_GET, uri, decode=True)
+
     def get_virtual_wires(self):
-        """Deletes a virtual wire."""
-        uri = '/api/2.0/vdn/virtualwires'
-        return self.do_request(HTTP_GET, uri)
+        """Get all virtual wires"""
+        vws = []
+        h, d = self._get_virtual_wires()
+        vws.extend(d['dataPage']['data'])
+        paging_info = d['dataPage']['pagingInfo']
+        page_size = int(paging_info['pageSize'])
+        count = int(paging_info['totalCount'])
+        LOG.debug("There are total %s virtual wires and page size is %s",
+                  count, page_size)
+        pages = int(count / page_size + 1)
+        for i in range(1, pages):
+            start_index = page_size * i
+            h, d = self._get_virtual_wires(start_index)
+            vws.extend(d['dataPage']['data'])
+        return vws
 
     def create_port_group(self, dvs_id, request):
         """Creates a port group on a DVS
