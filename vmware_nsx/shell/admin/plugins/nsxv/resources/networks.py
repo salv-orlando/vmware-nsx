@@ -46,8 +46,7 @@ def get_networks_from_backend():
 def get_virtual_wires():
     """Return a hash of the backend virtual wires by their id"""
     nsxv = utils.get_nsxv_client()
-    h, res = nsxv.get_virtual_wires()
-    vw_list = res['dataPage']['data']
+    vw_list = nsxv.get_virtual_wires()
     vw_hash = {}
     for vw in vw_list:
         vw_hash[vw['objectId']] = vw
@@ -306,7 +305,7 @@ def get_dvs_id_from_backend_name(backend_name):
         return reg.group(0)
 
 
-def list_intenrnal_virtual_wires(vws):
+def list_internal_virtual_wires(vws):
     # List the virtualwires matching plr-dlr connection with their vni
     table_results = []
     map_results = {}
@@ -361,7 +360,7 @@ def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
 
     vws = get_virtual_wires()
     if internal:
-        table_results, map_results = list_intenrnal_virtual_wires(vws)
+        table_results, map_results = list_internal_virtual_wires(vws)
     else:
         table_results, map_results = list_neutron_virtual_wires(vws)
 

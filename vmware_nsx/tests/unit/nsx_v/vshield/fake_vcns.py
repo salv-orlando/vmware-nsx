@@ -172,11 +172,7 @@ class FakeVcns(object):
         return (header, response)
 
     def get_virtual_wires(self):
-        header = {
-            'status': 200
-        }
-        response = {"dataPage": {"data": []}}
-        return (header, response)
+        return []
 
     def update_vdr_internal_interface(
         self, edge_id, interface_index, interface):
