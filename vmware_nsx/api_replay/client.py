@@ -149,6 +149,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         LOG.info("Starting NSX migration to %s.", self.dest_plugin)
         # Migrate all the objects
+        self.migrate_quotas()
         self.migrate_security_groups()
         self.migrate_qos_policies()
         routers_routes, routers_gw_info = self.migrate_routers()
@@ -223,6 +224,29 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 return group
 
         return False
+
+    def migrate_quotas(self):
+        global n_errors
+
+        source_quotas = self.source_neutron.list_quotas()['quotas']
+        dest_quotas = self.dest_neutron.list_quotas()['quotas']
+
+        total_num = len(source_quotas)
+        LOG.info("Migrating %s neutron quotas", total_num)
+        for count, quota in enumerate(source_quotas, 1):
+            dest_quota = self.have_id(quota['project_id'], dest_quotas)
+            if dest_quota is False:
+                body = self.prepare_quota(quota)
+                try:
+                    new_quota = (self.dest_neutron.update_quota(
+                        quota['project_id'], {'quota': body}))
+                    LOG.info("created quota %(count)s/%(total)s: %(q)s",
+                             {'count': count, 'total': total_num,
+                              'q': new_quota})
+                except Exception as e:
+                    LOG.error("Failed to create quota %(q)s: %(e)s",
+                              {'q': quota, 'e': e})
+                    n_errors = n_errors + 1
 
     def migrate_qos_rule(self, dest_policy, source_rule):
         """Add the QoS rule from the source to the QoS policy
@@ -636,7 +660,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
                 # Ignore internal NSXV objects
                 if port['project_id'] == nsxv_constants.INTERNAL_TENANT_ID:
-                    LOG.info("Skip router %s: Internal NSX-V port",
+                    LOG.info("Skip port %s: Internal NSX-V port",
                              port['id'])
                     continue
 
