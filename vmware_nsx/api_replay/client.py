@@ -839,24 +839,26 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
     def migrate_fwaas(self):
         """Migrates FWaaS V2 objects from source to dest neutron."""
         try:
-            source_rules = self.source_neutron.\
-                list_fwaas_firewall_rules()['firewall_rules']
-            source_polices = self.source_neutron.\
-                list_fwaas_firewall_policies()['firewall_policies']
+            # Reading existing source resources. Note that the firewall groups
+            # should be read first, to make sure default objects were created.
             source_groups = self.source_neutron.\
                 list_fwaas_firewall_groups()['firewall_groups']
+            source_polices = self.source_neutron.\
+                list_fwaas_firewall_policies()['firewall_policies']
+            source_rules = self.source_neutron.\
+                list_fwaas_firewall_rules()['firewall_rules']
         except Exception as e:
             # FWaaS might be disabled in the source
             LOG.info("FWaaS V2 was not found on the source server: %s", e)
             return
 
         try:
-            dest_rules = self.dest_neutron.\
-                list_fwaas_firewall_rules()['firewall_rules']
-            dest_polices = self.dest_neutron.\
-                list_fwaas_firewall_policies()['firewall_policies']
             dest_groups = self.dest_neutron.\
                 list_fwaas_firewall_groups()['firewall_groups']
+            dest_polices = self.dest_neutron.\
+                list_fwaas_firewall_policies()['firewall_policies']
+            dest_rules = self.dest_neutron.\
+                list_fwaas_firewall_rules()['firewall_rules']
         except Exception as e:
             # FWaaS might be disabled in the destination
             LOG.warning("Skipping FWaaS V2 migration. FWaaS V2 was not found "
