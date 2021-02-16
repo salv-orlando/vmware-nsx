@@ -19,6 +19,7 @@ LARGE = 'large'
 XLARGE = 'xlarge'
 QUADLARGE = 'quadlarge'
 
+VALID_EDGE_SIZE = [COMPACT, LARGE, XLARGE, QUADLARGE]
 
 EXCLUSIVE = "exclusive"
 
