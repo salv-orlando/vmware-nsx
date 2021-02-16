@@ -20,6 +20,7 @@ from neutron.conf.db import l3_hamode_db
 
 from vmware_nsx._i18n import _
 from vmware_nsx.common import exceptions as nsx_exc
+from vmware_nsx.common import nsxv_constants
 from vmware_nsx.dvs import dvs_utils
 from vmware_nsx.extensions import projectpluginmap
 from vmware_nsx.extensions import routersize
@@ -862,7 +863,13 @@ nsxv_opts = [
                 default=False,
                 help=_("Create LBaaS pools with transparent mode on. Use with "
                        "use_routers_as_lbaas_platform enabled")),
-
+    cfg.ListOpt('default_edge_size',
+                default=[],
+                help=_("(Optional) Defines the default edge size for router, "
+                       "dhcp and loadbalancer edges with the format: "
+                       "<purpose>:<edge_size>. "
+                       "purpose: router, dhcp, lb. "
+                       "edge_size: compact, large, xlarge, quadlarge")),
 ]
 
 # define the configuration of each NSX-V availability zone.
@@ -1122,6 +1129,15 @@ def validate_nsxv_config_options():
         error = _("dvs host/vcenter credentials must be defined to use "
                   "dvs features")
         raise nsx_exc.NsxPluginException(err_msg=error)
+    for purpose_def in cfg.CONF.nsxv.default_edge_size:
+        (p, s) = purpose_def.split(':')
+        if p not in ['lb', 'router', 'dhcp']:
+            error = _('Invalid service edge purpose %s') % p
+            raise nsx_exc.NsxPluginException(err_msg=error)
+
+        if s not in nsxv_constants.VALID_EDGE_SIZE:
+            error = _('Invalid service edge size %s') % s
+            raise nsx_exc.NsxPluginException(err_msg=error)
 
 
 def validate_nsx_config_options():
