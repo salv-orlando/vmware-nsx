@@ -260,6 +260,11 @@ class PrepareObjectForMigration(object):
             for field in v6_fields_to_remove:
                 if field in body:
                     body.pop(field)
+        else:
+            # For ipv6 mode - remove those only if empty
+            for field in v6_fields_to_remove:
+                if field in body and body[field] is None:
+                    body.pop(field)
         return body
 
     def prepare_port(self, port, remove_qos=False, direct_call=False):
