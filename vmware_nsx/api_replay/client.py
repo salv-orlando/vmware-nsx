@@ -384,23 +384,37 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     n_errors = n_errors + 1
 
                 # Use bulk rules creation for the rules of the SG
-                if sg_rules:
-                    rules = []
-                    for sg_rule in sg_rules:
+                if not sg_rules:
+                    continue
+                rules = []
+                for sg_rule in sg_rules:
+                    # skip the default rules that were already created
+                    skip = False
+                    created_rules = new_sg['security_group'].get(
+                        'security_group_rules', [])
+                    for rule in created_rules:
+                        if (rule['direction'] == sg_rule['direction'] and
+                            rule['ethertype'] == sg_rule['ethertype'] and
+                            rule['remote_group_id'] ==
+                                sg_rule['remote_group_id'] and
+                            not rule['protocol']):
+                            skip = True
+                            break
+                    if not skip:
                         body = self.prepare_security_group_rule(sg_rule)
                         rules.append({'security_group_rule': body})
-                    try:
-                        rules = self.dest_neutron.create_security_group_rule(
-                            {'security_group_rules': rules})
-                        LOG.debug("created %s security group rules for SG %s",
-                                  len(rules), sg['id'])
-                    except Exception:
-                        # NOTE(arosen): when you create a default
-                        # security group it is automatically populated
-                        # with some rules. When we go to create the rules
-                        # that already exist because of a match an error
-                        # is raised here but that's okay.
-                        pass
+
+                if not rules:
+                    continue
+                try:
+                    rules = self.dest_neutron.create_security_group_rule(
+                        {'security_group_rules': rules})
+                    LOG.debug("created %s security group rules for SG %s",
+                              len(rules), sg['id'])
+                except Exception as e:
+                    LOG.error("Failed to create security group %s "
+                              "rules: %s", sg['id'], e)
+                    n_errors = n_errors + 1
 
     def get_dest_availablity_zones(self, resource):
         azs = self.dest_neutron.list_availability_zones()['availability_zones']
