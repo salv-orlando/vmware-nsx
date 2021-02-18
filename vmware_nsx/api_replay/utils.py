@@ -64,6 +64,7 @@ class PrepareObjectForMigration(object):
         'tenant_id',
         'project_id',
         'housekeeper',
+        'nsx_policy',
         'l2-gateway-connection']
     drop_router_fields = basic_ignore_fields + [
         'status',
