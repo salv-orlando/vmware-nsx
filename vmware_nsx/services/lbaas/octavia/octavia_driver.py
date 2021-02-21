@@ -557,10 +557,54 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
     # Flavor
     @log_helpers.log_method_call
     def get_supported_flavor_metadata(self):
-        raise exceptions.NotImplementedError()
+        try:
+            md = self.client.call({}, 'get_supported_flavor_metadata')
+        except Exception:
+            raise exceptions.DriverError()
+
+        if md is None:
+            raise exceptions.NotImplementedError()
+        return md
 
     @log_helpers.log_method_call
     def validate_flavor(self, flavor_metadata):
+        kw = {'flavor_metadata': flavor_metadata}
+        try:
+            result = self.client.call({}, 'validate_flavor', **kw)
+        except Exception:
+            raise exceptions.DriverError()
+
+        if result and result.get('valid', False):
+            return None
+        if result:
+            raise exceptions.UnsupportedOptionError()
+        raise exceptions.NotImplementedError()
+
+    # AZ
+    @log_helpers.log_method_call
+    def get_supported_availability_zone_metadata(self):
+        try:
+            md = self.client.call(
+                {}, 'get_supported_availability_zone_metadata')
+        except Exception:
+            raise exceptions.DriverError()
+
+        if md is None:
+            raise exceptions.NotImplementedError()
+        return md
+
+    @log_helpers.log_method_call
+    def validate_availability_zone(self, availability_zone_metadata):
+        kw = {'availability_zone_metadata': availability_zone_metadata}
+        try:
+            result = self.client.call({}, 'validate_availability_zone', **kw)
+        except Exception:
+            raise exceptions.DriverError()
+
+        if result and result.get('valid', False):
+            return None
+        if result:
+            raise exceptions.UnsupportedOptionError()
         raise exceptions.NotImplementedError()
 
 
