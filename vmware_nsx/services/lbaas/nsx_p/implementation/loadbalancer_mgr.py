@@ -95,7 +95,8 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
             tags.append(p_utils.get_service_lb_tag(lb['id']))
 
             lb_size = lb_utils.get_lb_flavor_size(self.flavor_plugin, context,
-                                                  lb.get('flavor_id'))
+                                                  lb.get('flavor_id'),
+                                                  lb.get('flavor'))
 
             try:
                 if network and network.get('router:external'):
@@ -226,6 +227,30 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
         p_utils.set_allowed_cidrs_fw(self.core_plugin,
                                      context, lb, [])
         self.delete(context, lb, completor)
+
+    def get_supported_flavor_metadata(self):
+        return {
+            'lb_size': 'loadbalancer edge size, one of: %s' % ', '.join(
+                lb_const.LB_FLAVOR_SIZES)}
+
+    def validate_flavor(self, flavor_metadata):
+        # Validate flavor attributes
+        valid_flavor_keys = ['lb_size']
+        for k in flavor_metadata.keys():
+            if k not in valid_flavor_keys:
+                return {'valid': False}
+
+        # Validate attribute
+        if (flavor_metadata.get('lb_size') and
+                flavor_metadata['lb_size'] not in lb_const.LB_FLAVOR_SIZES):
+            return {'valid': False}
+        return {'valid': True}
+
+    def get_supported_availability_zone_metadata(self):
+        return {}
+
+    def validate_availability_zone(self, availability_zone_metadata):
+        return False
 
 
 def _nsx_status_to_lb_status(nsx_status):
