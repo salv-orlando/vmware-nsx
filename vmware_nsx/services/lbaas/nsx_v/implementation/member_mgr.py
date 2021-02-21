@@ -178,6 +178,14 @@ class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
             return
         pool_binding = nsxv_db.get_nsxv_lbaas_pool_binding(
             context.session, lb_id, member['pool_id'])
+
+        if not pool_binding:
+            # Don't fail deletion if the resource is already gone
+            LOG.warning("Couldn't find pool %s binding during member deletion",
+                        member['pool_id'])
+            completor(success=True)
+            return
+
         edge_id = lb_binding['edge_id']
 
         old_lb = lb_common.is_lb_on_router_edge(
@@ -206,7 +214,14 @@ class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                     return
 
             edge_pool_id = pool_binding['edge_pool_id']
-            edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
+            try:
+                edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
+            except nsxv_exc.RequestBad:
+                # Pool doesn't exist, so member is obviously gone
+                LOG.warning('Edge pool %s does not exist on edge %s',
+                            edge_pool_id, edge_id)
+                completor(success=True)
+                return
 
             for i, m in enumerate(edge_pool['member']):
                 if m['name'] == lb_common.get_member_id(member['id']):
