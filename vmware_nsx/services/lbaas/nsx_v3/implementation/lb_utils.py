@@ -62,7 +62,10 @@ def get_router_from_network(context, plugin, subnet_id):
 
 
 @log_helpers.log_method_call
-def get_lb_flavor_size(flavor_plugin, context, flavor_id):
+def get_lb_flavor_size(flavor_plugin, context, flavor_id, flavor):
+    # Octavia will have a flavor obj here
+    if flavor:
+        return flavor.get('lb_size', lb_const.DEFAULT_LB_SIZE)
     if not flavor_id:
         return lb_const.DEFAULT_LB_SIZE
     else:

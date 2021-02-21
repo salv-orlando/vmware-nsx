@@ -269,6 +269,18 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                 return False
         return True
 
+    def get_supported_flavor_metadata(self):
+        return None
+
+    def validate_flavor(self, flavor_metadata):
+        return None
+
+    def get_supported_availability_zone_metadata(self):
+        return None
+
+    def validate_availability_zone(self, availability_zone_metadata):
+        return None
+
 
 def _get_edge_loadbalancer_statistics(vcns, edge_id):
     stats = {'bytes_in': 0,

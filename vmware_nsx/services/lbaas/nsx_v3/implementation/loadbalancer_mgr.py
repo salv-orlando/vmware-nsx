@@ -55,7 +55,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             lb_service = service_client.get_router_lb_service(nsx_router_id)
         if not lb_service:
             lb_size = lb_utils.get_lb_flavor_size(
-                self.flavor_plugin, context, lb.get('flavor_id'))
+                self.flavor_plugin, context, lb.get('flavor_id'), None)
             if router_id:
                 # Make sure the NSX service router exists
                 if not self.core_plugin.service_router_has_services(
@@ -402,3 +402,15 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
             if vs_binding:
                 vs_list.append(vs_binding.get('lb_vs_id'))
         return vs_list
+
+    def get_supported_flavor_metadata(self):
+        return None
+
+    def validate_flavor(self, flavor_metadata):
+        return None
+
+    def get_supported_availability_zone_metadata(self):
+        return None
+
+    def validate_availability_zone(self, availability_zone_metadata):
+        return None
