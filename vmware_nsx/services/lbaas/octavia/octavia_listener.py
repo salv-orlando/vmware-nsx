@@ -694,6 +694,23 @@ class NSXOctaviaListenerEndpoint(object):
             return False
         return True
 
+    @log_helpers.log_method_call
+    def get_supported_flavor_metadata(self, ctxt):
+        return self.loadbalancer.get_supported_flavor_metadata()
+
+    @log_helpers.log_method_call
+    def validate_flavor(self, ctxt, flavor_metadata):
+        return self.loadbalancer.validate_flavor(flavor_metadata)
+
+    @log_helpers.log_method_call
+    def get_supported_availability_zone_metadata(self, ctxt):
+        return self.loadbalancer.get_supported_availability_zone_metadata()
+
+    @log_helpers.log_method_call
+    def validate_availability_zone(self, ctxt, availability_zone_metadata):
+        return self.loadbalancer.validate_availability_zone(
+            availability_zone_metadata)
+
 
 class NSXOctaviaStatisticsCollector(object):
     def __init__(self, core_plugin, listener_stats_getter,
