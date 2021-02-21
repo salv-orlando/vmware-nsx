@@ -183,6 +183,16 @@ class NSXClient(object):
             except exceptions.ManagerError as e:
                 print("Failed to delete nat rule %s: %s" % (rule['id'], e))
 
+    def cleanup_tier1_static_routes(self, tier1_uuid):
+        routes = self.nsxpolicy.tier1_static_route.list(tier1_uuid)
+        for route in routes:
+            try:
+                self.nsxpolicy.tier1_static_route.delete(tier1_uuid,
+                                                         route['id'])
+            except exceptions.ManagerError as e:
+                print("Failed to delete static route %s: %s" %
+                      (route['id'], e))
+
     def cleanup_tier1_routers(self):
         """Delete all OS created NSX Policy routers"""
         routers = self.get_os_nsx_tier1_routers()
@@ -190,8 +200,9 @@ class NSXClient(object):
         for rtr in routers:
             # remove all fwaas resources
             self.cleanup_fwaas_router_resources(rtr['id'])
-            # remove all nat rules from this router before deletion
+            # remove all nat rules and static routes before deletion
             self.cleanup_tier1_nat_rules(rtr['id'])
+            self.cleanup_tier1_static_routes(rtr['id'])
             try:
                 self.nsxpolicy.tier1.delete_locale_service(rtr['id'])
             except exceptions.ManagerError:
