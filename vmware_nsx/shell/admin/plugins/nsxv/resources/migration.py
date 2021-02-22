@@ -129,6 +129,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
 
             # VXLAN or portgroup provider networks
             net_type = net.get(pnet.NETWORK_TYPE)
+            overlay_net = bool(net_type != c_utils.NsxVNetworkTypes.VLAN)
             if (net_type == c_utils.NsxVNetworkTypes.VXLAN or
                 net_type == c_utils.NsxVNetworkTypes.PORTGROUP):
                 n_errors = n_errors + 1
@@ -146,6 +147,14 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 n_errors = n_errors + 1
                 LOG.error("ERROR: Network %s has %s dhcp subnets. Only 1 is "
                           "allowed.", net['id'], n_dhcp_subnets)
+
+            # Network attached to multiple routers
+            intf_ports = plugin._get_network_interface_ports(
+                admin_context, net['id'])
+            if len(intf_ports) > 1:
+                n_errors = n_errors + 1
+                LOG.error("ERROR: Network %s has interfaces on multiple "
+                          "routers. Only 1 is allowed.", net['id'])
 
             # Subnets overlapping with the transit network
             for subnet in subnets:
@@ -170,13 +179,20 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                                   "network ips: %s.",
                                   subnet['id'], transit_networks)
 
-            # Network attached to multiple routers
-            intf_ports = plugin._get_network_interface_ports(
-                admin_context, net['id'])
-            if len(intf_ports) > 1:
-                n_errors = n_errors + 1
-                LOG.error("ERROR: Network %s has interfaces on multiple "
-                          "routers. Only 1 is allowed.", net['id'])
+                # Cannot support non-dhcp overlay subnet attached to a router
+                # if there is also a dhcp subnet on the same network
+                if (overlay_net and n_dhcp_subnets > 0 and
+                    not subnet['enable_dhcp']):
+                    # look for a router interface for this subnet
+                    for if_port in intf_ports:
+                        if if_port['fixed_ips']:
+                            if_sub = if_port['fixed_ips'][0]['subnet_id']
+                            if subnet['id'] == if_sub:
+                                n_errors = n_errors + 1
+                                LOG.error("ERROR: Network %s has non-dhcp "
+                                          "subnet attached to a router, and "
+                                          "another dhcp subnet. This is not "
+                                          "allowed.", net['id'])
 
         # Routers validations:
         routers = plugin.get_routers(admin_context)
@@ -194,6 +210,21 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 n_errors = n_errors + 1
                 LOG.error("ERROR: Interface network of router %s cannot "
                           "overlap with router GW network", router['id'])
+
+            # router without external gw cannot be attached to a vlan subnet
+            router_db = plugin._get_router(admin_context, router['id'])
+            if not router_db.gw_port:
+                router_subnets = plugin._load_router_subnet_cidrs_from_db(
+                    admin_context, router['id'])
+                for subnet in router_subnets:
+                    net_id = subnet['network_id']
+                    net = plugin.get_network(admin_context, net_id)
+                    net_type = net.get(pnet.NETWORK_TYPE)
+                    if net_type == c_utils.NsxVNetworkTypes.VLAN:
+                        n_errors = n_errors + 1
+                        LOG.error("ERROR: Vlan network %s cannot be attached "
+                                  "to router %s without a gateway", net_id,
+                                router['id'])
 
         # Octavia loadbalancers validation:
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
@@ -275,6 +306,14 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                               "loadbalancer %s. This is not supported.", lb_id)
                     n_errors = n_errors + 1
                     break
+
+    # Security groups without policies
+    sgs = plugin.get_security_groups(admin_context)
+    for sg in sgs:
+        if plugin._is_policy_security_group(admin_context, sg['id']):
+            LOG.error("ERROR: Security group %s has NSX policy. This is not "
+                      "supported.", sg['id'])
+            n_errors = n_errors + 1
 
     # L2GW is not supported with the policy plugin
     l2gws = admin_context.session.query(l2gateway_models.L2Gateway).all()
