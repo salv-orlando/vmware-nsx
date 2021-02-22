@@ -86,6 +86,7 @@ disable=
  cyclic-import,
  no-name-in-module,
  bad-super-call,
+ use-a-generator,
 # new for python3 version of pylint
  consider-using-set-comprehension,
  unnecessary-pass,
