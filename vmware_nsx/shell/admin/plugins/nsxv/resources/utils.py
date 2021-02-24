@@ -13,6 +13,7 @@
 #    under the License.
 
 import time
+import xml.etree.ElementTree as et
 
 from unittest import mock
 
@@ -23,12 +24,15 @@ from neutron_lib import context as neutron_context
 from neutron_lib.plugins import directory
 
 from vmware_nsx.common import config
+from vmware_nsx.db import db as nsx_db
 from vmware_nsx.extensions import projectpluginmap
 from vmware_nsx import plugin
 from vmware_nsx.plugins.nsx_v.vshield import vcns
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 
 LOG = logging.getLogger(__name__)
+network_types = ['Network', 'VirtualWire', 'DistributedVirtualPortgroup']
+PORTGROUP_PREFIX = 'dvportgroup'
 
 
 def get_nsxv_client():
@@ -188,3 +192,85 @@ def get_edge_syslog_info(edge_id):
             output += "\n" + server_address
 
     return output
+
+
+def get_networks_from_backend():
+    nsxv = get_nsxv_client()
+    so_list = nsxv.get_scoping_objects()
+    return et.fromstring(so_list)
+
+
+def get_networks():
+    """Create an array of all the backend networks and their data
+    """
+    root = get_networks_from_backend()
+    networks = []
+    for obj in root.iter('object'):
+        if obj.find('objectTypeName').text in network_types:
+            networks.append({'type': obj.find('objectTypeName').text,
+                             'moref': obj.find('objectId').text,
+                             'name': obj.find('name').text})
+    return networks
+
+
+def get_orphaned_networks(backend_networks):
+    """List the NSX networks which are missing the neutron DB
+    """
+    admin_context = neutron_context.get_admin_context()
+    missing_networks = []
+
+    # get all neutron distributed routers in advanced
+    with NsxVPluginWrapper() as v_plugin:
+        neutron_routers = v_plugin.get_routers(
+            admin_context, fields=['id', 'name', 'distributed'])
+        neutron_dist_routers = [rtr for rtr in neutron_routers
+                                if rtr['distributed']]
+
+    # get the list of backend networks:
+    for net in backend_networks:
+        moref = net['moref']
+        backend_name = net['name']
+        # Decide if this is a neutron network by its name (which should always
+        # contain the net-id), and type
+        if (backend_name.startswith('edge-') or len(backend_name) < 36 or
+            net['type'] == 'Network'):
+            # This is not a neutron network
+            continue
+        if backend_name.startswith('int-') and net['type'] == 'VirtualWire':
+            # This is a PLR network. Check that the router exists
+            found = False
+            # compare the expected lswitch name by the dist router name & id
+            for rtr in neutron_dist_routers:
+                lswitch_name = ('int-' + rtr['name'] + rtr['id'])[:36]
+                if lswitch_name == backend_name:
+                    found = True
+                    break
+            # if the neutron router got renamed, this will not work.
+            # compare ids prefixes instead (might cause false positives)
+            for rtr in neutron_dist_routers:
+                if rtr['id'][:5] in backend_name:
+                    LOG.info("Logical switch %s probably matches distributed "
+                             "router %s", backend_name, rtr['id'])
+                    found = True
+                    break
+            if not found:
+                missing_networks.append(net)
+            continue
+
+        # get the list of neutron networks with this moref
+        neutron_networks = nsx_db.get_nsx_network_mapping_for_nsx_id(
+            admin_context.session, moref)
+        if not neutron_networks:
+            # no network found for this moref
+            missing_networks.append(net)
+
+        elif moref.startswith(PORTGROUP_PREFIX):
+            # This is a VLAN network. Also verify that the DVS Id matches
+            for entry in neutron_networks:
+                if (not entry['dvs_id'] or
+                    backend_name.startswith(entry['dvs_id'])):
+                    found = True
+            # this moref & dvs-id does not appear in the DB
+            if not found:
+                missing_networks.append(net)
+    return missing_networks

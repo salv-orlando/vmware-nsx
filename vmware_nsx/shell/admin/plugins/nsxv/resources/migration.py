@@ -18,6 +18,7 @@ import netaddr
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
+from oslo_utils import uuidutils
 
 from networking_l2gw.db.l2gateway import l2gateway_models
 from neutron.services.qos import qos_plugin
@@ -231,6 +232,32 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                         LOG.error("ERROR: Vlan network %s cannot be attached "
                                   "to router %s without a gateway", net_id,
                                 router['id'])
+
+        # Look for orphaned neutron networks and non neutron backend networks
+        backend_networks = utils.get_networks()
+        missing_networks = utils.get_orphaned_networks(backend_networks)
+        for net in missing_networks:
+            n_errors = n_errors + 1
+            LOG.error("ERROR: NSX backend network %s:%s is missing from "
+                      "neutron and is probably an orphaned. Please delete it.",
+                      net.get('moref'), net.get('name'))
+
+        for net in backend_networks:
+            moref = net['moref']
+            name = net['name']
+            net_type = net['type']
+            if ((len(name) < 36 or not uuidutils.is_uuid_like(name)) and
+                net_type in ['DistributedVirtualPortgroup', 'VirtualWire']):
+                if (net_type == 'DistributedVirtualPortgroup' and
+                    name.startswith('edge-')):
+                    continue
+                if (name == 'DPortGroup' and net_type ==
+                    'DistributedVirtualPortgroup'):
+                    continue
+                n_errors = n_errors + 1
+                LOG.error("ERROR: NSX backend network %s:%s is not a neutron "
+                          "network and cannot be migrated. Please delete it.",
+                          moref, name)
 
         # Octavia loadbalancers validation:
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
