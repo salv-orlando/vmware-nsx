@@ -13,7 +13,6 @@
 #    under the License.
 
 import re
-import xml.etree.ElementTree as et
 
 from neutron_lib.callbacks import registry
 from neutron_lib import context
@@ -29,19 +28,11 @@ from vmware_nsx.plugins.nsx_v.vshield.common import exceptions
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
-from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 from vmware_nsx.shell import resources as shell
 
 LOG = logging.getLogger(__name__)
 nsxv = utils.get_nsxv_client()
-network_types = ['Network', 'VirtualWire', 'DistributedVirtualPortgroup']
-PORTGROUP_PREFIX = 'dvportgroup'
-
-
-def get_networks_from_backend():
-    nsxv = utils.get_nsxv_client()
-    so_list = nsxv.get_scoping_objects()
-    return et.fromstring(so_list)
 
 
 def get_virtual_wires():
@@ -54,26 +45,13 @@ def get_virtual_wires():
     return vw_hash
 
 
-def get_networks():
-    """Create an array of all the backend networks and their data
-    """
-    root = get_networks_from_backend()
-    networks = []
-    for obj in root.iter('object'):
-        if obj.find('objectTypeName').text in network_types:
-            networks.append({'type': obj.find('objectTypeName').text,
-                             'moref': obj.find('objectId').text,
-                             'name': obj.find('name').text})
-    return networks
-
-
 def get_networks_name_map():
     """Create a dictionary mapping moref->backend name
     """
-    root = get_networks_from_backend()
+    root = utils.get_networks_from_backend()
     networks = {}
     for obj in root.iter('object'):
-        if obj.find('objectTypeName').text in network_types:
+        if obj.find('objectTypeName').text in utils.network_types:
             networks[obj.find('objectId').text] = obj.find('name').text
     return networks
 
@@ -81,7 +59,8 @@ def get_networks_name_map():
 @admin_utils.output_header
 def neutron_list_networks(resource, event, trigger,
                           **kwargs):
-    LOG.info(formatters.output_formatter(constants.NETWORKS, get_networks(),
+    LOG.info(formatters.output_formatter(constants.NETWORKS,
+                                         utils.get_networks(),
                                          ['type', 'moref', 'name']))
 
 
@@ -170,67 +149,11 @@ def list_missing_networks(resource, event, trigger, **kwargs):
 def list_orphaned_networks(resource, event, trigger, **kwargs):
     """List the NSX networks which are missing the neutron DB
     """
-    admin_context = context.get_admin_context()
-    missing_networks = []
-
-    # get all neutron distributed routers in advanced
-    with utils.NsxVPluginWrapper() as plugin:
-        neutron_routers = plugin.get_routers(
-            admin_context, fields=['id', 'name', 'distributed'])
-        neutron_dist_routers = [rtr for rtr in neutron_routers
-                                if rtr['distributed']]
-
-    # get the list of backend networks:
-    backend_networks = get_networks()
-    for net in backend_networks:
-        moref = net['moref']
-        backend_name = net['name']
-        # Decide if this is a neutron network by its name (which should always
-        # contain the net-id), and type
-        if (backend_name.startswith('edge-') or len(backend_name) < 36 or
-            net['type'] == 'Network'):
-            # This is not a neutron network
-            continue
-        if backend_name.startswith('int-') and net['type'] == 'VirtualWire':
-            # This is a PLR network. Check that the router exists
-            found = False
-            # compare the expected lswitch name by the dist router name & id
-            for rtr in neutron_dist_routers:
-                lswitch_name = ('int-' + rtr['name'] + rtr['id'])[:36]
-                if lswitch_name == backend_name:
-                    found = True
-                    break
-            # if the neutron router got renamed, this will not work.
-            # compare ids prefixes instead (might cause false positives)
-            for rtr in neutron_dist_routers:
-                if rtr['id'][:5] in backend_name:
-                    LOG.info("Logical switch %s probably matches distributed "
-                             "router %s", backend_name, rtr['id'])
-                    found = True
-                    break
-            if not found:
-                missing_networks.append(net)
-            continue
-
-        # get the list of neutron networks with this moref
-        neutron_networks = nsx_db.get_nsx_network_mapping_for_nsx_id(
-            admin_context.session, moref)
-        if not neutron_networks:
-            # no network found for this moref
-            missing_networks.append(net)
-
-        elif moref.startswith(PORTGROUP_PREFIX):
-            # This is a VLAN network. Also verify that the DVS Id matches
-            for entry in neutron_networks:
-                if (not entry['dvs_id'] or
-                    backend_name.startswith(entry['dvs_id'])):
-                    found = True
-            # this moref & dvs-id does not appear in the DB
-            if not found:
-                missing_networks.append(net)
+    backend_networks = utils.get_networks()
+    orphaned_networks = utils.get_orphaned_networks(backend_networks)
 
     LOG.info(formatters.output_formatter(constants.ORPHANED_NETWORKS,
-                                         missing_networks,
+                                         orphaned_networks,
                                          ['type', 'moref', 'name']))
 
 
@@ -399,7 +322,7 @@ def delete_backend_network(resource, event, trigger, **kwargs):
     # like VM, the deleting may fail and through an exception
 
     nsxv = utils.get_nsxv_client()
-    if moref.startswith(PORTGROUP_PREFIX):
+    if moref.startswith(utils.PORTGROUP_PREFIX):
         # get the dvs id from the backend name:
         dvs_id = get_dvs_id_from_backend_name(backend_name)
         if not dvs_id:
