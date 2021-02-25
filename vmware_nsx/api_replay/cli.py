@@ -60,6 +60,7 @@ class ApiReplayCli(object):
             ext_net_map=args.external_networks_map,
             net_vni_map=args.networks_vni_map,
             int_vni_map=args.internal_networks_vni_map,
+            vif_ids_map=args.vif_ids_map,
             logfile=args.logfile,
             max_retry=args.max_retry,
             cert_file=args.cert_file)
@@ -191,6 +192,10 @@ class ApiReplayCli(object):
             "--internal-networks-vni-map",
             help="Path to a json file mapping internal network ID "
                  "to its backend vni.")
+        parser.add_argument(
+            "--vif-ids-map",
+            help="Path to a json file mapping compute ports ids to the "
+                 "expected vif ids.")
 
         parser.add_argument(
             "--max-retry",

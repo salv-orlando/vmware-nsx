@@ -56,7 +56,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  octavia_os_tenant_name, octavia_os_tenant_domain_id,
                  octavia_os_password, octavia_os_auth_url,
                  neutron_conf, ext_net_map, net_vni_map, int_vni_map,
-                 logfile, max_retry, cert_file):
+                 vif_ids_map, logfile, max_retry, cert_file):
 
         # Init config and logging
         if neutron_conf:
@@ -152,6 +152,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             self.int_vni_map = jsonutils.loads(data)
         else:
             self.int_vni_map = None
+
+        if vif_ids_map:
+            with open(vif_ids_map, 'r') as myfile:
+                data = myfile.read()
+            self.vif_ids_map = jsonutils.loads(data)
+        else:
+            self.vif_ids_map = None
 
         self.n_errors = 0
         self.errors = []
@@ -687,7 +694,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                              port['id'])
                     continue
 
-                body = self.prepare_port(port, remove_qos=remove_qos)
+                body = self.prepare_port(port, remove_qos=remove_qos,
+                                         vif_ids_map=self.vif_ids_map)
 
                 # specify the network_id that we just created above
                 port['network_id'] = network['id']
