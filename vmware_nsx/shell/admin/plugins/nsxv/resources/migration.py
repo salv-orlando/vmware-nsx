@@ -19,6 +19,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from networking_l2gw.db.l2gateway import l2gateway_models
+from neutron.services.qos import qos_plugin
 from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
@@ -34,6 +35,7 @@ from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
 from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
+from vmware_nsx.services.qos.nsx_v3 import pol_utils as qos_utils
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
@@ -316,6 +318,25 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             LOG.error("ERROR: Security group %s has NSX policy. This is not "
                       "supported.", sg['id'])
             n_errors = n_errors + 1
+
+    # Validate QoS limits
+    qos_plugin_inst = qos_plugin.QoSPlugin()
+    policies = qos_plugin_inst.get_policies(admin_context)
+    for policy in policies:
+        for rule in policy.get('rules', []):
+            if rule.get('type') == 'bandwidth_limit':
+                # Validate the limits
+                if rule.get('max_kbps') < qos_utils.MAX_KBPS_MIN_VALUE:
+                    LOG.error("ERROR: QoS Policy %s has max_kbps below the "
+                              "minimal value of %s. This is not supported.",
+                              policy['id'], rule['max_kbps'])
+                    n_errors = n_errors + 1
+                if rule.get('max_burst_kbps') > qos_utils.MAX_BURST_MAX_VALUE:
+                    LOG.error("ERROR: QoS Policy %s has max_burst_kbps above "
+                              "the maximal value of %s. This is not "
+                              "supported.",
+                              policy['id'], rule['max_burst_kbps'])
+                    n_errors = n_errors + 1
 
     # L2GW is not supported with the policy plugin
     l2gws = admin_context.session.query(l2gateway_models.L2Gateway).all()
