@@ -256,6 +256,8 @@ nsxv_resources = {
                                        Operations.DELETE.value]),
     constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
                                         [Operations.VALIDATE.value]),
+    constants.PORTS: Resource(constants.PORTS,
+                              [Operations.LIST.value]),
 }
 
 

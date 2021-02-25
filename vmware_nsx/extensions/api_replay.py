@@ -35,6 +35,9 @@ ID_WITH_POST = {'allow_post': True, 'allow_put': False,
 RESOURCE_ATTRIBUTE_MAP = {
     'ports': {
         'id': ID_WITH_POST,
+        'vif_id': {'allow_post': True, 'allow_put': False,
+                   'default': '',
+                   'is_visible': True},
     },
     'networks': {
         'id': ID_WITH_POST,
