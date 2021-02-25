@@ -15,6 +15,7 @@
 import netaddr
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_serialization import jsonutils
 
 from networking_l2gw.db.l2gateway import l2gateway_models
 from neutron.services.qos import qos_plugin
@@ -35,6 +36,7 @@ from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
 from vmware_nsx.services.qos.nsx_v3 import pol_utils as qos_utils
 from vmware_nsx.shell.admin.plugins.common import constants
+from vmware_nsx.shell.admin.plugins.common import formatters
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 from vmware_nsx.shell import resources as shell
@@ -354,6 +356,47 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
              "NSX-T.")
 
 
+@admin_utils.output_header
+def list_ports_vif_ids(resource, event, trigger, **kwargs):
+    filename = None
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        filename = properties.get('map-file')
+
+    admin_context = n_context.get_admin_context()
+    table_results = []
+    map_results = {}
+
+    with utils.NsxVPluginWrapper() as plugin:
+        neutron_ports = plugin.get_ports(admin_context)
+        for port in neutron_ports:
+            # skip non compute ports
+            if (not port.get('device_owner').startswith(
+                nl_constants.DEVICE_OWNER_COMPUTE_PREFIX)):
+                continue
+            device_id = port.get('device_id')
+            port_id = port['id']
+            vnic_index = plugin._get_port_vnic_index(admin_context, port_id)
+            table_results.append({'neutron_id': port_id,
+                                  'instance_id': device_id,
+                                  'vnic_index': vnic_index})
+            if vnic_index is not None:
+                map_results[port_id] = '%s:%s' % (device_id, 4000 + vnic_index)
+
+    LOG.info(formatters.output_formatter(
+        "Compute ports VID IDs", table_results,
+        ['neutron_id', 'instance_id', 'vnic_index']))
+    if filename:
+        f = open(filename, "w")
+        f.write("%s" % jsonutils.dumps(map_results))
+        f.close()
+        LOG.info("Mapping data saved into %s", filename)
+
+
 registry.subscribe(validate_config_for_migration,
                    constants.NSX_MIGRATE_V_T,
                    shell.Operations.VALIDATE.value)
+
+registry.subscribe(list_ports_vif_ids,
+                   constants.PORTS,
+                   shell.Operations.LIST.value)
