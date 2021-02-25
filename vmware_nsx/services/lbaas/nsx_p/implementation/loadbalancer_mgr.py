@@ -83,7 +83,8 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 # Create the Tier1 service router if it does not exist
                 if not self.core_plugin.service_router_has_services(
                     context.elevated(), router_id):
-                    self.core_plugin.create_service_router(context, router_id)
+                    self.core_plugin.create_service_router(
+                        context.elevated(), router_id)
 
         if not lb_service:
             lb_name = p_utils.get_service_lb_name(lb, router_id)
