@@ -65,6 +65,19 @@ SUPPORTED_EDGE_LOG_MODULES = ('routing', 'highavailability',
 SUPPORTED_EDGE_LOG_LEVELS = ('none', 'debug', 'info', 'warning', 'error')
 
 
+def parse_service_edge_size():
+    edge_size_dict = {}
+    if cfg.CONF.nsxv.default_edge_size:
+        for purpose_def in cfg.CONF.nsxv.default_edge_size:
+            (p, s) = purpose_def.split(':')
+            edge_size_dict[p] = s
+    return edge_size_dict
+
+
+def get_service_edge_size(size_dict, purpose):
+    return size_dict.get(purpose, vcns_const.SERVICE_SIZE_MAPPING[purpose])
+
+
 def _get_vdr_transit_network_ipobj():
     transit_net = cfg.CONF.nsxv.vdr_transit_network
     return netaddr.IPNetwork(transit_net)
@@ -189,6 +202,10 @@ class EdgeManager(object):
         self.plugin = plugin
         self.per_interface_rp_filter = self._get_per_edge_rp_filter_state()
         self._check_backup_edge_pools()
+        self._service_edge_size_dict = parse_service_edge_size()
+
+    def get_service_edge_size(self, purpose):
+        return get_service_edge_size(self._service_edge_size_dict, purpose)
 
     def _parse_backup_edge_pool_opt(self):
         """Parse edge pool opts for all availability zones."""
@@ -846,14 +863,16 @@ class EdgeManager(object):
                          _uuid())[:vcns_const.EDGE_NAME_LEN]
         self._allocate_edge_appliance(
             context, resource_id, resource_name,
-            appliance_size=vcns_const.SERVICE_SIZE_MAPPING['dhcp'],
+            appliance_size=self.get_service_edge_size('dhcp'),
             availability_zone=availability_zone,
             deploy_metadata=True)
 
     def allocate_lb_edge_appliance(
             self, context, resource_id, availability_zone,
-            appliance_size=vcns_const.SERVICE_SIZE_MAPPING['lb']):
+            appliance_size=None):
 
+        if not appliance_size:
+            appliance_size = self.get_service_edge_size('lb')
         return self._allocate_edge_appliance(
             context, resource_id, resource_id,
             appliance_size=appliance_size,
@@ -888,9 +907,11 @@ class EdgeManager(object):
 
     def create_lrouter(
         self, context, lrouter, lswitch=None, dist=False,
-        appliance_size=vcns_const.SERVICE_SIZE_MAPPING['router'],
+        appliance_size=None,
         availability_zone=None):
         """Create an edge for logical router support."""
+        if not appliance_size:
+            appliance_size = self.get_service_edge_size('router')
         router_name = self._build_lrouter_name(lrouter['id'], lrouter['name'])
 
         edge_id = self._allocate_edge_appliance(
@@ -1252,7 +1273,7 @@ class EdgeManager(object):
 
     def reuse_existing_dhcp_edge(self, context, edge_id, resource_id,
                                  network_id, availability_zone):
-        app_size = vcns_const.SERVICE_SIZE_MAPPING['dhcp']
+        app_size = self.get_service_edge_size('dhcp')
         # There may be edge cases when we are waiting for edges to deploy
         # and the underlying db session may hit a timeout. So this creates
         # a new session
@@ -2030,7 +2051,8 @@ def create_lrouter(nsxv_manager, context, lrouter, lswitch=None, dist=False,
     """Create an edge for logical router support."""
     router_id = lrouter['id']
     router_name = lrouter['name'] + '-' + router_id
-    appliance_size = vcns_const.SERVICE_SIZE_MAPPING['router']
+    appliance_size = get_service_edge_size(parse_service_edge_size(),
+                                           'router')
     # store router-edge mapping binding
     nsxv_db.add_nsxv_router_binding(
         context.session, router_id, None, None,

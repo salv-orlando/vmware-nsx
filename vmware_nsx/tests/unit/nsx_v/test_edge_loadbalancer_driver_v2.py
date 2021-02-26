@@ -267,7 +267,7 @@ class TestEdgeLbaasV2LoadbalancerOnRtr(BaseTestEdgeLbaasV2):
                     self.edge_driver.pool.vcns, LB_EDGE_ID, 'accept')
                 mock_get_edge.assert_called_with(mock.ANY, mock.ANY, LB_ID,
                                                  LB_VIP, mock.ANY,
-                                                 LB_TENANT_ID, 'compact')
+                                                 LB_TENANT_ID, mock.ANY)
 
             mock_add_vip_fwr.assert_called_with(self.edge_driver.pool.vcns,
                                                 LB_EDGE_ID,
