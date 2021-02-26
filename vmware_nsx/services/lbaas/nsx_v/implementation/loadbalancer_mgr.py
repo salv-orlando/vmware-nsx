@@ -47,7 +47,7 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
     def _get_lb_flavor_size(self, context, flavor_id):
         if not flavor_id:
-            return vcns_const.SERVICE_SIZE_MAPPING['lb']
+            return self.core_plugin.edge_manager.get_service_edge_size('lb')
         else:
             flavor = flavors_plugin.FlavorsPlugin.get_flavor(
                 self.flavor_plugin, context, flavor_id)
