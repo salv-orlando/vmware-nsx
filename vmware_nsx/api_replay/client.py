@@ -590,6 +590,19 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         dest_azs = self.get_dest_availablity_zones('network')
 
         total_num = len(source_networks)
+
+        # Reorder the source networks as we need to migrate the external first
+        # This is mandatory as vlan networks cannot be added to a router with
+        # no GW
+        external = []
+        internal = []
+        for network in source_networks:
+            if network.get('router:external'):
+                external.append(network)
+            else:
+                internal.append(network)
+        source_networks = external + internal
+
         LOG.info("Migrating %(nets)s networks, %(subnets)s subnets and "
                  "%(ports)s ports",
                  {'nets': total_num, 'subnets': len(source_subnets),
