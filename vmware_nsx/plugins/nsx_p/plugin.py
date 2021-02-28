@@ -1370,11 +1370,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                             "subnets")
                 raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _validate_subnet_gw_ip(self, subnet, orig_subnet=None):
+    def _validate_subnet_gw_ip(self, context, subnet, orig_subnet=None):
         # Make sure the gw ip is legal and belongs to the subnet
         raw_gw_ip = subnet.get('gateway_ip')
-        if (orig_subnet and
-            (not raw_gw_ip or raw_gw_ip == const.ATTR_NOT_SPECIFIED)):
+        if orig_subnet and raw_gw_ip == const.ATTR_NOT_SPECIFIED:
+            # No change in GW ip
             raw_gw_ip = orig_subnet.get('gateway_ip')
         raw_cidr = subnet.get('cidr')
         if (orig_subnet and
@@ -1382,6 +1382,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             raw_cidr = orig_subnet.get('cidr')
         if (not raw_gw_ip or raw_gw_ip == const.ATTR_NOT_SPECIFIED or
             not raw_cidr or raw_cidr == const.ATTR_NOT_SPECIFIED):
+
+            if orig_subnet and raw_gw_ip is None:
+                # in update case, if the subnet is attached to a router the gw
+                # cannot be removes
+                interface_ports = self._get_network_interface_ports(
+                    context, orig_subnet['network_id'])
+                for if_port in interface_ports:
+                    if if_port['fixed_ips']:
+                        interface_sub = if_port['fixed_ips'][0]['subnet_id']
+                        if orig_subnet['id'] == interface_sub:
+                            msg = _('Subnet for router interface must have a '
+                                    'gateway IP')
+                            raise n_exc.BadRequest(resource='router', msg=msg)
+            # Nothing else to check here
             return
 
         gw_ip = netaddr.IPAddress(raw_gw_ip)
@@ -1424,7 +1438,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         net_id = subnet['subnet']['network_id']
         network = self._get_network(context, net_id)
         self._validate_single_ipv6_subnet(context, network, subnet['subnet'])
-        self._validate_subnet_gw_ip(subnet['subnet'])
+        self._validate_subnet_gw_ip(context, subnet['subnet'])
         net_az = self.get_network_az_by_net_id(context, net_id)
 
         # Allow manipulation of only 1 subnet of the same network at once
@@ -1522,7 +1536,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         updated_subnet = None
         orig_subnet = self.get_subnet(context, subnet_id)
         self._validate_subnet_host_routes(subnet, orig_subnet=orig_subnet)
-        self._validate_subnet_gw_ip(subnet_data, orig_subnet=orig_subnet)
+        self._validate_subnet_gw_ip(context, subnet_data,
+                                    orig_subnet=orig_subnet)
 
         net_id = orig_subnet['network_id']
         network = self._get_network(context, net_id)
