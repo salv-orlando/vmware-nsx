@@ -268,7 +268,8 @@ class PrepareObjectForMigration(object):
                     body.pop(field)
         return body
 
-    def prepare_port(self, port, remove_qos=False, direct_call=False):
+    def prepare_port(self, port, remove_qos=False, vif_ids_map=None,
+                     direct_call=False):
         self.fix_description(port)
         body = self.drop_fields(port, self.drop_port_fields)
         if remove_qos:
@@ -295,6 +296,9 @@ class PrepareObjectForMigration(object):
                         body['id'])
             body['port_security_enabled'] = False
             body['security_groups'] = []
+
+        if vif_ids_map and body['id'] in vif_ids_map:
+            body['vif_id'] = vif_ids_map[body['id']]
 
         if direct_call:
             if 'device_id' not in body:

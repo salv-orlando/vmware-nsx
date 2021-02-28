@@ -52,19 +52,6 @@ def post_v2t_migration_cleanups(resource, event, trigger, **kwargs):
                                           section['id'])
                 continue
 
-    # cleanup migrated DVS ports (belong to the edges that are not in use)
-    segments = nsxpolicy.segment.list()
-    for seg in segments:
-        # skip non-neutron segments
-        if not p_utils.is_neutron_resource(seg):
-            continue
-        ports = nsxpolicy.segment_port.list(seg['id'])
-        # find the non-neutron ports and delete them
-        for port in ports:
-            if not p_utils.is_neutron_resource(port):
-                nsxpolicy.segment_port.delete(seg['id'], port['id'])
-                LOG.error("Deleted migrated non-neutron port %s", port['id'])
-
 
 @admin_utils.output_header
 def migration_tier0_redistribute(resource, event, trigger, **kwargs):

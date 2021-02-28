@@ -341,6 +341,9 @@ V2T migration
 
     nsxadmin -r nsx-migrate-v2t -o validate [--property transit-network=<cidr>] [--property strict=true]
 
+- Get compute ports vif ids mapping for the migration::
+
+    nsxadmin -r ports -o list (--property map-file=<filename>)
 Config
 ~~~~~~
 
