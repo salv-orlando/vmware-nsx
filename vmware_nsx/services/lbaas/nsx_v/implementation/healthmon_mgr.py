@@ -169,7 +169,16 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         hm_binding = nsxv_db.get_nsxv_lbaas_monitor_binding(
             context.session, lb_id, pool_id, hm['id'], edge_id)
 
-        edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
+        try:
+            edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
+        except nsxv_exc.RequestBad:
+            # Pool doesn't exist, so member is obviously gone
+            LOG.warning('Edge pool %s does not exist on edge %s',
+                        edge_pool_id, edge_id)
+            nsxv_db.del_nsxv_lbaas_monitor_binding(
+                context.session, lb_id, pool_id, hm['id'], edge_id)
+            completor(success=True)
+            return
         if hm_binding and hm_binding['edge_mon_id'] in edge_pool['monitorId']:
             edge_pool['monitorId'].remove(hm_binding['edge_mon_id'])
 
