@@ -20,6 +20,7 @@ import logging
 import paramiko
 import tenacity
 
+from networking_l2gw.db.l2gateway import l2gateway_models
 from neutron.extensions import securitygroup as ext_sg
 from neutron_fwaas.db.firewall.v2 import firewall_db_v2
 from neutron_lib.callbacks import registry
@@ -1466,10 +1467,15 @@ def pre_migration_checks(nsxlib, plugin):
                       "running migration again.")
             return False
         if 'l2gw' in srv_plugin:
-            LOG.error("Pre migration check failed: L2GW is not supported. "
-                      "Please delete its configuration and disable it, before "
-                      "running migration again.")
-            return False
+            # L2GW is not supported with the policy plugin
+            admin_context = context.get_admin_context()
+            l2gws = admin_context.session.query(
+                l2gateway_models.L2Gateway).all()
+            if len(l2gws):
+                LOG.error("Pre migration check failed: L2GW is not supported. "
+                          "Please delete all its resources, before "
+                          "running migration again.")
+                return False
 
     # Tier0 with disabled BGP config
     neutron_t0s = get_neurton_tier0s(plugin)
@@ -1491,6 +1497,7 @@ def pre_migration_checks(nsxlib, plugin):
                   "try again.")
         return False
 
+    LOG.info("Pre migration check succeeded")
     return True
 
 
