@@ -199,6 +199,17 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                                           "another dhcp subnet. This is not "
                                           "allowed.", net['id'])
 
+                # Cannot use a non-gateway subnet attached to a router
+                if not subnet['gateway_ip']:
+                    for if_port in intf_ports:
+                        if if_port['fixed_ips']:
+                            if_sub = if_port['fixed_ips'][0]['subnet_id']
+                            if subnet['id'] == if_sub:
+                                n_errors = n_errors + 1
+                                LOG.error("ERROR: Subnet %s attached to a "
+                                          "router must have a gateway IP.",
+                                          subnet['id'])
+
         # Routers validations:
         routers = plugin.get_routers(admin_context)
         for router in routers:
