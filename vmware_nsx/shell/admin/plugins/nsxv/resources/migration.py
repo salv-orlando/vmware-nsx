@@ -21,6 +21,7 @@ from oslo_utils import uuidutils
 from networking_l2gw.db.l2gateway import l2gateway_models
 from neutron.services.qos import qos_plugin
 from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
+from neutron_lib.api.definitions import portbindings as pbin
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
 from neutron_lib.callbacks import registry
@@ -30,6 +31,7 @@ from neutron_lib import context as n_context
 from vmware_nsx.common import config
 from vmware_nsx.common import nsxv_constants
 from vmware_nsx.common import utils as c_utils
+from vmware_nsx.db import nsx_portbindings_db as portbinding
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
 from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
@@ -121,6 +123,16 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 LOG.error("ERROR: Compute port %s on external network %s is "
                           "not allowed.", port['id'], net_id)
 
+            vnic = port.get(pbin.VNIC_TYPE)
+            if vnic in portbinding.VNIC_TYPES_DIRECT_PASSTHROUGH:
+                net = plugin.get_network(admin_context, port['network_id'])
+                net_type = net.get(pnet.NETWORK_TYPE)
+                if net_type not in portbinding.SUPPORTED_T_NETWORK_TYPES:
+                    n_errors = n_errors + 1
+                    LOG.error("ERROR: Port %s vnic type %s is not supported "
+                              "with network type %s.", port['id'],
+                              vnic, net_type)
+
         # Networks & subnets validations:
         networks = plugin.get_networks(admin_context)
         for net in networks:
@@ -160,6 +172,17 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 n_errors = n_errors + 1
                 LOG.error("ERROR: Network %s has interfaces on multiple "
                           "routers. Only 1 is allowed.", net['id'])
+
+            if (cfg.CONF.vlan_transparent and
+                net.get('vlan_transparent') is True):
+                if len(intf_ports) > 0:
+                    n_errors = n_errors + 1
+                    LOG.error("ERROR: VLAN Transparent network %s cannot be "
+                              "attached to a logical router.", net['id'])
+                if n_dhcp_subnets > 0:
+                    n_errors = n_errors + 1
+                    LOG.error("ERROR: DHCP is not supported for VLAN "
+                              "transparent network %s.", net['id'])
 
             # Subnets overlapping with the transit network
             for subnet in subnets:
@@ -246,15 +269,17 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         backend_networks = utils.get_networks()
         missing_networks = utils.get_orphaned_networks(backend_networks)
         for net in missing_networks:
-            n_errors = n_errors + 1
-            LOG.error("ERROR: NSX backend network %s:%s is missing from "
-                      "neutron and is probably an orphaned. Please delete it.",
-                      net.get('moref'), net.get('name'))
+            if strict:
+                n_errors = n_errors + 1
+            LOG.warning("WARNING: NSX backend network %s:%s is missing from "
+                        "neutron and is probably an orphaned. Please delete "
+                        "it.", net.get('moref'), net.get('name'))
 
         for net in backend_networks:
             moref = net['moref']
             name = net['name']
             net_type = net['type']
+
             if ((len(name) < 36 or not uuidutils.is_uuid_like(name)) and
                 net_type in ['DistributedVirtualPortgroup', 'VirtualWire']):
                 if (net_type == 'DistributedVirtualPortgroup' and
@@ -263,10 +288,24 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 if (name == 'DPortGroup' and net_type ==
                     'DistributedVirtualPortgroup'):
                     continue
-                n_errors = n_errors + 1
-                LOG.error("ERROR: NSX backend network %s:%s is not a neutron "
-                          "network and cannot be migrated. Please delete it.",
-                          moref, name)
+
+                if name:
+                    # Find the vlan networks
+                    id_from_name = name[-36:]
+                    if nsxv_db.get_network_bindings(admin_context.session,
+                                                    id_from_name):
+                        continue
+                if net_type == 'DistributedVirtualPortgroup':
+                    if nsxv_db.get_network_bindings_by_physical_net(
+                        admin_context.session, moref):
+                        continue
+
+                if strict:
+                    n_errors = n_errors + 1
+                LOG.warning("WARNING: NSX backend network %s:%s is not a "
+                            "neutron network and cannot be migrated. "
+                            "Please delete it or migrate it manually.",
+                            moref, name)
 
         # Octavia loadbalancers validation:
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
@@ -377,11 +416,16 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     n_errors = n_errors + 1
 
     # L2GW is not supported with the policy plugin
-    l2gws = admin_context.session.query(l2gateway_models.L2Gateway).all()
-    if len(l2gws):
-        LOG.error("ERROR: Found %s L2Gws: %s. Networking-l2gw is not "
-                  "supported.", len(l2gws), [l2gw.id for l2gw in l2gws])
-        n_errors = n_errors + 1
+    try:
+        l2gws = admin_context.session.query(l2gateway_models.L2Gateway).all()
+    except Exception:
+        # L2GW DB was not initialized
+        pass
+    else:
+        if len(l2gws):
+            LOG.error("ERROR: Found %s L2Gws: %s. Networking-l2gw is not "
+                      "supported.", len(l2gws), [l2gw.id for l2gw in l2gws])
+            n_errors = n_errors + 1
 
     if n_errors > 0:
         plural = n_errors > 1

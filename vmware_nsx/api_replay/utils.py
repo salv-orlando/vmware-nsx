@@ -202,14 +202,16 @@ class PrepareObjectForMigration(object):
             del body['provider:network_type']
             if 'provider:physical_network' in body:
                 del body['provider:physical_network']
+            if 'provider:segmentation_id' in body:
+                del body['provider:segmentation_id']
 
         # For VLAN network we are removing the physical_network so the default
-        # vlan TAZ will be used by the plugin
+        # vlan TZ will be used by the plugin
         if (body.get('provider:network_type') == 'vlan'):
             if 'provider:physical_network' in body:
                 del body['provider:physical_network']
 
-        # external networks needs some special care
+        # external networks need some special care
         if body.get('router:external'):
             fields_reset = False
             # TODO(asarfaty): map external network neutron ids to Policy tier0
@@ -255,7 +257,7 @@ class PrepareObjectForMigration(object):
         self.fix_description(subnet)
         body = self.drop_fields(subnet, self.drop_subnet_fields)
 
-        # Drops v6 fields on subnets that are v4 as server doesn't allow them.
+        # Drop v6 fields on subnets that are v4 as server doesn't allow them.
         v6_fields_to_remove = ['ipv6_address_mode', 'ipv6_ra_mode']
         if body['ip_version'] == 4:
             for field in v6_fields_to_remove:
