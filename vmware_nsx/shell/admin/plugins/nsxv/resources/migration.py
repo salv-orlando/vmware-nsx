@@ -59,6 +59,28 @@ def _get_router_from_network(context, plugin, subnet_id):
         return ports[0]['device_id']
 
 
+all_errors = []
+all_warnings = []
+n_errors = 0
+n_warnings = 0
+
+
+def log_error(msg):
+    global all_errors
+    global n_errors
+    LOG.error(msg)
+    all_errors.append(msg)
+    n_errors = n_errors + 1
+
+
+def log_warning(msg):
+    global all_warnings
+    global n_warnings
+    LOG.warning(msg)
+    all_warnings.append(msg)
+    n_warnings = n_warnings + 1
+
+
 @admin_utils.output_header
 def validate_config_for_migration(resource, event, trigger, **kwargs):
     """Validate the nsxv configuration before migration to nsx-t"""
@@ -66,6 +88,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
     # Read the command line parameters
     transit_networks = ["100.64.0.0/16"]
     strict = False
+    out_file = None
     if kwargs.get('property'):
         # input validation
         properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
@@ -73,12 +96,21 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         if transit_network:
             transit_networks = [transit_network]
         strict = bool(properties.get('strict', 'false').lower() == 'true')
+        out_file = properties.get('summary-file-name')
 
     LOG.info("Running migration config validation in %sstrict mode",
              '' if strict else 'non-')
 
-    admin_context = n_context.get_admin_context()
+    global all_errors
+    all_errors = []
+    global all_warnings
+    all_warnings = []
+    global n_errors
     n_errors = 0
+    global n_warnings
+    n_warnings = 0
+
+    admin_context = n_context.get_admin_context()
 
     # General config options / per AZ which are unsupported
     config.register_nsxv_azs(cfg.CONF, cfg.CONF.nsxv.availability_zones)
@@ -87,19 +119,16 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
     for az in zones.list_availability_zones_objects():
         for attr in unsupported_configs:
             if getattr(az, attr):
-                LOG.warning("WARNING: \'%s\' configuration is not supported "
+                log_warning("WARNING: \'%s\' configuration is not supported "
                             "and will not be honored by NSX-T (availability "
-                            "zone %s)", attr, az.name)
-                if strict:
-                    n_errors = n_errors + 1
+                            "zone %s)" % (attr, az.name))
 
     with utils.NsxVPluginWrapper() as plugin:
         # The migration is supported only for NSX 6.4.9 and above
         nsx_ver = plugin.nsx_v.vcns.get_version()
         if not c_utils.is_nsxv_version_6_4_9(nsx_ver):
-            LOG.error("ERROR: Migration with NSX-V version %s is not "
-                      "supported.", nsx_ver)
-            n_errors = n_errors + 1
+            log_error("ERROR: Migration with NSX-V version %s is not "
+                      "supported." % nsx_ver)
 
         # Ports validations:
         # Max number of allowed address pairs (allowing 1 for fixed ips)
@@ -108,32 +137,36 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         for port in ports:
             net_id = port['network_id']
             # Too many address pairs in a port
-            address_pairs = port.get(addr_apidef.ADDRESS_PAIRS)
+            address_pairs = port.get(addr_apidef.ADDRESS_PAIRS, [])
             if len(address_pairs) > num_allowed_addr_pairs:
-                LOG.warning("WARNING: %s allowed address pairs for port %s. "
-                            "Only %s are allowed.",
-                            len(address_pairs), port['id'],
-                            num_allowed_addr_pairs)
-                if strict:
-                    n_errors = n_errors + 1
+                log_warning("WARNING: %s allowed address pairs for port %s. "
+                            "Only %s are allowed." %
+                            (len(address_pairs), port['id'],
+                             num_allowed_addr_pairs))
+
+            fixed_ips = [fixed.get('ip_address')
+                         for fixed in port['fixed_ips']]
+            for pair in address_pairs:
+                if (port['mac_address'] == pair['mac_address'] and
+                    pair['ip_address'] in fixed_ips):
+                    log_error("ERROR: Port %s address pair cannot be "
+                              "identical to the fixed ip." % port['id'])
 
             # Compute port on external network
             if (port.get('device_owner', '').startswith(
                     nl_constants.DEVICE_OWNER_COMPUTE_PREFIX) and
                 plugin._network_is_external(admin_context, net_id)):
-                n_errors = n_errors + 1
-                LOG.error("ERROR: Compute port %s on external network %s is "
-                          "not allowed.", port['id'], net_id)
+                log_error("ERROR: Compute port %s on external network %s is "
+                          "not allowed." % (port['id'], net_id))
 
             vnic = port.get(pbin.VNIC_TYPE)
             if vnic in portbinding.VNIC_TYPES_DIRECT_PASSTHROUGH:
                 net = plugin.get_network(admin_context, port['network_id'])
                 net_type = net.get(pnet.NETWORK_TYPE)
                 if net_type not in portbinding.SUPPORTED_T_NETWORK_TYPES:
-                    n_errors = n_errors + 1
-                    LOG.error("ERROR: Port %s vnic type %s is not supported "
-                              "with network type %s.", port['id'],
-                              vnic, net_type)
+                    log_error("ERROR: Port %s vnic type %s is not supported "
+                              "with network type %s." % (port['id'],
+                              vnic, net_type))
 
         # Networks & subnets validations:
         networks = plugin.get_networks(admin_context)
@@ -151,9 +184,8 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             overlay_net = bool(net_type != c_utils.NsxVNetworkTypes.VLAN)
             if (net_type == c_utils.NsxVNetworkTypes.VXLAN or
                 net_type == c_utils.NsxVNetworkTypes.PORTGROUP):
-                n_errors = n_errors + 1
-                LOG.error("ERROR: Network %s of type %s is not supported.",
-                          net['id'], net_type)
+                log_error("ERROR: Network %s of type %s is not supported." %
+                          (net['id'], net_type))
 
             subnets = plugin._get_subnets_by_network(admin_context, net['id'])
             n_dhcp_subnets = 0
@@ -163,30 +195,27 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 if subnet['enable_dhcp']:
                     n_dhcp_subnets = n_dhcp_subnets + 1
             if n_dhcp_subnets > 1:
-                n_errors = n_errors + 1
-                LOG.error("ERROR: Network %s has %s dhcp subnets. Only 1 is "
-                          "allowed.", net['id'], n_dhcp_subnets)
+                log_error("ERROR: Network %s has %s dhcp subnets. Only 1 is "
+                          "allowed." % (net['id'], n_dhcp_subnets))
 
             # Network attached to multiple routers
             intf_ports = plugin._get_network_interface_ports(
                 admin_context, net['id'])
             if len(intf_ports) > 1:
-                n_errors = n_errors + 1
-                LOG.error("ERROR: Network %s has interfaces on multiple "
-                          "routers. Only 1 is allowed.", net['id'])
+                log_error("ERROR: Network %s has interfaces on multiple "
+                          "routers. Only 1 is allowed." % net['id'])
 
             if (cfg.CONF.vlan_transparent and
                 net.get('vlan_transparent') is True):
                 if len(intf_ports) > 0:
-                    n_errors = n_errors + 1
-                    LOG.error("ERROR: VLAN Transparent network %s cannot be "
-                              "attached to a logical router.", net['id'])
+                    log_error("ERROR: VLAN Transparent network %s cannot be "
+                              "attached to a logical router." % net['id'])
                 if n_dhcp_subnets > 0:
-                    n_errors = n_errors + 1
-                    LOG.error("ERROR: DHCP is not supported for VLAN "
-                              "transparent network %s.", net['id'])
+                    log_error("ERROR: DHCP is not supported for VLAN "
+                              "transparent network %s." % net['id'])
 
             # Subnets overlapping with the transit network
+            ipv6_subnets = 0
             for subnet in subnets:
                 # get the subnet IPs
                 if ('allocation_pools' in subnet and
@@ -204,10 +233,9 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 for subnet_net in subnet_networks:
                     if (netaddr.IPSet(subnet_net) &
                         netaddr.IPSet(transit_networks)):
-                        n_errors = n_errors + 1
-                        LOG.error("ERROR: Subnet %s overlaps with the transit "
-                                  "network ips: %s.",
-                                  subnet['id'], transit_networks)
+                        log_error("ERROR: Subnet %s overlaps with the transit "
+                                  "network ips: %s." %
+                                  (subnet['id'], transit_networks))
 
                 # Cannot support non-dhcp overlay subnet attached to a router
                 # if there is also a dhcp subnet on the same network
@@ -218,11 +246,10 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                         if if_port['fixed_ips']:
                             if_sub = if_port['fixed_ips'][0]['subnet_id']
                             if subnet['id'] == if_sub:
-                                n_errors = n_errors + 1
-                                LOG.error("ERROR: Network %s has non-dhcp "
+                                log_error("ERROR: Network %s has non-dhcp "
                                           "subnet attached to a router, and "
                                           "another dhcp subnet. This is not "
-                                          "allowed.", net['id'])
+                                          "allowed." % net['id'])
 
                 # Cannot use a non-gateway subnet attached to a router
                 if not subnet['gateway_ip']:
@@ -230,10 +257,20 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                         if if_port['fixed_ips']:
                             if_sub = if_port['fixed_ips'][0]['subnet_id']
                             if subnet['id'] == if_sub:
-                                n_errors = n_errors + 1
-                                LOG.error("ERROR: Subnet %s attached to a "
-                                          "router must have a gateway IP.",
+                                log_error("ERROR: Subnet %s attached to a "
+                                          "router must have a gateway IP." %
                                           subnet['id'])
+                # only 2 dns_nameservers allowed
+                if len(subnet.get('dns_nameservers', [])) > 2:
+                    log_error("ERROR: Subnet %s cannot have more than 2 "
+                              "dns_nameservers." % subnet['id'])
+
+                if subnet.get('ip_version') == 6:
+                    ipv6_subnets = ipv6_subnets + 1
+
+            if ipv6_subnets > 1:
+                log_error("ERROR: Network %s cannot have more than 1 "
+                          "IPv6 subnets." % net['id'])
 
         # Routers validations:
         routers = plugin.get_routers(admin_context)
@@ -248,9 +285,8 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             if_ip_set = netaddr.IPSet(if_cidrs)
 
             if gw_ip_set & if_ip_set:
-                n_errors = n_errors + 1
-                LOG.error("ERROR: Interface network of router %s cannot "
-                          "overlap with router GW network", router['id'])
+                log_error("ERROR: Interface network of router %s cannot "
+                          "overlap with router GW network" % router['id'])
 
             # router without external gw cannot be attached to a vlan subnet
             router_db = plugin._get_router(admin_context, router['id'])
@@ -262,20 +298,17 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     net = plugin.get_network(admin_context, net_id)
                     net_type = net.get(pnet.NETWORK_TYPE)
                     if net_type == c_utils.NsxVNetworkTypes.VLAN:
-                        n_errors = n_errors + 1
-                        LOG.error("ERROR: Vlan network %s cannot be attached "
-                                  "to router %s without a gateway", net_id,
-                                router['id'])
+                        log_error("ERROR: Vlan network %s cannot be attached "
+                                  "to router %s without a gateway" % (net_id,
+                                  router['id']))
 
         # Look for orphaned neutron networks and non neutron backend networks
         backend_networks = utils.get_networks()
         missing_networks = utils.get_orphaned_networks(backend_networks)
         for net in missing_networks:
-            if strict:
-                n_errors = n_errors + 1
-            LOG.warning("WARNING: NSX backend network %s:%s is missing from "
+            log_warning("WARNING: NSX backend network %s:%s is missing from "
                         "neutron and is probably an orphaned. Please delete "
-                        "it.", net.get('moref'), net.get('name'))
+                        "it." % (net.get('moref'), net.get('name')))
 
         for net in backend_networks:
             moref = net['moref']
@@ -301,13 +334,17 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     if nsxv_db.get_network_bindings_by_physical_net(
                         admin_context.session, moref):
                         continue
+                if net_type == 'VirtualWire':
+                    # Find internal networks for distributed routers
+                    filters = {'lswitch_id': moref}
+                    if nsxv_db.get_nsxv_router_bindings(admin_context.session,
+                                                        like_filters=filters):
+                        continue
 
-                if strict:
-                    n_errors = n_errors + 1
-                LOG.warning("WARNING: NSX backend network %s:%s is not a "
+                log_warning("WARNING: NSX backend network %s:%s is not a "
                             "neutron network and cannot be migrated. "
-                            "Please delete it or migrate it manually.",
-                            moref, name)
+                            "Please delete it or migrate it manually." %
+                            (moref, name))
 
         # Octavia loadbalancers validation:
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
@@ -326,10 +363,9 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 # belong to an external network
                 if (not lb_router_id and network and
                     not network.get('router:external')):
-                    n_errors = n_errors + 1
-                    LOG.error("ERROR: Loadbalancer %s subnet %s is not "
-                              "external nor connected to a router.",
-                              port.get('device_id'), subnet_id)
+                    log_error("ERROR: Loadbalancer %s subnet %s is not "
+                              "external nor connected to a router." %
+                              (port.get('device_id'), subnet_id))
 
             if not lb_id:
                 continue
@@ -351,10 +387,9 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     if not vip.get('defaultPoolId'):
                         continue
                     if vip['defaultPoolId'] in pools:
-                        LOG.error("ERROR: Found multiple listeners using the "
+                        log_error("ERROR: Found multiple listeners using the "
                                   "same default pool with loadbalancer %s. "
-                                  "This is not supported.", lb_id)
-                        n_errors = n_errors + 1
+                                  "This is not supported." % lb_id)
                         break
                     pools.append(vip['defaultPoolId'])
 
@@ -376,27 +411,25 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                     router_id = _get_router_from_network(
                         admin_context, plugin, sub_id)
                     if not router_id:
-                        LOG.error("ERROR: Found member of subnet %s not "
+                        log_error("ERROR: Found member of subnet %s not "
                                   "uplinked to any router on loadbalancer "
-                                  "%s. This is not supported.",
-                                  sub_id, lb_id)
-                        n_errors = n_errors + 1
+                                  "%s. This is not supported." %
+                                  (sub_id, lb_id))
                     elif router_id not in lb_routers:
                         lb_routers.append(router_id)
                 if len(lb_routers) > 1:
-                    LOG.error("ERROR: Found members/vips from different "
+                    log_error("ERROR: Found members/vips from different "
                               "subnets or uplinks to different routers on "
-                              "loadbalancer %s. This is not supported.", lb_id)
-                    n_errors = n_errors + 1
+                              "loadbalancer %s. This is not supported." %
+                              lb_id)
                     break
 
     # Security groups without policies
     sgs = plugin.get_security_groups(admin_context)
     for sg in sgs:
         if plugin._is_policy_security_group(admin_context, sg['id']):
-            LOG.error("ERROR: Security group %s has NSX policy. This is not "
-                      "supported.", sg['id'])
-            n_errors = n_errors + 1
+            log_error("ERROR: Security group %s has NSX policy. This is not "
+                      "supported." % sg['id'])
 
     # Validate QoS limits
     qos_plugin_inst = qos_plugin.QoSPlugin()
@@ -406,16 +439,14 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             if rule.get('type') == 'bandwidth_limit':
                 # Validate the limits
                 if rule.get('max_kbps') < qos_utils.MAX_KBPS_MIN_VALUE:
-                    LOG.error("ERROR: QoS Policy %s has max_kbps below the "
-                              "minimal value of %s. This is not supported.",
-                              policy['id'], rule['max_kbps'])
-                    n_errors = n_errors + 1
+                    log_error("ERROR: QoS Policy %s has max_kbps below the "
+                              "minimal value of %s. This is not supported." %
+                              (policy['id'], rule['max_kbps']))
                 if rule.get('max_burst_kbps') > qos_utils.MAX_BURST_MAX_VALUE:
-                    LOG.error("ERROR: QoS Policy %s has max_burst_kbps above "
+                    log_error("ERROR: QoS Policy %s has max_burst_kbps above "
                               "the maximal value of %s. This is not "
-                              "supported.",
-                              policy['id'], rule['max_burst_kbps'])
-                    n_errors = n_errors + 1
+                              "supported." %
+                              (policy['id'], rule['max_burst_kbps']))
 
     # L2GW is not supported with the policy plugin
     try:
@@ -425,14 +456,38 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         pass
     else:
         if len(l2gws):
-            LOG.error("ERROR: Found %s L2Gws: %s. Networking-l2gw is not "
-                      "supported.", len(l2gws), [l2gw.id for l2gw in l2gws])
-            n_errors = n_errors + 1
+            log_error("ERROR: Found %s L2Gws: %s. Networking-l2gw is not "
+                      "supported." % (len(l2gws), [l2gw.id for l2gw in l2gws]))
+
+    LOG.info("\nPre-migration validation is complete")
+    if n_errors:
+        LOG.error("Found %s errors:", n_errors)
+        for msg in all_errors:
+            LOG.error(msg)
+    if n_warnings:
+        LOG.warning("Found %s warnings:", n_warnings)
+        for msg in all_warnings:
+            LOG.warning(msg)
+
+    if out_file:
+        f = open(out_file, "w")
+        if n_errors:
+            f.write("Found %s errors:\n" % n_errors)
+            for msg in all_errors:
+                f.write("%s\n" % msg)
+        if n_warnings:
+            f.write("Found %s warnings:\n" % n_warnings)
+            for msg in all_warnings:
+                f.write("%s\n" % msg)
+        f.close()
+
+    if strict:
+        n_errors = n_errors + n_warnings
 
     if n_errors > 0:
         plural = n_errors > 1
         LOG.error("The NSX-V plugin configuration is not ready to be "
-                  "migrated to NSX-T. %s error%s found.", n_errors,
+                  "migrated to NSX-T. %s issue%s found.", n_errors,
                   's were' if plural else ' was')
         sys.exit(n_errors)
 
