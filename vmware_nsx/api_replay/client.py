@@ -487,7 +487,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             # If its a distributed router, we may also need to create its
             # internal network
             if self.int_vni_map and router['id'] in self.int_vni_map:
-                net_name = ("Internal network for distributed router %s" %
+                net_name = ("Internal network for router %s migration" %
                             router['id'])
                 net_body = {'tenant_id': nsxv_constants.INTERNAL_TENANT_ID,
                             'id': router['id'],

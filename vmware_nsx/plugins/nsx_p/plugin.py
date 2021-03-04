@@ -68,6 +68,7 @@ from vmware_nsx.common import exceptions as nsx_exc
 from vmware_nsx.common import l3_rpc_agent_api
 from vmware_nsx.common import locking
 from vmware_nsx.common import managers
+from vmware_nsx.common import nsxv_constants
 from vmware_nsx.common import utils
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.extensions import api_replay
@@ -807,15 +808,22 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         return created_net
 
+    def _check_internal_network(self, net):
+        if net.get('tenant_id') == nsxv_constants.INTERNAL_TENANT_ID:
+            msg = _("This network was created during the migration for "
+                    "internal usage and cannot be deleted")
+            raise n_exc.InvalidInput(error_message=msg)
+
     def delete_network(self, context, network_id):
         is_external_net = self._network_is_external(context, network_id)
+        network = self._get_network(context, network_id)
+        self._check_internal_network(network)
 
         if not is_external_net:
             # First disable DHCP & delete its port
             if self.use_policy_dhcp:
                 lock = 'nsxp_network_' + network_id
                 with locking.LockManager.get_lock(lock):
-                    network = self._get_network(context, network_id)
                     if not self._has_active_port(context, network_id):
                         self._disable_network_dhcp(context, network)
             elif cfg.CONF.nsx_p.allow_passthrough:
