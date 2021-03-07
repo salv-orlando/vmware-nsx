@@ -375,6 +375,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         total_num = len(source_sec_groups)
         LOG.info("Migrating %s security groups", total_num)
+        rules_dict = {}
         for count, sg in enumerate(source_sec_groups, 1):
             dest_sec_group = self.have_id(sg['id'], dest_sec_groups)
             # If the security group already exists on the dest_neutron
@@ -433,16 +434,21 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                         body = self.prepare_security_group_rule(sg_rule)
                         rules.append({'security_group_rule': body})
 
-                if not rules:
-                    continue
-                try:
-                    rules = self.dest_neutron.create_security_group_rule(
-                        {'security_group_rules': rules})
-                    LOG.debug("created %s security group rules for SG %s",
-                              len(rules), sg['id'])
-                except Exception as e:
-                    self.add_error("Failed to create security group %s "
-                                   "rules: %s" % (sg['id'], e))
+                # save rules to create once all the sgs are created
+                if rules:
+                    rules_dict[sg['id']] = rules
+
+        # Create the rules after all security groups are created to allow
+        # dependencies in remote_group_id
+        for sg_id in rules_dict:
+            try:
+                rules = self.dest_neutron.create_security_group_rule(
+                    {'security_group_rules': rules_dict[sg_id]})
+                LOG.debug("created %s security group rules for SG %s",
+                          len(rules), sg_id)
+            except Exception as e:
+                self.add_error("Failed to create security group %s "
+                               "rules: %s" % (sg_id, e))
 
     def get_dest_availablity_zones(self, resource):
         azs = self.dest_neutron.list_availability_zones()['availability_zones']
