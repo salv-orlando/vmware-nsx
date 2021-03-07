@@ -19,6 +19,7 @@ from oslo_config import cfg
 from oslo_utils import uuidutils
 import webob.exc
 
+from vmware_nsx.common import nsxv_constants
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 
 logging.basicConfig(level=logging.INFO)
@@ -250,6 +251,11 @@ class PrepareObjectForMigration(object):
 
         if net_vni_map and body['id'] in net_vni_map:
             body['vni'] = net_vni_map[body['id']]
+
+        if (body.get('project_id') == nsxv_constants.INTERNAL_TENANT_ID and
+            body.get('name').startswith('inter-edge-net')):
+            # rename the internal network
+            body['name'] = "Internal network for mdproxy migration"
 
         return body
 
