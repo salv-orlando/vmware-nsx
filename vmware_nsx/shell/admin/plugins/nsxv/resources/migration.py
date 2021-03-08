@@ -34,6 +34,7 @@ from vmware_nsx.common import utils as c_utils
 from vmware_nsx.db import nsx_portbindings_db as portbinding
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.plugins.nsx_v import availability_zones as nsx_az
+from vmware_nsx.services.lbaas.nsx_p.implementation import lb_utils as lb_pol
 from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
 from vmware_nsx.services.lbaas.octavia import constants as oct_const
@@ -346,6 +347,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         # Octavia loadbalancers validation:
         filters = {'device_owner': [nl_constants.DEVICE_OWNER_LOADBALANCERV2,
                                     oct_const.DEVICE_OWNER_OCTAVIA]}
+        lbs_map = {}
         lb_ports = plugin.get_ports(admin_context, filters=filters)
         for port in lb_ports:
             lb_id = port.get('device_id')
@@ -354,11 +356,20 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 subnet_id = fixed_ips[0]['subnet_id']
                 network = lb_utils.get_network_from_subnet(
                     admin_context, plugin, subnet_id)
-                lb_router_id = _get_router_from_network(
+                lb_rtr_id = _get_router_from_network(
                     admin_context, plugin, subnet_id)
+                # only 20 loadbalancers are allowed on the same router
+                if lb_rtr_id not in lbs_map:
+                    lbs_map[lb_rtr_id] = 1
+                else:
+                    lbs_map[lb_rtr_id] = lbs_map[lb_rtr_id] + 1
+                    if lbs_map[lb_rtr_id] == lb_pol.SERVICE_LB_TAG_MAX + 1:
+                        log_error("ERROR: Router %s has over %s attached "
+                                  "loadbalancers. This is not supported." %
+                                  (lb_rtr_id, lb_pol.SERVICE_LB_TAG_MAX))
                 # Loadbalancer vip subnet must be connected to a router or
                 # belong to an external network
-                if (not lb_router_id and network and
+                if (not lb_rtr_id and network and
                     not network.get('router:external')):
                     log_error("ERROR: Loadbalancer %s subnet %s is not "
                               "external nor connected to a router." %
@@ -403,7 +414,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
                 lb_subnets = list(set([port['fixed_ips'][0]['subnet_id']
                                        for port in lb_ports]))
                 # make sure all subnets are connected to the same router
-                lb_routers = [lb_router_id]
+                lb_routers = [lb_rtr_id]
                 for sub_id in lb_subnets:
                     router_id = _get_router_from_network(
                         admin_context, plugin, sub_id)
