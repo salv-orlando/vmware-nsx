@@ -21,6 +21,7 @@ from neutron.db.models import l3
 from neutron.db.models import securitygroup
 from neutron.db.models import segment  # noqa
 from neutron.db import models_v2
+from neutron.db.qos import models as qos_models
 from neutron_lib.db import model_base
 from oslo_db.sqlalchemy import models
 
@@ -91,6 +92,9 @@ class NeutronNsxDB(object):
 
     def get_logical_ports(self):
         return self.query_all('nsx_port_id', NeutronNsxPortMapping)
+
+    def get_qos_policies(self):
+        return self.query_all('id', qos_models.QosPolicy)
 
 
 class NSXClient(object):
@@ -241,6 +245,12 @@ class NSXClient(object):
         print("Cleaning interfaces of %s segments and %s tier-1s" % (
               len(segments), len(routers)))
         for s in segments:
+            bindings = self.nsxpolicy.segment_dhcp_static_bindings.list(
+                s['id'])
+            for b in bindings:
+                self.nsxpolicy.segment_dhcp_static_bindings.delete(
+                        s['id'], b['id'])
+
             # Disassociate overlay interfaces from tier1 routers
             self.nsxpolicy.segment.remove_connectivity_and_subnets(s['id'])
 
@@ -467,7 +477,47 @@ class NSXClient(object):
         self._cleanup_lb_resource(self.nsxpolicy.load_balancer.lb_service,
                                   'LB services')
 
+    def cleanup_lb_gateways(self):
+        # cleanup gateway policies and other resources related to the
+        # allowed cidrs feature
+
+        # First get the list of loadbalancers
+        lbs = []
+        lb_services = self.nsxpolicy.load_balancer.lb_service.list()
+        for lb_srv in lb_services:
+            service = self.nsxpolicy.load_balancer.lb_service.get(lb_srv['id'])
+            for tag in service.get('tags', []):
+                if tag['scope'] == 'loadbalancer_id':
+                    lbs.append(tag['tag'])
+
+        for lb_id in lbs:
+            # Delete gateway policy
+            try:
+                self.nsxpolicy.gateway_policy.delete(
+                    policy_constants.DEFAULT_DOMAIN,
+                    map_id=lb_id)
+            except exceptions.ManagerError:
+                # Not always exists
+                pass
+
+            # Also delete all groups & services
+            tags_to_search = [{'scope': 'os-lbaas-lb-id',
+                               'tag': lb_id}]
+            groups = self.nsxpolicy.search_by_tags(
+                tags_to_search,
+                self.nsxpolicy.group.entry_def.resource_type())['results']
+            for group in groups:
+                self.nsxpolicy.group.delete(policy_constants.DEFAULT_DOMAIN,
+                                            group['id'])
+
+            services = self.nsxpolicy.search_by_tags(
+                tags_to_search,
+                self.nsxpolicy.service.parent_entry_def.resource_type())
+            for srv in services['results']:
+                self.nsxpolicy.service.delete(srv['id'])
+
     def cleanup_load_balancers(self):
+        self.cleanup_lb_gateways()
         self.cleanup_lb_virtual_servers()
         self.cleanup_lb_profiles()
         self.cleanup_lb_services()
@@ -502,6 +552,18 @@ class NSXClient(object):
             for srv in services['results']:
                 self.nsxpolicy.service.delete(srv['id'])
 
+    def get_os_qos_policies(self):
+        policies = self.get_os_resources(self.nsxpolicy.qos_profile.list())
+        if policies and self.neutron_db:
+            db_qos = self.neutron_db.get_qos_policies()
+            policies = [s for s in policies if s['id'] in db_qos]
+        return policies
+
+    def cleanup_qos(self):
+        policies = self.get_os_qos_policies()
+        for pol in policies:
+            self.nsxpolicy.qos_profile.delete(pol['id'])
+
     def cleanup_all(self):
         """
         Per domain cleanup steps:
@@ -516,6 +578,7 @@ class NSXClient(object):
         self.cleanup_security_groups(policy_constants.DEFAULT_DOMAIN)
         self.cleanup_segments_interfaces()
         self.cleanup_segments()
+        self.cleanup_qos()
         self.cleanup_load_balancers()
         self.cleanup_nsx_logical_dhcp_servers()
         self.cleanup_tier1_routers()
