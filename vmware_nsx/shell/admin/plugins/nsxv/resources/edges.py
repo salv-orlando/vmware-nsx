@@ -69,15 +69,10 @@ def extend_edge_info(edges):
         edge['syslog'] = utils.get_edge_syslog_info(edge['id'])
 
 
-def get_router_edge_bindings():
-    edgeapi = utils.NeutronDbClient()
-    return nsxv_db.get_nsxv_router_bindings(edgeapi.context)
-
-
 @admin_utils.output_header
 def neutron_list_router_edge_bindings(resource, event, trigger, **kwargs):
     """List NSXv edges from Neutron DB"""
-    edges = get_router_edge_bindings()
+    edges = utils.get_router_edge_bindings()
     LOG.info(formatters.output_formatter(
         constants.EDGES, edges,
         ['edge_id', 'router_id', 'availability_zone', 'status']))
@@ -142,7 +137,7 @@ def get_orphaned_router_bindings():
             if plr_id:
                 plr_tlr_ids[plr_id] = tlr_id
 
-        for binding in get_router_edge_bindings():
+        for binding in utils.get_router_edge_bindings():
             if not router_binding_obj_exist(context, binding,
                                             net_ids, rtr_ids, plr_tlr_ids):
                 orphaned_list.append(binding)
@@ -214,18 +209,6 @@ def router_binding_obj_exist(context, binding, net_ids, rtr_ids, plr_tlr_ids):
     return False
 
 
-def get_orphaned_edges():
-    nsxv_edge_ids = set()
-    for edge in utils.get_nsxv_backend_edges():
-        nsxv_edge_ids.add(edge.get('id'))
-
-    neutron_edge_bindings = set()
-    for binding in get_router_edge_bindings():
-        neutron_edge_bindings.add(binding.edge_id)
-
-    return nsxv_edge_ids - neutron_edge_bindings
-
-
 @admin_utils.output_header
 def nsx_list_orphaned_edges(resource, event, trigger, **kwargs):
     """List orphaned Edges on NSXv.
@@ -235,7 +218,7 @@ def nsx_list_orphaned_edges(resource, event, trigger, **kwargs):
     """
     LOG.info("NSXv edges present on NSXv backend but not present "
              "in Neutron DB\n")
-    orphaned_edges = get_orphaned_edges()
+    orphaned_edges = utils.get_orphaned_edges()
     if not orphaned_edges:
         LOG.info("\nNo orphaned edges found."
                  "\nNeutron DB and NSXv backend are in sync\n")
@@ -250,7 +233,7 @@ def nsx_list_orphaned_edges(resource, event, trigger, **kwargs):
 @admin_utils.output_header
 def nsx_delete_orphaned_edges(resource, event, trigger, **kwargs):
     """Delete orphaned edges from NSXv backend"""
-    orphaned_edges = get_orphaned_edges()
+    orphaned_edges = utils.get_orphaned_edges()
     LOG.info("Before delete; Orphaned Edges: %s", orphaned_edges)
 
     if not kwargs.get('force'):
@@ -268,7 +251,7 @@ def nsx_delete_orphaned_edges(resource, event, trigger, **kwargs):
         nsxv_c.delete_edge(edge)
 
     LOG.info("After delete; Orphaned Edges: \n%s",
-        pprint.pformat(get_orphaned_edges()))
+        pprint.pformat(utils.get_orphaned_edges()))
 
 
 def get_missing_edges():
@@ -277,7 +260,7 @@ def get_missing_edges():
         nsxv_edge_ids.add(edge.get('id'))
 
     neutron_edge_bindings = set()
-    for binding in get_router_edge_bindings():
+    for binding in utils.get_router_edge_bindings():
         neutron_edge_bindings.add(binding.edge_id)
 
     return neutron_edge_bindings - nsxv_edge_ids
