@@ -25,6 +25,7 @@ from neutron_lib.plugins import directory
 
 from vmware_nsx.common import config
 from vmware_nsx.db import db as nsx_db
+from vmware_nsx.db import nsxv_db
 from vmware_nsx.extensions import projectpluginmap
 from vmware_nsx import plugin
 from vmware_nsx.plugins.nsx_v.vshield import vcns
@@ -274,3 +275,22 @@ def get_orphaned_networks(backend_networks):
             if not found:
                 missing_networks.append(net)
     return missing_networks
+
+
+def get_router_edge_bindings():
+    edgeapi = NeutronDbClient()
+    return nsxv_db.get_nsxv_router_bindings(edgeapi.context)
+
+
+def get_orphaned_edges_data():
+    nsxv_edges = get_nsxv_backend_edges()
+    neutron_edge_bindings = set()
+    for binding in get_router_edge_bindings():
+        neutron_edge_bindings.add(binding.edge_id)
+
+    return [edge for edge in nsxv_edges
+            if edge['id'] not in neutron_edge_bindings]
+
+
+def get_orphaned_edges():
+    return [edge['id'] for edge in get_orphaned_edges_data()]
