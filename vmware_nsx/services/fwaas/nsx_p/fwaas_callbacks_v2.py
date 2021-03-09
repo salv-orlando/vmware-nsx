@@ -452,6 +452,9 @@ class NsxpFwaasCallbacksV2(com_callbacks.NsxCommonv3FwaasCallbacksV2):
         self.cleanup_router_fw_resources(router_id)
 
     def cleanup_router_fw_resources(self, router_id):
+        # TODO(asarfaty): In case multiple routers are using the same rule,
+        # the group and service will hold on one of the router ids. so this
+        # delete may fail or not get called.
         tags_to_search = [{'scope': ROUTER_FW_TAG, 'tag': router_id}]
         # Delete per rule & per network groups
         groups = self.nsxpolicy.search_by_tags(
