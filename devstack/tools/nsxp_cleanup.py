@@ -543,14 +543,22 @@ class NSXClient(object):
                 tags_to_search,
                 self.nsxpolicy.group.entry_def.resource_type())['results']
             for group in groups:
-                self.nsxpolicy.group.delete(policy_constants.DEFAULT_DOMAIN,
-                                            group['id'])
+                try:
+                    self.nsxpolicy.group.delete(
+                        policy_constants.DEFAULT_DOMAIN, group['id'])
+                except exceptions.ResourceInUse:
+                    # This may happen if the rule is used in multiple gateways
+                    pass
 
             services = self.nsxpolicy.search_by_tags(
                 tags_to_search,
                 self.nsxpolicy.service.parent_entry_def.resource_type())
             for srv in services['results']:
-                self.nsxpolicy.service.delete(srv['id'])
+                try:
+                    self.nsxpolicy.service.delete(srv['id'])
+                except exceptions.ResourceInUse:
+                    # This may happen if the rule is used in multiple gateways
+                    pass
 
     def get_os_qos_policies(self):
         policies = self.get_os_resources(self.nsxpolicy.qos_profile.list())
