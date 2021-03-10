@@ -569,6 +569,7 @@ class NSXClient(object):
 
     def cleanup_qos(self):
         policies = self.get_os_qos_policies()
+        print("Number of QoS policies to be deleted: %s" % len(policies))
         for pol in policies:
             self.nsxpolicy.qos_profile.delete(pol['id'])
 
