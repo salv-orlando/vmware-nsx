@@ -4102,18 +4102,22 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             return router_driver.add_router_interface(
                 context, router_id, interface_info)
         except vsh_exc.VcnsApiException as e:
+            json_response = jsonutils.loads(e.response)
+            details = json_response.get('details')
+            msg = details or e.response
             LOG.error("Failed to add interface_info %(info)s on "
                       "router %(router_id)s: %(e)s",
                       {'info': str(interface_info),
                        'router_id': router_id,
-                       'e': e.message})
+                       'e': msg})
             try:
                 router_driver.remove_router_interface(
                     context, router_id, interface_info)
             except Exception:
                 # Rollback may fail if creation failed too early
                 pass
-            raise nsx_exc.NsxPluginException(err_msg=e.message)
+            # Log the original error
+            raise nsx_exc.NsxPluginException(err_msg=msg)
 
     def remove_router_interface(self, context, router_id, interface_info):
         # Get the router interface port id
