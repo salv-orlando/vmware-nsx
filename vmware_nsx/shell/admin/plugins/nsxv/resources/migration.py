@@ -23,6 +23,7 @@ from oslo_utils import uuidutils
 from networking_l2gw.db.l2gateway import l2gateway_models
 from neutron.services.qos import qos_plugin
 from neutron_lib.api.definitions import allowedaddresspairs as addr_apidef
+from neutron_lib.api.definitions import port_security as psec
 from neutron_lib.api.definitions import portbindings as pbin
 from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
@@ -113,7 +114,8 @@ def _validate_ports(plugin, admin_context):
             log_error("Compute port %s on external network %s is "
                       "not allowed." % (port['id'], net_id))
 
-        # direct vnic ports are allowed only with vlan networks
+        # direct vnic ports are allowed only with vlan networks, and port
+        # security must be disabled
         vnic = port.get(pbin.VNIC_TYPE)
         if vnic in portbinding.VNIC_TYPES_DIRECT_PASSTHROUGH:
             net = plugin.get_network(admin_context, port['network_id'])
@@ -122,6 +124,9 @@ def _validate_ports(plugin, admin_context):
                 log_error("Port %s vnic type %s is not supported "
                           "with network type %s." % (port['id'],
                           vnic, net_type))
+            elif port.get(psec.PORTSECURITY):
+                log_error("Security features are not supported for port %s "
+                          "with vnic type %s." % (port['id'], vnic))
 
 
 def _validate_networks(plugin, admin_context, transit_networks):
