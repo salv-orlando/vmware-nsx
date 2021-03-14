@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from neutron_lib import constants as n_consts
@@ -138,14 +139,30 @@ class RouterExclusiveDriver(router_driver.RouterBaseDriver):
             context, router_id, gw_info, force_update=True)
 
     def delete_router(self, context, router_id):
+        edge_id, az_name = self.plugin._get_edge_id_and_az_by_rtr_id(
+            context, router_id)
         if self.plugin.metadata_proxy_handler:
             # The neutron router was already deleted, so we cannot get the AZ
             # from it. Get it from the router-bindings DB
-            edge_id, az_name = self.plugin._get_edge_id_and_az_by_rtr_id(
-                context, router_id)
             md_proxy = self.plugin.get_metadata_proxy_handler(az_name)
             if md_proxy:
                 md_proxy.cleanup_router_edge(context, router_id)
+
+        # When LBs are hosted on router edges, there are cases where LB binding
+        # remains even though the LB is gone. While the router is protected
+        # from deletion when an LB exists, there's no proper cleanup for this
+        # binding entry so we clean it up here
+        if cfg.CONF.nsxv.use_routers_as_lbaas_platform:
+            lb_bindings = nsxv_db.get_nsxv_lbaas_loadbalancer_binding_by_edge(
+                context.session, edge_id)
+
+            for lb_binding in lb_bindings:
+                LOG.warning("Deleting stale LB binding for LB %s on edge %s",
+                            lb_binding['loadbalancer_id'],
+                            edge_id)
+                nsxv_db.del_nsxv_lbaas_loadbalancer_binding(
+                    context.session, lb_binding['loadbalancer_id'])
+
         self.edge_manager.delete_lrouter(context, router_id, dist=False)
 
     def update_routes(self, context, router_id, nexthop):

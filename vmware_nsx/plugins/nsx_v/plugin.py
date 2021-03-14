@@ -4334,16 +4334,23 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         lb_rules = nsxv_db.get_nsxv_lbaas_loadbalancer_binding_by_edge(
                 context.session, edge_id)
         for rule in lb_rules:
-            vsm_rule = self.nsx_v.vcns.get_firewall_rule(
-                    edge_id, rule['edge_fw_rule_id'])[1]
-            lb_fw_rule = {
-                'action': edge_firewall_driver.FWAAS_ALLOW,
-                'enabled': vsm_rule['enabled'],
-                'destination_ip_address': vsm_rule['destination']['ipAddress'],
-                'name': vsm_rule['name'],
-                'ruleId': vsm_rule['ruleId']
-            }
-            fw_rules.append(lb_fw_rule)
+            vsm_rule = None
+            try:
+                vsm_rule = self.nsx_v.vcns.get_firewall_rule(
+                        edge_id, rule['edge_fw_rule_id'])[1]
+            except vsh_exc.ResourceNotFound:
+                LOG.error("LB firewall rule %s for edge %s exists in DB but "
+                          "not in backend", rule['edge_fw_rule_id'], edge_id)
+            if vsm_rule:
+                lb_fw_rule = {
+                    'action': edge_firewall_driver.FWAAS_ALLOW,
+                    'enabled': vsm_rule['enabled'],
+                    'destination_ip_address':
+                        vsm_rule['destination']['ipAddress'],
+                    'name': vsm_rule['name'],
+                    'ruleId': vsm_rule['ruleId']
+                }
+                fw_rules.append(lb_fw_rule)
 
         fw = {'firewall_rule_list': fw_rules}
         try:
