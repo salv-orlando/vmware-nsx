@@ -477,6 +477,10 @@ class NSXClient(object):
         self._cleanup_lb_resource(self.nsxpolicy.load_balancer.lb_service,
                                   'LB services')
 
+    def cleanup_lb_certificates(self):
+        self._cleanup_lb_resource(self.nsxpolicy.certificate,
+                                  'Certificates')
+
     def cleanup_lb_gateways(self):
         # cleanup gateway policies and other resources related to the
         # allowed cidrs feature
@@ -523,6 +527,7 @@ class NSXClient(object):
         self.cleanup_lb_services()
         self.cleanup_lb_server_pools()
         self.cleanup_lb_monitors()
+        self.cleanup_lb_certificates()
 
     def cleanup_fwaas_router_resources(self, rtr_id):
         # delete the GW policy
