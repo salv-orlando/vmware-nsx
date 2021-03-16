@@ -1740,8 +1740,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             device_owner.startswith('compute:') and port_data.get('vif_id')):
             # During api-replay, migrated vm port should have this vif-id
             vif_id = port_data['vif_id']
-        elif (not device_owner or
-              device_owner != l3_db.DEVICE_OWNER_ROUTER_INTF):
+        elif (is_create and (not device_owner or
+              device_owner != l3_db.DEVICE_OWNER_ROUTER_INTF)):
             # Set vif_id even if no device owner so that auto-generated
             # MP ports won't be created for VMs before neutron sets the vif-id
             vif_id = port_data['id']
