@@ -42,7 +42,7 @@ def cleanup_db_mappings(resource, event, trigger, **kwargs):
 def post_v2t_migration_cleanups(resource, event, trigger, **kwargs):
     """Cleanup unneeded migrated resources after v2t migration is done"""
     nsxpolicy = p_utils.get_connected_nsxpolicy()
-    # clean all migrated DFW sections
+    # Clean all migrated DFW sections
     sections = nsxpolicy.comm_map.list(policy_constants.DEFAULT_DOMAIN)
     for section in sections:
         # Look for the tag marking the migrated sections
@@ -52,6 +52,19 @@ def post_v2t_migration_cleanups(resource, event, trigger, **kwargs):
                 nsxpolicy.comm_map.delete(policy_constants.DEFAULT_DOMAIN,
                                           section['id'])
                 continue
+
+    # Cleanup migrated DVS ports (belong to the edges that are not in use)
+    segments = nsxpolicy.segment.list()
+    for seg in segments:
+        # Skip non-neutron segments
+        if not p_utils.is_neutron_resource(seg):
+            continue
+        ports = nsxpolicy.segment_port.list(seg['id'])
+        # Find the non-neutron ports and delete them
+        for port in ports:
+            if not p_utils.is_neutron_resource(port):
+                nsxpolicy.segment_port.delete(seg['id'], port['id'])
+                LOG.error("Deleted migrated non-neutron port %s", port['id'])
 
 
 @admin_utils.output_header
