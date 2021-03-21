@@ -2111,8 +2111,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         # Do this outside of the context writer scope so it can overcome
         # failures
-        if port.get('tenant_id'):
-            self._ensure_default_security_group(context, port['tenant_id'])
+        if port_data.get('tenant_id'):
+            self._ensure_default_security_group(context,
+                                                port_data['tenant_id'])
 
         with db_api.CONTEXT_WRITER.using(context):
             neutron_db = self.base_create_port(context, port)
