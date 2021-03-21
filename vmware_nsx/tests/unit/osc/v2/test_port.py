@@ -73,7 +73,7 @@ class TestCreatePort(test_port.TestCreatePort):
 
         ref_columns, ref_data = self._get_common_cols_data(self._port)
         self.assertEqual(ref_columns, columns)
-        self.assertItemEqual(ref_data, data)
+        self.assertItemsEqual(ref_data, data)
 
     def _test_create_with_vnix_index(self, val, is_valid=True):
         self._test_create_with_arg_and_val('vnic_index', val, is_valid)
@@ -112,7 +112,7 @@ class TestCreatePort(test_port.TestCreatePort):
 
         ref_columns, ref_data = self._get_common_cols_data(self._port)
         self.assertEqual(ref_columns, columns)
-        self.assertItemEqual(ref_data, data)
+        self.assertItemsEqual(ref_data, data)
 
     def test_create_with_provider_security_groups(self):
         # create a port with few provider security groups
@@ -144,7 +144,7 @@ class TestCreatePort(test_port.TestCreatePort):
 
         ref_columns, ref_data = self._get_common_cols_data(self._port)
         self.assertEqual(ref_columns, columns)
-        self.assertItemEqual(ref_data, data)
+        self.assertItemsEqual(ref_data, data)
 
     def test_create_with_provider_security_group_by_name(self):
         # create a port with 1 provider security group
@@ -174,7 +174,7 @@ class TestCreatePort(test_port.TestCreatePort):
 
         ref_columns, ref_data = self._get_common_cols_data(self._port)
         self.assertEqual(ref_columns, columns)
-        self.assertItemEqual(ref_data, data)
+        self.assertItemsEqual(ref_data, data)
 
     def _test_create_with_flag_arg(
         self, arg_name, validate_name, validate_val):
@@ -204,7 +204,7 @@ class TestCreatePort(test_port.TestCreatePort):
 
         ref_columns, ref_data = self._get_common_cols_data(self._port)
         self.assertEqual(ref_columns, columns)
-        self.assertItemEqual(ref_data, data)
+        self.assertItemsEqual(ref_data, data)
 
     def test_create_with_mac_learning(self):
         self._test_create_with_flag_arg(

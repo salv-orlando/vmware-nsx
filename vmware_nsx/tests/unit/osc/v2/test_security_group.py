@@ -70,7 +70,7 @@ class TestCreateSecurityGroup(
             validate_name: validate_val,
         })
         self.assertEqual(self.columns, columns)
-        self.assertItemEqual(self.data, data)
+        self.assertItemsEqual(self.data, data)
 
     def test_create_with_logging(self):
         self._test_create_with_flag_arg('logging', 'logging', True)
@@ -107,7 +107,7 @@ class TestCreateSecurityGroup(
             arg_name: arg_val,
         })
         self.assertEqual(self.columns, columns)
-        self.assertItemEqual(self.data, data)
+        self.assertItemsEqual(self.data, data)
 
     def test_create_with_policy(self):
         self._test_create_with_arg_val('policy', 'policy-1')

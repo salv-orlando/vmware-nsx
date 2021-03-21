@@ -66,7 +66,7 @@ class TestCreateRouter(test_router.TestCreateRouter):
         })
 
         self.assertEqual(self.columns, columns)
-        self.assertItemEqual(self.data, data)
+        self.assertItemsEqual(self.data, data)
 
     def _test_create_with_size(self, size, is_valid=True):
         self._test_create_with_arg_and_val('router_size', size, is_valid)
