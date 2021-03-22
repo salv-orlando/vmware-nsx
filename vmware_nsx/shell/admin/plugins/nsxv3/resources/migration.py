@@ -53,6 +53,7 @@ from vmware_nsxlib.v3.policy import utils as policy_utils
 
 LOG = logging.getLogger(__name__)
 
+# Migration statuses
 POLICY_API_STATUS_FAILED = 'FAILED'
 POLICY_API_STATUS_SUCCESS = 'SUCCESS'
 POLICY_API_STATUS_IN_PROGRESS = 'PAUSING'
@@ -64,6 +65,7 @@ STATUS_ALLOW_MIGRATION_REQ = set([
     POLICY_API_STATUS_READY
 ])
 
+# Limits to number of objects that can be migrated in a single payload
 MIGRATE_LIMIT_NO_LIMIT = 0
 MIGRATE_LIMIT_TIER0 = 1
 MIGRATE_LIMIT_TIER0_PORTS = 1000
@@ -89,7 +91,6 @@ COMPONENT_STATUS_ALREADY_MIGRATED = 1
 COMPONENT_STATUS_OK = 2
 
 ROLLBACK_DATA = []
-EDGE_FW_SEQ = 1
 DFW_SEQ = 1
 NSX_ROUTER_SECTIONS = []
 SERVICE_UP_RETRIES = 30
@@ -137,7 +138,6 @@ def change_migration_service_status(start=True, nsxlib=None):
     """Enable/Disable the migration service on the NSX manager
     using SSH command
     """
-    # TODO(asarfaty): Is there an api for that? or use sshpass
     action = 'start' if start else 'stop'
     command = "%s service migration-coordinator" % action
     LOG.info("Going to %s the migration service on the NSX manager by "
@@ -242,6 +242,10 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
                                 metadata_callback=None,
                                 skip_policy_path_check=False,
                                 nsxlib_list_args=None):
+    """Get the payload for a specific resource by reading all the MP objects,
+    And comparing then to neutron objects, using callbacks to add required
+    information
+    """
     if not printable_name:
         printable_name = resource_type
     LOG.debug("Getting data for MP %s", printable_name)
@@ -253,6 +257,7 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
     if not isinstance(resources, list):
         # The nsxlib resources list return inconsistent type of result
         resources = resources.get('results', [])
+
     policy_ids = []
     entries = []
     for resource in resources:
@@ -266,6 +271,7 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
                 # This is already a policy resource
                 found_policy_path = True
             if neutron_id_tags and tag['scope'] in neutron_id_tags:
+                # Found the neutron id
                 neutron_id = tag['tag']
         if not skip_policy_path_check and found_policy_path:
             LOG.debug("Skipping %s %s as it is already a policy "
@@ -287,7 +293,7 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
             # Callback to change the policy id
             policy_id = policy_id_callback(resource, policy_id)
         if policy_id and policy_resource_get:
-            # filter out resources that already exit on policy!
+            # filter out resources that already exist on policy
             try:
                 policy_resource_get(policy_id, silent=True)
             except nsxlib_exc.ResourceNotFound:
@@ -301,11 +307,11 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
         if policy_id:
             if policy_id in policy_ids:
                 msg = (_("Cannot migrate %(res)s %(name)s to policy-id "
-                         "%(id)s: Another %(res)s "
-                         "has the same designated policy-id. One of those is "
-                         "probably a neutron orphaned. Please delete it and "
-                         "try migration again.") % {'res': printable_name,
-                         'name': name_and_id, 'id': policy_id})
+                         "%(id)s: Another %(res)s has the same designated "
+                         "policy-id. One of those is probably a neutron "
+                         "orphaned. Please delete it and try migration again.")
+                       % {'res': printable_name, 'name': name_and_id,
+                          'id': policy_id})
                 raise Exception(msg)
             policy_ids.append(policy_id)
 
@@ -321,13 +327,15 @@ def get_resource_migration_data(nsxlib_resource, neutron_id_tags,
 
 
 def migrate_objects(nsxlib, data, use_admin=False):
+    # Do the actual migration for a given payload with admin or non admin user
     if not ensure_migration_state_ready(nsxlib):
+        LOG.error("The migration server is not ready")
         raise Exception(_("The migration server is not ready"))
 
     migration_body = {"migration_data": [data]}
 
     # Update the principal identity for the policy resources
-    # use 'admin' for predefined objects, and the opestack configured
+    # use 'admin' for predefined objects, and the openstack configured
     # user/identity for openstack resources
     if use_admin:
         user = 'admin'
@@ -376,13 +384,16 @@ def migrate_objects(nsxlib, data, use_admin=False):
 def migrate_resource(nsxlib, resource_type, entries,
                      limit=MIGRATE_LIMIT_NO_LIMIT,
                      count_internals=False, use_admin=False):
-    # Call migrate_resource with the part of resources we need by the limit
+    """Perform the migration of a specific resource with all its objects.
+    In case there is a limit to the number of object in a single call, divide
+    it to several calls.
+    """
     if not entries:
         LOG.info("No %s to migrate", resource_type)
         return
 
     LOG.info("Going to migrate %d %s objects in groups of max %s",
-             len(entries), resource_type, limit)
+             len(entries), resource_type, limit if limit else "UNLIMITED")
     start_time = time.time()
 
     if limit == MIGRATE_LIMIT_NO_LIMIT:
@@ -390,6 +401,8 @@ def migrate_resource(nsxlib, resource_type, entries,
                                  'resource_ids': entries},
                         use_admin=use_admin)
     else:
+        # Call migrate_objects with a partial list of objects depending on
+        # the size of the limit
         if count_internals:
             # Limit the total number of resources, including internal ones
             counter = 0
@@ -433,6 +446,9 @@ def migrate_resource(nsxlib, resource_type, entries,
 
 
 def get_configured_values(plugin, az_attribute):
+    """Return all configured values of a config param
+    from all the availability zones
+    """
     values = []
     for az in plugin.get_azs_list():
         az_values = getattr(az, az_attribute)
@@ -441,6 +457,14 @@ def get_configured_values(plugin, az_attribute):
         else:
             values.append(az_values)
     return values
+
+
+def is_neutron_resource(resource):
+    # Return True if the resource has the neutron marking tag
+    for tag in resource.get('tags', []):
+        if tag.get('scope') == 'os-api-version':
+            return True
+    return False
 
 
 def get_neurton_tier0s(plugin):
@@ -461,6 +485,7 @@ def migrate_tier0s(nsxlib, nsxpolicy, plugin):
                 neutron_t0s.append(bind.phy_uuid)
 
     def cond(resource):
+        # migration condition for Tier0-s
         return (resource.get('router_type', '') == 'TIER0' and
                 resource.get('id') in neutron_t0s)
 
@@ -469,6 +494,7 @@ def migrate_tier0s(nsxlib, nsxpolicy, plugin):
         'TIER0', resource_condition=cond,
         policy_resource_get=nsxpolicy.tier0.get,
         nsxlib_list_args={'router_type': nsx_constants.ROUTER_TYPE_TIER0})
+
     migrate_resource(nsxlib, 'TIER0', entries, MIGRATE_LIMIT_TIER0,
                      use_admin=True)
     migrated_tier0s = [entry['manager_id'] for entry in entries]
@@ -484,14 +510,6 @@ def migrate_tier0s(nsxlib, nsxpolicy, plugin):
             public_switches.append(port['logical_switch_id'])
 
     return public_switches, migrated_tier0s
-
-
-def is_neutron_resource(resource):
-    # Return True if the resource has the neutron marking tag
-    for tag in resource.get('tags', []):
-        if tag.get('scope') == 'os-api-version':
-            return True
-    return False
 
 
 def migrate_switch_profiles(nsxlib, nsxpolicy, plugin):
@@ -529,6 +547,7 @@ def migrate_switch_profiles(nsxlib, nsxpolicy, plugin):
         return cond
 
     def get_policy_id_callback(res, policy_id):
+        """Callback to decide the profile policy id"""
         # In case of plugin init profiles: give it the id the policy plugin
         # will use
         mapping = {v3_plugin.NSX_V3_MAC_LEARNING_PROFILE_NAME:
@@ -546,6 +565,7 @@ def migrate_switch_profiles(nsxlib, nsxpolicy, plugin):
 
         return policy_id
 
+    # Migrate each type of profile
     entries = get_resource_migration_data(
         nsxlib.switching_profile, None,
         'SPOOFGUARD_PROFILES',
@@ -657,6 +677,7 @@ def migrate_networks(nsxlib, nsxpolicy, plugin, public_switches):
             nsx_networks.append(bind.phy_uuid)
 
     def cond(resource):
+        # migrate external network, nsx provider networks and neutron networks
         return (resource.get('id', '') in nsx_networks or
                 resource.get('id', '') in public_switches or
                 is_neutron_resource(resource))
@@ -674,7 +695,7 @@ def migrate_networks(nsxlib, nsxpolicy, plugin, public_switches):
                 return tag['tag']
 
     def add_metadata(entry, policy_id, resource):
-        # Add dhcp-v4 static bindings
+        # Add dhcp-v4 static bindings for each network
         network_id = None
         for tag in resource.get('tags', []):
             # Use the neutron ID
@@ -705,9 +726,13 @@ def migrate_networks(nsxlib, nsxpolicy, plugin, public_switches):
         metadata_callback=add_metadata)
     migrate_resource(nsxlib, 'LOGICAL_SWITCH', entries,
                      MIGRATE_LIMIT_LOGICAL_SWITCH)
+    migrated_networks = [entry['manager_id'] for entry in entries]
+    return migrated_networks
 
 
-def migrate_ports(nsxlib, nsxpolicy, plugin):
+def migrate_ports(nsxlib, nsxpolicy, plugin, migrated_networks):
+    """Migrate all the neutron ports by network"""
+
     # For nsx networks support, keep a mapping of neutron id and MP id
     nsx_networks = {}
     ctx = context.get_admin_context()
@@ -719,7 +744,8 @@ def migrate_ports(nsxlib, nsxpolicy, plugin):
             nsx_networks[bind.network_id] = bind.phy_uuid
 
     def get_policy_port(port_id, silent=False):
-        # Get the segment id from neutron
+        """Getter to check if the port already exists on the backend"""
+        # First get the segment id from neutron
         ctx = context.get_admin_context()
         neutron_port = plugin.get_port(ctx, port_id)
         net_id = neutron_port['network_id']
@@ -727,6 +753,7 @@ def migrate_ports(nsxlib, nsxpolicy, plugin):
             segment_id = nsx_networks[net_id]
         else:
             segment_id = net_id
+        # Now get the nsx port using the segment id
         return nsxpolicy.segment_port.get(segment_id, port_id, silent=silent)
 
     def add_metadata(entry, policy_id, resource):
@@ -738,17 +765,39 @@ def migrate_ports(nsxlib, nsxpolicy, plugin):
                              {'key': 'qos-profile-binding-maps-id',
                               'value': policy_resources.DEFAULT_MAP_ID}]
 
-    entries = get_resource_migration_data(
-        nsxlib.logical_port, ['os-neutron-port-id'],
-        'LOGICAL_PORT',
-        policy_resource_get=get_policy_port,
-        metadata_callback=add_metadata)
-    migrate_resource(nsxlib, 'LOGICAL_PORT', entries,
-                     MIGRATE_LIMIT_LOGICAL_PORT)
+    nsx_version = nsxlib.get_version()
+    if nsx_utils.is_nsx_version_3_2_0(nsx_version):
+        # separate call per neutron network
+        class portResource(object):
+            def list(self, **kwargs):
+                # Mock the list command to do list by network
+                return nsxlib.logical_port.get_by_logical_switch(
+                    kwargs.get('logical_switch_id'))
+        nsxlib_ls_mock = portResource()
+
+        # Call migration per network
+        for nsx_ls_id in migrated_networks:
+            entries = get_resource_migration_data(
+                nsxlib_ls_mock, ['os-neutron-port-id'],
+                'LOGICAL_PORT',
+                policy_resource_get=get_policy_port,
+                metadata_callback=add_metadata,
+                nsxlib_list_args={'logical_switch_id': nsx_ls_id})
+            migrate_resource(nsxlib, 'LOGICAL_PORT', entries,
+                             MIGRATE_LIMIT_NO_LIMIT)
+    else:
+        # migrate all ports together split up by the limit
+        entries = get_resource_migration_data(
+            nsxlib.logical_port, ['os-neutron-port-id'],
+            'LOGICAL_PORT',
+            policy_resource_get=get_policy_port,
+            metadata_callback=add_metadata)
+        migrate_resource(nsxlib, 'LOGICAL_PORT', entries,
+                         MIGRATE_LIMIT_LOGICAL_PORT)
 
 
 def migrate_routers(nsxlib, nsxpolicy):
-
+    """Migrate neutron Tier-1 routers"""
     entries = get_resource_migration_data(
         nsxlib.logical_router,
         ['os-neutron-router-id'],
@@ -760,7 +809,7 @@ def migrate_routers(nsxlib, nsxpolicy):
     return migrated_routers
 
 
-def _get_subnet_by_cidr(subnets, cidr):
+def _get_subnet_id_by_cidr(subnets, cidr):
     for subnet in subnets:
         if subnet['cidr'] == cidr:
             return subnet['id']
@@ -860,7 +909,7 @@ def migrate_routers_config(nsxlib, nsxpolicy, plugin, migrated_routers):
             if rule['action'] == 'NO_DNAT':
                 seq_num = p_plugin.NAT_RULE_PRIORITY_GW
                 cidr = rule['match_destination_network']
-                subnet_id = _get_subnet_by_cidr(router_subnets, cidr)
+                subnet_id = _get_subnet_id_by_cidr(router_subnets, cidr)
                 if not subnet_id:
                     LOG.error("Could not find subnet with cidr %s matching "
                               "NO_DNAT rule %s tier1 %s",
@@ -872,7 +921,7 @@ def migrate_routers_config(nsxlib, nsxpolicy, plugin, migrated_routers):
                 cidr = rule['match_source_network']
                 if '/' in cidr:
                     seq_num = p_plugin.NAT_RULE_PRIORITY_GW
-                    subnet_id = _get_subnet_by_cidr(router_subnets, cidr)
+                    subnet_id = _get_subnet_id_by_cidr(router_subnets, cidr)
                     if not subnet_id:
                         LOG.error("Could not find subnet with cidr %s "
                                   "matching SNAT rule %s tier1 %s",
@@ -921,7 +970,7 @@ def migrate_routers_config(nsxlib, nsxpolicy, plugin, migrated_routers):
 
 
 def migrate_tier0_config(nsxlib, nsxpolicy, tier0s):
-    """Migrate ports and config for the already migrated Tier0s"""
+    """Migrate ports and config for the already migrated Tier0-s"""
 
     entries = []
     for tier0 in tier0s:
@@ -953,8 +1002,8 @@ def migrate_tier0_config(nsxlib, nsxpolicy, tier0s):
 
 
 def migrate_groups(nsxlib, nsxpolicy):
-    """Migrate NS groups of neutron defined security groups and predefined at
-    plugin init
+    """Migrate NS groups of neutron defined security groups and groups
+    predefined at plugin init
     """
     def get_policy_id_callback(res, policy_id):
         # In case of plugin init groups: give it the id the policy plugin
@@ -980,16 +1029,6 @@ def migrate_groups(nsxlib, nsxpolicy):
         policy_resource_get=get_policy_group,
         policy_id_callback=get_policy_id_callback)
     migrate_resource(nsxlib, 'NS_GROUP', entries, MIGRATE_LIMIT_NS_GROUP)
-
-
-def dfw_migration_cond(resource):
-    return (resource.get('enforced_on') == 'VIF' and
-            resource.get('category') == 'Default' and
-            resource.get('section_type') == 'LAYER3' and
-            not resource.get('is_default') and
-            # Migrate only DFW sections only and no edge FW sections
-            'applied_tos' in resource and
-            resource['applied_tos'][0].get('target_type', '') == 'NSGroup')
 
 
 def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
@@ -1048,6 +1087,15 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
         return nsxpolicy.comm_map.get(policy_constants.DEFAULT_DOMAIN, sec_id,
                                       silent=silent)
 
+    def dfw_migration_cond(resource):
+        return (resource.get('enforced_on') == 'VIF' and
+                resource.get('category') == 'Default' and
+                resource.get('section_type') == 'LAYER3' and
+                not resource.get('is_default') and
+                # Migrate only DFW sections only and no edge FW sections
+                'applied_tos' in resource and
+                resource['applied_tos'][0].get('target_type', '') == 'NSGroup')
+
     entries = get_resource_migration_data(
         nsxlib.firewall_section,
         ['os-neutron-secgr-id', 'os-neutron-id'],
@@ -1061,7 +1109,7 @@ def migrate_dfw_sections(nsxlib, nsxpolicy, plugin):
 
 
 def migrate_edge_firewalls(nsxlib, nsxpolicy, plugin):
-    # -- Migrate edge firewall sections:
+    # Migrate edge firewall sections:
     # The MP plugin uses the default MP edge firewall section, while the policy
     # plugin uses a non default one, so regular migration cannot be used.
     # Instead, create new edge firewall sections, and remove rules from the MP
@@ -1229,11 +1277,15 @@ def migrate_lb_services(nsxlib, nsxpolicy):
                      MIGRATE_LIMIT_LB_SERVICE)
 
 
-def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
+def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin,
+                            start_migration_service=False):
     """Create policy resources for all MP resources used by neutron"""
 
     # Initialize the migration process
-    if not ensure_migration_state_ready(nsxlib, with_abort=True):
+    if not ensure_migration_state_ready(
+            nsxlib, with_abort=start_migration_service):
+        LOG.error("The migration coordinator service is not ready. "
+                  "Please start it and try again.")
         return False
 
     try:
@@ -1248,8 +1300,9 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         migrate_groups(nsxlib, nsxpolicy)
         migrate_dhcp_servers(nsxlib, nsxpolicy)
         mp_routers = migrate_routers(nsxlib, nsxpolicy)
-        migrate_networks(nsxlib, nsxpolicy, plugin, public_switches)
-        migrate_ports(nsxlib, nsxpolicy, plugin)
+        mp_networks = migrate_networks(nsxlib, nsxpolicy, plugin,
+                                       public_switches)
+        migrate_ports(nsxlib, nsxpolicy, plugin, mp_networks)
         migrate_routers_config(nsxlib, nsxpolicy, plugin, mp_routers)
         migrate_tier0_config(nsxlib, nsxpolicy, tier0s)
         migrate_lb_resources(nsxlib, nsxpolicy)
@@ -1263,7 +1316,8 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
         end_migration_process()
 
         # Stop the migration service
-        change_migration_service_status(start=False)
+        if start_migration_service:
+            change_migration_service_status(start=False)
 
         return True
 
@@ -1285,7 +1339,8 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
             # Finalize the migration (Also needed after rollback)
             end_migration_process()
             # Stop the migration service
-            change_migration_service_status(start=False)
+            if start_migration_service:
+                change_migration_service_status(start=False)
         except Exception as e:
             LOG.error("Rollback failed: %s", e)
         return False
@@ -1388,7 +1443,7 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
                 break
 
     # -- Create DHCP server configs to be used in neutron config
-    # (The migration does not migrate MP DHCP profiles)
+    # (The migration did not migrate MP DHCP profiles)
     neutron_dhcp = get_configured_values(plugin, '_native_dhcp_profile_uuid')
     for mp_dhcp in neutron_dhcp:
         # check if it was already migrated
@@ -1437,6 +1492,7 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
                 break
 
     # -- Delete MP edge firewall rules
+    global NSX_ROUTER_SECTIONS
     for section in NSX_ROUTER_SECTIONS:
         # make sure the policy section was already realized
         # with runtime_status=SUCESS
@@ -1525,12 +1581,12 @@ def _get_nsxlib_from_config(verbose, for_end_api=False):
         exit(1)
 
     if for_end_api:
-        # enlarge timeouts and disable retries
+        # Enlarge timeouts and disable retries
         cfg.CONF.set_override('http_read_timeout', END_API_TIMEOUT, 'nsx_v3')
         cfg.CONF.set_override('http_retries', 0, 'nsx_v3')
         cfg.CONF.set_override('retries', 0, 'nsx_v3')
 
-    # Initialize the nsxlib objects, using just one of the managers because
+    # Initialize the nsxlib objects using just one of the managers because
     # the migration will be enabled only on one
     nsx_api_managers = copy.copy(cfg.CONF.nsx_v3.nsx_api_managers)
     nsx_api_user = copy.copy(cfg.CONF.nsx_v3.nsx_api_user)
@@ -1582,6 +1638,7 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
     else:
         LOG.setLevel(logging.INFO)
 
+    start_migration_service = False
     if kwargs.get('property'):
         # Add logfile
         properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
@@ -1592,6 +1649,9 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
                 '%(asctime)s %(levelname)s %(message)s')
             f_handler.setFormatter(f_formatter)
             LOG.addHandler(f_handler)
+        start_service_flag = properties.get('start-migration-service', 'False')
+        if start_service_flag.lower() == 'true':
+            start_migration_service = True
 
     nsxlib = _get_nsxlib_from_config(verbose)
     nsxpolicy = p_utils.get_connected_nsxpolicy(
@@ -1624,7 +1684,8 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
         LOG.debug("Pre-migration took %s seconds", elapsed_time)
 
         start_time = time.time()
-        if not migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin):
+        if not migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin,
+                                       start_migration_service):
             # Failed
             LOG.error("T2P migration failed. Aborting\n\n")
             exit(1)
@@ -1641,7 +1702,10 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
 
 @admin_utils.output_header
 def MP2Policy_cleanup_db_mappings(resource, event, trigger, **kwargs):
-    """Delete all entries from nsx-t mapping tables in DB"""
+    """Delete all entries from nsx-t mapping tables in DB.
+    This cleanup does not have to run, as all those tables have delete-cascade
+    so manipulation on the migrated resources will not be blocked by this.
+    """
     confirm = admin_utils.query_yes_no(
         "Are you sure you want to delete all MP plugin mapping DB tables?",
         default="no")
