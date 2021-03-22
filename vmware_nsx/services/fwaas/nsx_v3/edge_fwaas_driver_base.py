@@ -13,11 +13,20 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from neutron_lib import constants as nl_constants
 from neutron_lib import context as n_context
 from neutron_lib.exceptions import firewall_v2 as exceptions
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from vmware_nsx.services.fwaas.common import fwaas_driver_base
+
+try:
+    from neutron_fwaas.db.firewall.v2 import firewall_db_v2
+except ImportError:
+    # FWaaS project no found
+    from vmware_nsx.services.fwaas.common import fwaas_mocks \
+        as firewall_db_v2
 
 LOG = logging.getLogger(__name__)
 
@@ -68,6 +77,14 @@ class CommonEdgeFwaasV3Driver(fwaas_driver_base.EdgeFwaasDriverBaseV2):
                 LOG.error("Failed to update NSX edge firewall for router %s: "
                           "%s", router_id, e)
                 raise self.driver_exception(driver=self.driver_name)
+
+        if cfg.CONF.api_replay_mode and len(routers) > 0:
+            # In api replay mode the RPC isn't working so the FW group status
+            # should be updated directly
+            with context.session.begin(subtransactions=True):
+                group = (context.session.query(firewall_db_v2.FirewallGroup).
+                         filter_by(id=fwg_id).one())
+                group['status'] = nl_constants.ACTIVE
 
     def should_apply_firewall_to_router(self, router_data):
         """Return True if the firewall rules should be added the router"""
