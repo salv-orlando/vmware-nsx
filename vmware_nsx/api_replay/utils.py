@@ -197,6 +197,8 @@ class PrepareObjectForMigration(object):
             body.get('provider:segmentation_id') is not None):
             del body['provider:network_type']
             del body['provider:segmentation_id']
+            if 'provider:physical_network' in body:
+                del body['provider:physical_network']
 
         # flat network should be translated to a regular network in nsx-v3/P.
         if (body.get('provider:network_type') == 'flat'):
