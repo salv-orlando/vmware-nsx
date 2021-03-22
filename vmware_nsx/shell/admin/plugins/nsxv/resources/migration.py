@@ -139,11 +139,10 @@ def _validate_networks(plugin, admin_context, transit_networks):
         if plugin._network_is_external(admin_context, net['id']):
             continue
 
-        # VXLAN or portgroup provider networks
+        # portgroup provider networks are not ssupported
         net_type = net.get(pnet.NETWORK_TYPE)
         overlay_net = bool(net_type != c_utils.NsxVNetworkTypes.VLAN)
-        if (net_type == c_utils.NsxVNetworkTypes.VXLAN or
-            net_type == c_utils.NsxVNetworkTypes.PORTGROUP):
+        if net_type == c_utils.NsxVNetworkTypes.PORTGROUP:
             log_error("Network %s of type %s is not supported." %
                       (net['id'], net_type))
 
@@ -350,8 +349,17 @@ def _validate_loadbalancers(plugin, admin_context):
             lb_subnets = list(set([port['fixed_ips'][0]['subnet_id']
                                    for port in lb_ports]))
             # make sure all subnets are connected to the same router
-            lb_routers = [lb_rtr_id]
+            lb_routers = []
+            if lb_rtr_id:
+                lb_routers = [lb_rtr_id]
             for sub_id in lb_subnets:
+                # skip external subnets
+                network = lb_utils.get_network_from_subnet(
+                    admin_context, plugin, sub_id)
+                if network.get('router:external'):
+                    # Member on external subnet must have a fip but this cannot
+                    # be checked here are the member ip is unknown
+                    continue
                 router_id = _get_router_from_network(
                     admin_context, plugin, sub_id)
                 if not router_id:
@@ -368,6 +376,15 @@ def _validate_loadbalancers(plugin, admin_context):
                           lb_id)
                 break
 
+            # Make sure this router has a gateway
+            if lb_routers:
+                router_db = plugin._get_router(admin_context, lb_routers[0])
+                if not router_db.gw_port:
+                    log_error("Loadbalancer's %s subnets are connected to a "
+                              "router without a gateway. This is not "
+                              "supported." % lb_id)
+                    break
+
 
 def _validate_security_groups(plugin, admin_context):
     # Security groups without policies
@@ -378,27 +395,44 @@ def _validate_security_groups(plugin, admin_context):
                       "supported." % sg['id'])
 
 
+def _get_config_ext_nets():
+    config.register_nsxv_azs(cfg.CONF, cfg.CONF.nsxv.availability_zones)
+    zones = nsx_az.NsxVAvailabilityZones()
+    nets = []
+    for az in zones.list_availability_zones_objects():
+        nets.append(az.external_network)
+    return nets
+
+
 def _validate_non_neutron_networks(admin_context):
     # Look for orphaned neutron networks and non neutron backend networks
     backend_networks = utils.get_networks()
     missing_networks = utils.get_orphaned_networks(backend_networks)
+    config_networks = _get_config_ext_nets()
+
+    missing_morefs = []
     for net in missing_networks:
         log_warning("NSX backend network %s:%s is missing from Neutron "
                     "and is probably an orphaned. Please delete it." %
                     (net.get('moref'), net.get('name')))
+        missing_morefs.append(net.get('moref'))
 
     for net in backend_networks:
         moref = net['moref']
         name = net['name']
         net_type = net['type']
 
+        if moref in missing_morefs:
+            # Already reported
+            continue
+
         if ((len(name) < 36 or not uuidutils.is_uuid_like(name)) and
             net_type in ['DistributedVirtualPortgroup', 'VirtualWire']):
             if (net_type == 'DistributedVirtualPortgroup' and
                 name.startswith('edge-')):
                 continue
-            if (name == 'DPortGroup' and net_type ==
-                'DistributedVirtualPortgroup'):
+
+            if moref in config_networks:
                 continue
 
             if name:
