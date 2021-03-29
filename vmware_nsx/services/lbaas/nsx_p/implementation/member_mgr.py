@@ -37,8 +37,8 @@ class EdgeMemberManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                                                         filters=filters)
         if floating_ips:
             return floating_ips[0]
-        msg = (_('Member IP %(fip)s is an external IP, and is expected to '
-                 'be a floating IP') % {'fip': fip})
+        msg = (_('Member IP %(fip)s is expected to be an external IP with a '
+                 'floating IP') % {'fip': fip})
         raise n_exc.BadRequest(resource='lbaas-vip', msg=msg)
 
     def _get_info_from_fip(self, context, fip):
