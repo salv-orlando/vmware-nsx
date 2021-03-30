@@ -4248,7 +4248,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         if not router_id:
             router_id = router_db['id']
 
-        self.update_router_firewall(context, router_id, router_db)
+        self.update_router_firewall(context.elevated(), router_id, router_db)
 
     def _get_firewall_icmpv6_rules(self):
         # Add ipv6 icmp multicast rule (blocked in Vsphere 7 & up)
