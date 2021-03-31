@@ -199,9 +199,11 @@ def _validate_networks(plugin, admin_context, transit_networks):
                               (subnet['id'], transit_networks))
 
             # Cannot support non-dhcp overlay subnet attached to a router
-            # if there is also a dhcp subnet on the same network
+            # if there is also a dhcp subnet on the same network and the
+            # same ipver
             if (overlay_net and n_dhcp_subnets > 0 and
-                not subnet['enable_dhcp']):
+                not subnet['enable_dhcp'] and
+                subnet.get('ip_version', 4) == 4):
                 # look for a router interface for this subnet
                 for if_port in intf_ports:
                     if if_port['fixed_ips']:
