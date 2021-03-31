@@ -517,7 +517,6 @@ def _validate_config():
 @admin_utils.output_header
 def validate_config_for_migration(resource, event, trigger, **kwargs):
     """Validate the nsxv configuration before migration to nsx-t"""
-
     # Read the command line parameters
     transit_networks = ["100.64.0.0/16"]
     strict = False
@@ -531,6 +530,13 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
         strict = bool(properties.get('strict', 'false').lower() == 'true')
         out_file = properties.get('summary-file-name')
 
+    # Ensure ca_file in DVS section is always set otherwise secure connection
+    # to vcenter will fail
+    if not cfg.CONF.dvs.ca_file:
+        ca_file_default = "/etc/ssl/certs/vcenter.pem"
+        LOG.info("ca_file for vCenter unset, defaulting to: %s",
+                 ca_file_default)
+        cfg.CONF.set_override('ca_file', ca_file_default, 'dvs')
     LOG.info("Running migration config validation in %sstrict mode",
              '' if strict else 'non-')
 
