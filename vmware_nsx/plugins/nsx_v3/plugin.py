@@ -172,6 +172,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         router=l3_db_models.Router,
         floatingip=l3_db_models.FloatingIP)
     def __init__(self):
+        # Register these resources before the relevant extensiosn are loaded
+        # to prevent failures due to QuotaResourceUnknown error while creating
+        # default security group
+        resource_registry.register_resource_by_name('security_group')
+        resource_registry.register_resource_by_name('security_group_rule')
         self.fwaas_callbacks = None
         self._is_sub_plugin = tvd_utils.is_tvd_core_plugin()
         self.init_is_complete = False
