@@ -158,15 +158,16 @@ def _validate_networks(plugin, admin_context, transit_networks):
                       "allowed." % (net['id'], n_dhcp_subnets))
 
         # Network attached to multiple routers
-        intf_ports = plugin._get_network_interface_ports(
-            admin_context, net['id'])
-        if len(intf_ports) > 1:
+        router_ids = set(plugin._get_network_router_ids(
+            admin_context, net['id']))
+        if len(router_ids) > 1:
             log_error("Network %s has interfaces on multiple "
-                      "routers. Only 1 is allowed." % net['id'])
+                      "routers (%s). Only 1 is allowed."
+                      % (net['id'], ",".join(router_ids)))
 
         if (cfg.CONF.vlan_transparent and
             net.get('vlan_transparent') is True):
-            if len(intf_ports) > 0:
+            if len(router_ids) > 0:
                 log_error("VLAN Transparent network %s cannot be "
                           "attached to a logical router." % net['id'])
             if n_dhcp_subnets > 0:
@@ -175,6 +176,8 @@ def _validate_networks(plugin, admin_context, transit_networks):
 
         # Subnets overlapping with the transit network
         ipv6_subnets = 0
+        intf_ports = plugin._get_network_interface_ports(
+            admin_context, net['id'])
         for subnet in subnets:
             # get the subnet IPs
             if ('allocation_pools' in subnet and
