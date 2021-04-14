@@ -12,6 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
+
 import netaddr
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -537,9 +539,10 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
     # to vcenter will fail
     if not cfg.CONF.dvs.ca_file:
         ca_file_default = "/etc/ssl/certs/vcenter.pem"
-        LOG.info("ca_file for vCenter unset, defaulting to: %s",
-                 ca_file_default)
-        cfg.CONF.set_override('ca_file', ca_file_default, 'dvs')
+        if os.path.isfile(ca_file_default):
+            LOG.info("ca_file for vCenter unset, defaulting to: %s",
+                     ca_file_default)
+            cfg.CONF.set_override('ca_file', ca_file_default, 'dvs')
     LOG.info("Running migration config validation in %sstrict mode",
              '' if strict else 'non-')
 
