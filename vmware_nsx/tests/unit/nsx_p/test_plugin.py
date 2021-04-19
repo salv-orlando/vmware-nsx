@@ -1066,6 +1066,24 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
     def test_requested_invalid_fixed_ip_address_v6_slaac(self):
         self.skipTest("NSX subnet GW validation")
 
+    def test_delete_port_shared_network_with_dhcp_sub(self):
+        with mock.patch.object(
+            self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+            'delete') as mock_delete_binding:
+            with self.network(shared=True) as network:
+                with self.subnet(network):
+                    port_res = self._create_port(
+                        self.fmt, network['network']['id'],
+                        exc.HTTPCreated.code,
+                        tenant_id='another_tenant',
+                        set_context=True)
+                    port = self.deserialize(self.fmt, port_res)
+                    self._delete('ports', port['port']['id'])
+                    self._show('ports', port['port']['id'],
+                            expected_code=exc.HTTPNotFound.code)
+                mock_delete_binding.assert_called_once_with(
+                    network['network']['id'], mock.ANY)
+
 
 class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                       NsxPPluginTestCaseMixin):
