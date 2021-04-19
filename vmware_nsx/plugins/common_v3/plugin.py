@@ -44,6 +44,7 @@ from neutron.db.models import securitygroup as securitygroup_model
 from neutron.db import models_v2
 from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
+from neutron.db.quota import driver  # noqa
 from neutron.db import securitygroups_db
 from neutron.db import vlantransparent_db
 from neutron.extensions import securitygroup as ext_sg
