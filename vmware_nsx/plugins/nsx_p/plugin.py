@@ -1940,10 +1940,13 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def _delete_port_policy_dhcp_binding(self, context, port):
         # Do not check device_owner here because Nova may have already
         # deleted that before Neutron's port deletion.
+        # These operations need to performed in elevated context as it is not
+        # possible to guarantee port and network belong to the same tenant
+        ctx_elevated = context.elevated()
         net_id = port['network_id']
-        if not self._is_dhcp_network(context, net_id):
+        if not self._is_dhcp_network(ctx_elevated, net_id):
             return
-        segment_id = self._get_network_nsx_segment_id(context, net_id)
+        segment_id = self._get_network_nsx_segment_id(ctx_elevated, net_id)
 
         v4_dhcp = v6_dhcp = False
         for fixed_ip in port['fixed_ips']:
