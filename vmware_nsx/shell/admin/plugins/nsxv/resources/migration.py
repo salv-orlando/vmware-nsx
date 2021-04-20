@@ -141,10 +141,12 @@ def _validate_networks(plugin, admin_context, transit_networks):
         if plugin._network_is_external(admin_context, net['id']):
             continue
 
-        # portgroup provider networks are not ssupported
+        # portgroup provider networks are not supported
+        # This includes FLAT and PORTGROUP networks
         net_type = net.get(pnet.NETWORK_TYPE)
         overlay_net = bool(net_type != c_utils.NsxVNetworkTypes.VLAN)
-        if net_type == c_utils.NsxVNetworkTypes.PORTGROUP:
+        if (net_type in [c_utils.NsxVNetworkTypes.PORTGROUP,
+                         c_utils.NsxVNetworkTypes.FLAT]):
             log_error("Network %s of type %s is not supported." %
                       (net['id'], net_type))
 
