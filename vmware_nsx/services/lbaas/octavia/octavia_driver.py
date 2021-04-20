@@ -23,6 +23,7 @@ from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 import oslo_messaging as messaging
 from oslo_messaging.rpc import dispatcher
+import tenacity
 
 from octavia.api.drivers import utils as oct_utils
 from octavia.db import api as db_apis
@@ -40,6 +41,12 @@ cfg.CONF.import_group('oslo_messaging', 'octavia.common.config')
 
 TRANSPORT = None
 RPC_SERVER = None
+
+
+def _log_before_retry(retry_state):
+    if retry_state.attempt_number > 0:
+        LOG.warning("Retrying the call to _update_loadbalancer_status due to "
+                    "timeout")
 
 
 def get_transport():
@@ -670,11 +677,20 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
         self._removed_not_in_db(status, 'pools', 'pool')
 
         try:
-            return super(NSXOctaviaDriverEndpoint,
-                         self).update_loadbalancer_status(status)
+            return self._update_loadbalancer_status(status)
         except exceptions.UpdateStatusError as e:
             LOG.error("Failed to update Octavia loadbalancer status. "
                       "Status %s, Error %s", status, e.fault_string)
+
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(30), reraise=True,
+        wait=tenacity.wait_exponential(multiplier=1, min=1, max=5),
+        before=_log_before_retry,
+        retry=tenacity.retry_if_exception_type(
+            exceptions.UpdateStatusError))
+    def _update_loadbalancer_status(self, status):
+        super(NSXOctaviaDriverEndpoint,
+              self).update_loadbalancer_status(status)
 
     @log_helpers.log_method_call
     def update_listener_statistics(self, ctxt, statistics):
