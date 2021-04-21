@@ -502,9 +502,19 @@ def migrate_tier0s(nsxlib, nsxpolicy, plugin):
         uplink_port = nsxlib.logical_router_port.get_tier0_uplink_port(tier0)
         if uplink_port:
             # Get the external LS id from the uplink port
-            port_id = uplink_port['linked_logical_switch_port_id']['target_id']
-            port = nsxlib.logical_port.get(port_id)
-            public_switches.append(port['logical_switch_id'])
+            linked_ls_id = uplink_port.get('linked_logical_switch_port_id')
+            if linked_ls_id:
+                try:
+                    port_id = linked_ls_id['target_id']
+                    port = nsxlib.logical_port.get(port_id)
+                    public_switches.append(port['logical_switch_id'])
+                except KeyError as e:
+                    LOG.info("Required attribute missing: %s. Cannot "
+                             "add public switch to objects to migrate", e)
+            else:
+                LOG.info("Uplink port %s for Tier0 router %s is not "
+                         "connected to a logical switch",
+                         tier0, uplink_port['id'])
 
     return public_switches, migrated_tier0s
 
