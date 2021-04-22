@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from neutron_lib import constants
 from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
 from oslo_utils import excutils
@@ -29,8 +30,7 @@ class EdgeL7RuleManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
     def __init__(self, vcns_driver):
         super(EdgeL7RuleManagerFromDict, self).__init__(vcns_driver)
 
-    def _handle_l7policy_rules_change(self, context, rule, completor,
-                                      delete=False):
+    def _handle_l7policy_rules_change(self, context, rule, completor):
         # Get the nsx application rule id and edge id
         edge_id, app_rule_id = l7policy_mgr.policy_to_edge_and_rule_id(
             context, rule['l7policy_id'])
@@ -60,8 +60,11 @@ class EdgeL7RuleManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         self._handle_l7policy_rules_change(context, new_rule, completor)
 
     def delete(self, context, rule, completor):
-        self._handle_l7policy_rules_change(context, rule, completor,
-                                           delete=True)
+        # Mark rule for deletion in policy rule list
+        for r in rule['policy']['rules']:
+            if r['l7rule_id'] == rule['l7rule_id']:
+                r['provisioning_status'] = constants.PENDING_DELETE
+        self._handle_l7policy_rules_change(context, rule, completor)
 
     def delete_cascade(self, context, rule, completor):
         self.delete(context, rule, completor)
