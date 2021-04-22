@@ -592,6 +592,70 @@ class NsxPTestNetworks(test_db_base_plugin_v2.TestNetworksV2,
                                          network['id'], data)
         self.assertEqual(False, res['port_security_enabled'])
 
+    def test_update_network_l3_ext_provider(self):
+        with self._create_l3_ext_network() as network:
+            net_data = network['network']
+            data = {'network': {'id': net_data['id'],
+                                'provider:network_type': 'l3_ext',
+                                'provider:physical_network': 'other'}}
+            res = self.plugin.update_network(context.get_admin_context(),
+                                             net_data['id'], data)
+            self.assertEqual('other', res['provider:physical_network'])
+
+    def test_update_network_l3_ext_provider_segmentation_id_fails(self):
+        with self._create_l3_ext_network() as network:
+            net_data = network['network']
+            data = {'network': {'id': net_data['id'],
+                                'provider:network_type': 'l3_ext',
+                                'provider:physical_network': 'other',
+                                'provider:segmentation_id': 666}}
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.update_network,
+                              context.get_admin_context(),
+                              net_data['id'], data)
+
+    def test_update_network_l3_ext_provider_no_original_prov_fails(self):
+        with self.network(name='test_no_prov') as network:
+            net_data = network['network']
+            data = {'network': {'id': net_data['id'],
+                                'provider:network_type': 'l3_ext',
+                                'provider:physical_network': 'other',
+                                'provider:segmentation_id': 666}}
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.update_network,
+                              context.get_admin_context(),
+                              net_data['id'], data)
+
+    def test_update_network_no_prov_does_not_update_bindings(self):
+        with mock.patch(
+            'vmware_nsx.db.db.delete_network_bindings') as mock_del_bindings,\
+             mock.patch(
+            'vmware_nsx.db.db.add_network_binding') as mock_add_bindings,\
+                self.network(name='test_no_prov') as network:
+            net_data = network['network']
+            data = {'network': {'id': net_data['id'],
+                                'name': 'new_name'}}
+            res = self.plugin.update_network(context.get_admin_context(),
+                                             net_data['id'], data)
+            self.assertEqual('new_name', res['name'])
+            mock_del_bindings.assert_not_called()
+            mock_add_bindings.assert_not_called()
+
+    def test_update_network_l3_ext_provider_other_original_prov_fails(self):
+        providernet_args = {pnet.NETWORK_TYPE: 'geneve'}
+        with self.network(name='test_geneve_net',
+                          providernet_args=providernet_args,
+                          arg_list=(pnet.NETWORK_TYPE, )) as network:
+            net_data = network['network']
+            data = {'network': {'id': net_data['id'],
+                                'provider:network_type': 'l3_ext',
+                                'provider:physical_network': 'other',
+                                'provider:segmentation_id': 666}}
+            self.assertRaises(n_exc.InvalidInput,
+                              self.plugin.update_network,
+                              context.get_admin_context(),
+                              net_data['id'], data)
+
 
 class NsxPTestPorts(common_v3.NsxV3TestPorts,
                     common_v3.NsxV3SubnetMixin,
