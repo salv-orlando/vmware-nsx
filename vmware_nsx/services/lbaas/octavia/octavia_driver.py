@@ -368,6 +368,15 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
                 policy_dict['id'] = obj_dict['l7policy_id']
                 self.update_policy_dict(
                     policy_dict, policy_obj, is_update=is_update)
+
+                # During create operations, the created rule will not be
+                # retrieved from Octavia DB, as it is updated later on
+                if (obj_dict['l7rule_id'] not in
+                        [r['l7rule_id'] for r in
+                         policy_dict.get('rules', [])]):
+                    # Deepcopy obj_dict to avoid circular reference while
+                    # serializing to JSON
+                    policy_dict['rules'].append(copy.deepcopy(obj_dict))
                 obj_dict['policy'] = policy_dict
 
         LOG.debug("Translated %(type)s to dictionary: %(obj)s",
