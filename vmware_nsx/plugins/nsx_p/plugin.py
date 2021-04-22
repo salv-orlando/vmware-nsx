@@ -877,6 +877,30 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             if nsx_id in NET_NSX_2_NEUTRON_ID_CACHE:
                 del NET_NSX_2_NEUTRON_ID_CACHE[nsx_id]
 
+    def _raise_if_updates_provider_attributes(self, original_net, net_data):
+        # Neutron does not support changing provider network values
+        # except for chaging provider physical network on networks whose
+        # provider network_type is l3_ext
+        try:
+            utils.raise_if_updates_provider_attributes(net_data)
+            # No provider update
+        except n_exc.InvalidInput as e:
+            # if we end here provider attributes were specified
+            original_net_type = original_net.get(pnet_apidef.NETWORK_TYPE)
+            if original_net_type == utils.NetworkTypes.L3_EXT:
+                if (not validators.is_attr_set(net_data.get(
+                    pnet_apidef.SEGMENTATION_ID)) and validators.is_attr_set(
+                    net_data.get(pnet_apidef.PHYSICAL_NETWORK))):
+                    # Ensure valid T0 router
+                    self._validate_external_net_create(
+                        net_data, None, self._tier0_validator)
+                    LOG.info("Allowing update of l3_ext provider network "
+                             "%s with physical network %s",
+                             original_net['id'],
+                             net_data.get(pnet_apidef.PHYSICAL_NETWORK))
+                    return net_data.get(pnet_apidef.PHYSICAL_NETWORK)
+            raise e
+
     def update_network(self, context, network_id, network):
         original_net = super(NsxPolicyPlugin, self).get_network(
             context, network_id)
@@ -887,21 +911,45 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                                       net_data)
         self._assert_on_resource_admin_state_down(net_data)
 
-        # Neutron does not support changing provider network values
-        utils.raise_if_updates_provider_attributes(net_data)
+        # Physical network for l3_ext can be changed
+        new_provider_phy_net = self._raise_if_updates_provider_attributes(
+            original_net, net_data)
         extern_net = self._network_is_external(context, network_id)
         is_nsx_net = self._network_is_nsx_net(context, network_id)
 
         # Update the neutron network
-        updated_net = super(NsxPolicyPlugin, self).update_network(
-            context, network_id, network)
+        with db_api.CONTEXT_WRITER.using(context):
+            updated_net = super(NsxPolicyPlugin, self).update_network(
+                context, network_id, network)
+            if new_provider_phy_net:
+                # Save provider network fields, needed by get_network()
+                curr_bindings = nsx_db.get_network_bindings(
+                    context.session, network_id)
+                if curr_bindings:
+                    nsx_db.delete_network_bindings(
+                        context.session, network_id)
+                    net_type = curr_bindings[0].binding_type
+                    vlan_id = curr_bindings[0].vlan_id
+                else:
+                    # This should never happen. However safe defaults can be
+                    # set easily
+                    LOG.warning("Bindings for provider network %s not found. "
+                                "Setting defaults", network_id)
+                    net_type = utils.NetworkTypes.L3_EXT
+                    vlan_id = 0
+
+                net_bindings = [nsx_db.add_network_binding(
+                    context.session, network_id,
+                    net_type, new_provider_phy_net, vlan_id)]
+                self._extend_network_dict_provider(context, updated_net,
+                                                bindings=net_bindings)
+
         self._extension_manager.process_update_network(context, net_data,
                                                        updated_net)
         if psec.PORTSECURITY in net_data:
             self._process_network_port_security_update(
                 context, net_data, updated_net)
         self._process_l3_update(context, updated_net, network['network'])
-        self._extend_network_dict_provider(context, updated_net)
 
         if qos_consts.QOS_POLICY_ID in net_data:
             # attach the policy to the network in neutron DB
