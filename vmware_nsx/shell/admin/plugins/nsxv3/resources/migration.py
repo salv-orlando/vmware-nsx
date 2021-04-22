@@ -1639,20 +1639,25 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
         LOG.setLevel(logging.INFO)
 
     start_migration_service = False
+    handler = logging.StreamHandler()
+
     if kwargs.get('property'):
-        # Add logfile
         properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
         logfile = properties.get('logfile', None)
         if logfile:
-            f_handler = logging.FileHandler(logfile)
-            f_formatter = logging.Formatter(
-                '%(asctime)s %(levelname)s %(message)s')
-            f_handler.setFormatter(f_formatter)
-            LOG.addHandler(f_handler)
+            handler = logging.FileHandler(logfile)
+
         start_service_flag = properties.get('start-migration-service', 'False')
         if start_service_flag.lower() == 'true':
             start_migration_service = True
 
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    handler.setFormatter(formatter)
+    LOG.addHandler(handler)
+    # Remove handler from root logger to avoid duplication
+    root_logger = logging.getLogger(None)
+    for root_handler in root_logger.handlers[:]:
+        root_logger.removeHandler(root_handler)
     nsxlib = _get_nsxlib_from_config(verbose)
     nsxpolicy = p_utils.get_connected_nsxpolicy(
         conf_path=cfg.CONF.nsx_v3, verbose=verbose)
