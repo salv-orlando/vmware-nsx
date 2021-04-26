@@ -100,7 +100,8 @@ disable=
  assignment-from-none,
  invalid-overridden-method,
  raising-format-tuple,
- comparison-with-callable
+ comparison-with-callable,
+ consider-using-with
 
 [BASIC]
 # Variable names can be 1 to 31 characters long, with lowercase and underscores
