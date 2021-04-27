@@ -51,6 +51,7 @@ from vmware_nsxlib.v3 import nsx_constants
 from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import core_resources as policy_resources
 from vmware_nsxlib.v3.policy import utils as policy_utils
+from vmware_nsxlib.v3 import security
 
 LOG = logging.getLogger(__name__)
 
@@ -1395,6 +1396,27 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
     """
     LOG.info("Starting post-migration actions")
     ctx = context.get_admin_context()
+
+    # -- Amend default security group criteria
+    mp_scope_and_tag = "%s|%s" % (security.PORT_SG_SCOPE,
+                                  v3_plugin.NSX_V3_DEFAULT_SECTION)
+    p_scope_and_tag = "%s|" % (p_plugin.NSX_P_PORT_RESOURCE_TYPE)
+    mp_condition = nsxpolicy.group.build_condition(
+        cond_val=mp_scope_and_tag,
+        cond_key=policy_constants.CONDITION_KEY_TAG,
+        cond_member_type=policy_constants.CONDITION_MEMBER_PORT)
+    p_condition = nsxpolicy.group.build_condition(
+        cond_val=p_scope_and_tag,
+        cond_key=policy_constants.CONDITION_KEY_TAG,
+        cond_member_type=policy_constants.CONDITION_MEMBER_PORT)
+    final_conditions = nsxpolicy.group.build_union_condition(
+        conditions=[mp_condition, p_condition])
+
+    nsxpolicy.group.update_with_conditions(
+        p_plugin.NSX_P_GLOBAL_DOMAIN_ID,
+        p_plugin.NSX_P_DEFAULT_GROUP,
+        conditions=final_conditions)
+    LOG.info("Match criteria for default SG group updated")
 
     # -- Update Lb tags on loadbalancer service
     pol_lb_services = nsxpolicy.load_balancer.lb_service.list()
