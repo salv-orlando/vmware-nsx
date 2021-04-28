@@ -141,6 +141,17 @@ class PrepareObjectForMigration(object):
         if 'description' in body and body['description'] is None:
             body['description'] = ''
 
+    def check_and_apply_tags(self, client, resource_type,
+                             resource_id, resource_data):
+        """Check if a resource has tags, and apply them.
+
+        The routine calls tag API once for each tag as Neutron API does not
+        support bulk addition of tags.
+        """
+        tags = resource_data.get('tags', [])
+        for tag in tags:
+            client.add_tag(resource_type, resource_id, tag)
+
     # direct_call arg means that the object is prepared for calling the plugin
     # create method directly
     def prepare_security_group_rule(self, sg_rule, direct_call=False):
