@@ -378,6 +378,8 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
 
                 # During create operations, the created rule will not be
                 # retrieved from Octavia DB, as it is updated later on
+                if policy_dict.get('rules') is None:
+                    policy_dict['rules'] = []
                 if (obj_dict['l7rule_id'] not in
                         [r['l7rule_id'] for r in
                          policy_dict.get('rules', [])]):
