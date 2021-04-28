@@ -4819,6 +4819,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         with locking.LockManager.get_lock('rule-update-%s' % sg_id):
             # Querying DB for associated dfw section id
             section_uri = self._get_section_uri(context.session, sg_id)
+            if not section_uri:
+                error = "NSX mapping for security group %s not found" % sg_id
+                raise nsx_exc.NsxPluginException(err_msg=error)
             logging = self._is_security_group_logged(context, sg_id)
             provider = self._is_provider_security_group(context, sg_id)
             log_all_rules = cfg.CONF.nsxv.log_security_groups_allowed_traffic
