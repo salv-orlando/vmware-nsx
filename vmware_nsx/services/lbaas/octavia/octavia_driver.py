@@ -33,8 +33,8 @@ from octavia_lib.api.drivers import exceptions
 
 from octavia_lib.api.drivers import provider_base as driver_base
 
+from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.octavia import constants as d_const
-
 
 LOG = logging.getLogger(__name__)
 cfg.CONF.import_group('oslo_messaging', 'octavia.common.config')
@@ -508,6 +508,10 @@ class NSXOctaviaDriver(driver_base.ProviderDriver):
     # Health Monitor
     @log_helpers.log_method_call
     def health_monitor_create(self, healthmonitor):
+        if healthmonitor.type == lb_const.LB_HEALTH_MONITOR_UDP_CONNECT:
+            raise exceptions.UnsupportedOptionError(
+                user_fault_string="UDP-CONNECT monitor is not supported")
+
         kw = {'healthmonitor': self.obj_to_dict(healthmonitor)}
         self.client.cast({}, 'healthmonitor_create', **kw)
 
