@@ -42,7 +42,7 @@ def policy_to_application_rule(policy):
     condition = ''
     rule_lines = []
     for rule in policy['rules']:
-        if rule['provisioning_status'] == constants.PENDING_DELETE:
+        if rule.get('provisioning_status') == constants.PENDING_DELETE:
             # skip this rule as it is being deleted
             continue
 
