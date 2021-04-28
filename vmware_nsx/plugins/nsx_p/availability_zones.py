@@ -55,6 +55,12 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
         # NOTE(annak): we may need to generalize this for API calls
         # requiring path ids
         name_or_id = getattr(self, config_name)
+        err_msg = (_("Could not find %(res)s %(id)s for availability "
+                     "zone %(az)s") % {
+                'res': config_name,
+                'id': name_or_id,
+                'az': self.name})
+
         if not name_or_id:
             if auto_config:
                 # If the field not specified, the system will auto-configure
@@ -76,9 +82,23 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
                 raise nsx_exc.NsxPluginException(err_msg=msg)
             return None
 
+        # If filtering was specified, we need to ensure the configured
+        # resource matches the filter
+        def verify_resource_matches_filter(result):
+            if filter_list_results:
+                exists = filter_list_results([result])
+                if not exists:
+                    LOG.error("Resource %s doesn't match config "
+                              "requirement for %s" % (name_or_id, config_name))
+                    if self.is_default():
+                        raise cfg.RequiredOptError(config_name,
+                                                   group=cfg.OptGroup('nsx_p'))
+                    raise nsx_exc.NsxPluginException(err_msg=err_msg)
         try:
             # Check if the configured value is the ID
-            resource_api.get(name_or_id, silent=True)
+            resource = resource_api.get(name_or_id, silent=True)
+            verify_resource_matches_filter(resource)
+
             return name_or_id
         except nsx_lib_exc.ResourceNotFound:
             # Search by tags
@@ -94,18 +114,14 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
             # Check if the configured value is the name
             resource = resource_api.get_by_name(name_or_id)
             if resource:
+                verify_resource_matches_filter(resource)
                 return resource['id']
 
             # Resource not found
             if self.is_default():
                 raise cfg.RequiredOptError(config_name,
                                            group=cfg.OptGroup('nsx_p'))
-            msg = (_("Could not find %(res)s %(id)s for availability "
-                     "zone %(az)s") % {
-                'res': config_name,
-                'id': name_or_id,
-                'az': self.name})
-            raise nsx_exc.NsxPluginException(err_msg=msg)
+            raise nsx_exc.NsxPluginException(err_msg=err_msg)
 
     def translate_configured_names_to_uuids(self, nsxpolicy, nsxlib=None,
                                             search_scope=None):
@@ -237,11 +253,12 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
         if self.use_policy_dhcp:
             dhcp_ec_path = nsxpolicy.dhcp_server_config.get(
                 self._policy_dhcp_server_config).get('edge_cluster_path')
-            dhcp_ec = p_utils.path_to_id(dhcp_ec_path)
-            if dhcp_ec != tier0_ec_uuid:
-                self._validate_tz(nsxpolicy, nsxlib, 'DHCP server config',
-                                  self._policy_dhcp_server_config,
-                                  dhcp_ec)
+            if dhcp_ec_path:
+                dhcp_ec = p_utils.path_to_id(dhcp_ec_path)
+                if dhcp_ec != tier0_ec_uuid:
+                    self._validate_tz(nsxpolicy, nsxlib, 'DHCP server config',
+                                      self._policy_dhcp_server_config,
+                                      dhcp_ec)
         elif self._native_dhcp_profile_uuid:
             dhcp_ec = nsxlib.native_dhcp_profile.get(
                 self._native_dhcp_profile_uuid).get('edge_cluster_id')
