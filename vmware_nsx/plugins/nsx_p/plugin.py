@@ -325,34 +325,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 LOG.error(msg)
                 raise nsx_exc.NsxPluginException(err_msg=msg)
 
-    def _init_backend_resource(self, resource_api, name_or_id,
-                               search_scope=None):
-        resource_type = resource_api.entry_def.resource_type()
-        if not name_or_id:
-            return None
-        try:
-            # Check if the configured value is the ID
-            resource_api.get(name_or_id, silent=True)
-            return name_or_id
-        except nsx_lib_exc.ResourceNotFound:
-            # Search by tags
-            if search_scope:
-                resource_id = self.nsxpolicy.get_id_by_resource_and_tag(
-                    resource_type,
-                    search_scope,
-                    name_or_id)
-                if resource_id:
-                    return resource_id
-
-            # Check if the configured value is the name
-            resource = resource_api.get_by_name(name_or_id)
-            if resource:
-                return resource['id']
-
-        msg = (_("Could not find %(type)s %(id)s") % {
-            'type': resource_type, 'id': name_or_id})
-        raise nsx_exc.NsxPluginException(err_msg=msg)
-
     def get_waf_profile_path_and_mode(self):
         # WAF is currently not supported by the NSX
         return None, None
