@@ -125,6 +125,7 @@ class Vcns(object):
         self._normalized_global_objects = None
 
     @retry_upon_exception(exceptions.ServiceConflict)
+    @retry_upon_exception(exceptions.ResourceConnectionError)
     def _client_request(self, client, method, uri,
                         params, headers, encodeParams, timeout=None):
         return client(method, uri, params, headers, encodeParams,
