@@ -80,3 +80,7 @@ class ServiceConflict(VcnsApiException):
 
 class AlreadyExists(VcnsApiException):
     message = _("Resource %(resource)s already exists")
+
+
+class ResourceConnectionError(VcnsApiException):
+    message = _("Resource %(uri)s connection error")
