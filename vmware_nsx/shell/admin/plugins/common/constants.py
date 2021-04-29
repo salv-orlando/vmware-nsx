@@ -37,6 +37,7 @@ CONFIG = 'config'
 ORPHANED_NETWORKS = 'orphaned-networks'
 ORPHANED_ROUTERS = 'orphaned-routers'
 SYSTEM = 'system'
+LOADBALANCERS = 'loadbalancers'
 
 # NSXV3 only Resource Constants
 PORTS = 'ports'
