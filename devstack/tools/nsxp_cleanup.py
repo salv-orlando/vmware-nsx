@@ -14,15 +14,14 @@
 #    under the License.
 
 import optparse
-
-import sqlalchemy as sa
+import sys
 
 from neutron.db.models import l3
 from neutron.db.models import securitygroup
 from neutron.db.models import segment  # noqa
 from neutron.db import models_v2
 from neutron.db.qos import models as qos_models
-
+import sqlalchemy as sa
 from vmware_nsx.db import nsx_models
 from vmware_nsxlib import v3
 from vmware_nsxlib.v3 import config
@@ -590,8 +589,13 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     # Get NSX REST client
-    nsx_client = NSXClient(options.policy_ip, options.username,
-                           options.password, options.db_connection,
-                           options.allow_passthrough)
-    # Clean all objects created by OpenStack
-    nsx_client.cleanup_all()
+    try:
+        nsx_client = NSXClient(options.policy_ip, options.username,
+                            options.password, options.db_connection,
+                            options.allow_passthrough)
+        # Clean all objects created by OpenStack
+        nsx_client.cleanup_all()
+    except Exception as e:
+        print("Unable to cleanup NSX-T Policy resources due to: %s."
+              "Please retry." % e)
+        sys.exit(1)
