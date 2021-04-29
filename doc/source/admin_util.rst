@@ -351,6 +351,13 @@ Config
 
     nsxadmin -r config -o validate
 
+Loadbalancers
+~~~~~~~~~~~~~
+
+- Set an Octavia loadbalancer id to ERROR status. Useful while the loadbalancer hangs in PENDING status::
+
+    nsxadmin -r loadbalancers -o set-status-error --property loadbalancer-id=<loadbalancer id>
+
 NSX-T Plugin
 ------------
 
@@ -640,6 +647,13 @@ T2P migration
 
     nsxadmin -r nsx-migrate-t2p -o clean-all
 
+Loadbalancers
+~~~~~~~~~~~~~
+
+- Set an Octavia loadbalancer id to ERROR status. Useful while the loadbalancer hangs in PENDING status::
+
+    nsxadmin -r loadbalancers -o set-status-error --property loadbalancer-id=<loadbalancer id>
+
 NSXtvd Plugin
 -------------
 
@@ -705,6 +719,10 @@ NSX Policy Plugin
 - Validate external subnets cidrs before V2T migration::
 
     nsxadmin -r nsx-migrate-v2t -o validate --property ext-net=<path> --property ext-cidr=<path>
+
+- Set an Octavia loadbalancer id to ERROR status. Useful while the loadbalancer hangs in PENDING status::
+
+    nsxadmin -r loadbalancers -o set-status-error --property loadbalancer-id=<loadbalancer id>
 
 Client Certificate
 ~~~~~~~~~~~~~~~~~~

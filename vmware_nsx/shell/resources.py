@@ -78,6 +78,7 @@ class Operations(enum.Enum):
     REUSE = 'reuse'
     UPDATE_TIER0 = 'update-tier0'
     UPDATE_FIREWALL_MATCH = 'update-nat-firewall-match'
+    SET_STATUS_ERROR = 'set-status-error'
 
 
 ops = [op.value for op in Operations]
@@ -166,6 +167,8 @@ nsxv3_resources = {
                                         [Operations.IMPORT.value,
                                          Operations.CLEAN_ALL.value,
                                          Operations.VALIDATE.value]),
+    constants.LOADBALANCERS: Resource(constants.LOADBALANCERS,
+                                      [Operations.SET_STATUS_ERROR.value]),
 }
 
 # Add supported NSX-V resources in this dictionary
@@ -262,6 +265,8 @@ nsxv_resources = {
                                         [Operations.VALIDATE.value]),
     constants.PORTS: Resource(constants.PORTS,
                               [Operations.LIST.value]),
+    constants.LOADBALANCERS: Resource(constants.LOADBALANCERS,
+                                      [Operations.SET_STATUS_ERROR.value]),
 }
 
 
@@ -300,6 +305,8 @@ nsxp_resources = {
                                         [Operations.CLEAN_ALL.value,
                                          Operations.VALIDATE.value,
                                          Operations.NSX_REDISTRIBUTE.value]),
+    constants.LOADBALANCERS: Resource(constants.LOADBALANCERS,
+                                      [Operations.SET_STATUS_ERROR.value]),
 }
 
 nsxv3_resources_names = list(nsxv3_resources.keys())
