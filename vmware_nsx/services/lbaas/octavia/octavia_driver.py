@@ -44,7 +44,7 @@ RPC_SERVER = None
 
 
 def _log_before_retry(retry_state):
-    if retry_state.attempt_number > 0:
+    if retry_state.attempt_number > 1:
         LOG.warning("Retrying the call to _update_loadbalancer_status due to "
                     "timeout")
 
@@ -704,7 +704,7 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
         retry=tenacity.retry_if_exception_type(
             exceptions.UpdateStatusError))
     def _update_loadbalancer_status(self, status):
-        super(NSXOctaviaDriverEndpoint,
+        return super(NSXOctaviaDriverEndpoint,
               self).update_loadbalancer_status(status)
 
     @log_helpers.log_method_call
