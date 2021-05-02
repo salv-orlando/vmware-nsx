@@ -145,7 +145,18 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
         cert_obj = self.vcns.upload_edge_certificate(edge_id, request)[1]
         cert_list = cert_obj.get('certificates', {})
         if cert_list:
-            edge_cert_id = cert_list[0]['objectId']
+            if len(cert_list) > 1:
+                LOG.warning(
+                    'Certificate object contains multiple certificates. '
+                    'Using first signed certificate of the bundle')
+            edge_cert_id = None
+            for cert in cert_list:
+                if cert['certificateType'] == 'certificate_signed':
+                    edge_cert_id = cert['objectId']
+                    break
+            if not edge_cert_id:
+                error = _("No signed certificate found in certificate bundle")
+                raise nsxv_exc.NsxPluginException(err_msg=error)
         else:
             error = _("Failed to upload a certificate to edge %s") % edge_id
             raise nsxv_exc.NsxPluginException(err_msg=error)
