@@ -12,7 +12,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
+import copy
 import socket
 import time
 
@@ -334,10 +334,18 @@ class NSXOctaviaListenerEndpoint(object):
                 listener['loadbalancer'] = loadbalancer
                 listener_dict[listener['id']] = listener
                 for policy in listener.get('l7policies', []):
+                    dummy_policy = copy.deepcopy(policy)
+                    policy['listener'] = listener
                     for rule in policy.get('rules', []):
+                        if not rule.get('policy'):
+                            rule['policy'] = dummy_policy
                         LOG.info("Delete cascade: deleting l7 rule of lb %s",
                                  loadbalancer['id'])
                         self.l7rule.delete_cascade(ctx, rule, dummy_completor)
+                        for r in dummy_policy['rules']:
+                            if r['l7rule_id'] == rule['l7rule_id']:
+                                dummy_policy['rules'].remove(r)
+                                break
                     LOG.info("Delete cascade: deleting l7 policy of lb %s",
                              loadbalancer['id'])
                     self.l7policy.delete_cascade(ctx, policy, dummy_completor)
