@@ -1182,7 +1182,7 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                         'fixed_ips': []}
                     }
             port = self.plugin.create_port(self.ctx, data)
-            data['port']['fixed_ips'] = '10.0.0.1'
+            data['port']['fixed_ips'] = [{'ip_address': '10.0.0.1'}]
             self.assertRaises(
                 n_exc.InvalidInput,
                 self.plugin.update_port, self.ctx, port['id'], data)
@@ -1629,35 +1629,6 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
             # making sure the port creation succeeded anyway
             created_port = self.plugin.create_port(self.ctx, data)
             self.assertEqual('fake_device', created_port['device_id'])
-
-    def test_update_port_add_additional_ip(self):
-        """Test update of port with additional IP fails."""
-        with self.subnet() as subnet:
-            with self.port(subnet=subnet) as port:
-                data = {'port': {'admin_state_up': False,
-                                 'fixed_ips': [{'subnet_id':
-                                                subnet['subnet']['id']},
-                                               {'subnet_id':
-                                                subnet['subnet']['id']}]}}
-                req = self.new_update_request('ports', data,
-                                              port['port']['id'])
-                res = req.get_response(self.api)
-                self.assertEqual(exc.HTTPBadRequest.code,
-                                 res.status_int)
-
-    def test_create_port_additional_ip(self):
-        """Test that creation of port with additional IP fails."""
-        with self.subnet() as subnet:
-            data = {'port': {'network_id': subnet['subnet']['network_id'],
-                             'tenant_id': subnet['subnet']['tenant_id'],
-                             'fixed_ips': [{'subnet_id':
-                                            subnet['subnet']['id']},
-                                           {'subnet_id':
-                                            subnet['subnet']['id']}]}}
-            port_req = self.new_create_request('ports', data)
-            res = port_req.get_response(self.api)
-            self.assertEqual(exc.HTTPBadRequest.code,
-                             res.status_int)
 
     def test_create_port_with_switching_profiles(self):
         """Tests that nsx ports get the configures switching profiles"""
