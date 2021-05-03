@@ -627,30 +627,88 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if not validators.is_attr_set(fixed_ip_list):
             return
 
-        msg = _('Exceeded maximum amount of fixed ips per port and ip version')
-        if len(fixed_ip_list) > 2:
-            raise n_exc.InvalidInput(error_message=msg)
-
-        if len(fixed_ip_list) < 2:
+        # Do not perform additional checks in the trivial case where there is a
+        # single fixed IP
+        if len(fixed_ip_list) <= 1:
             return
 
-        def get_fixed_ip_version(i):
-            if 'ip_address' in fixed_ip_list[i]:
-                return netaddr.IPAddress(
-                    fixed_ip_list[i]['ip_address']).version
-            if 'subnet_id' in fixed_ip_list[i]:
-                subnet = self.get_subnet(context.elevated(),
-                                         fixed_ip_list[i]['subnet_id'])
-                return subnet['ip_version']
-            return None
+        # Validation needed
+        err_msg = _("Exceeded maximum amount of fixed IPs "
+                    "per port and IP version")
+        ip1_err_msg = ("Subnet %s is IPv6 or has DHCP enabled. IP %s "
+                       "already allocated for this port. Cannot allocate %s")
+        ip2_err_msg = ("Subnet %s is IPv6 or has DHCP enabled. Can only "
+                       "allocate a single IP per subnet. Requested %d")
 
-        ipver1 = get_fixed_ip_version(0)
-        ipver2 = get_fixed_ip_version(1)
-        if ipver1 and ipver2 and ipver1 != ipver2:
-            # One fixed IP is allowed for each IP version
-            return
+        # Build a map of fixed IPs per subnet id
+        subnet_fixed_ip_dict = {}
+        fixed_ips_no_subnet = []
+        for item in fixed_ip_list:
+            if item.get('subnet_id'):
+                subnet_id = item['subnet_id']
+                subnet_fixed_ips = subnet_fixed_ip_dict.setdefault(
+                    subnet_id, [])
+                subnet_fixed_ips.append(item.get('ip_address', 'UNSPECIFIED'))
+            else:
+                # Log something so we know we know this entry will be
+                # processed differently
+                LOG.debug("Fixed IP entry %s has no subnet ID", item)
+                if item.get('ip_address'):
+                    fixed_ips_no_subnet.append(item['ip_address'])
+        if len(subnet_fixed_ip_dict) > 2:
+            raise n_exc.InvalidInput(error_message=err_msg)
 
-        raise n_exc.InvalidInput(error_message=msg)
+        # This works as a cache, fetch from DB only the subnets we need
+        # and reuse them -> optimize DB access
+        subnet_map = {}
+
+        def infer_fixed_ip_version(subnet_id, fixed_ips):
+            # Infer from IPs
+            for ip_address in fixed_ips:
+                if ip_address != 'UNSPECIFIED':
+                    return (subnet_id,
+                            netaddr.IPAddress(ip_address).version)
+            # Infer from subnet
+            subnet = subnet_map.setdefault(
+                subnet_id, self.get_subnet(context.elevated(), subnet_id))
+            return (subnet_id, subnet['ip_version'])
+
+        # If we are here we have at most 2 subnets, and must have different IP
+        # version
+        ip_versions = [infer_fixed_ip_version(subnet_id, fixed_ips) for
+                       (subnet_id, fixed_ips) in subnet_fixed_ip_dict.items()]
+
+        for item in zip(ip_versions, ip_versions):
+            if item[0][0] != item[1][0] and item[0][1] == item[1][1]:
+                # Not good! Different subnet but same IP version
+                # One fixed IP is allowed for each IP version
+                raise n_exc.InvalidInput(error_message=err_msg)
+
+        def validate_subnet_dhcp_and_ipv6_state(subnet_id, fixed_ips):
+            subnet = subnet_map.setdefault(
+                subnet_id, self.get_subnet(context.elevated(), subnet_id))
+            if ((subnet['enable_dhcp'] or subnet.get('ip_version') == 6) and
+                len(fixed_ips) > 1):
+                raise n_exc.InvalidInput(
+                    error_message=ip2_err_msg %
+                    (subnet_id, len(fixed_ips)))
+            if ((subnet['enable_dhcp'] or subnet.get('ip_version') == 6) and
+                fixed_ips):
+                cidr = netaddr.IPNetwork(subnet['cidr'])
+                for ip in fixed_ips_no_subnet:
+                    # netaddr converts string IP into IPAddress
+                    if ip in cidr:
+                        raise n_exc.InvalidInput(
+                            error_message=ip1_err_msg %
+                            (subnet_id, ",".join(fixed_ips), ip))
+
+        # Validate if any "unbound" IP would fall on a subnet which has DHCP
+        # enabled and other IPs. Also ensure no more than one IP for any
+        # DHCP subnet is requested. fixed_ip attribute does not have patch
+        # behaviour, so all requested IP allocations must be included in it
+
+        for subnet_id, fixed_ips in subnet_fixed_ip_dict.items():
+            validate_subnet_dhcp_and_ipv6_state(subnet_id, fixed_ips)
 
     def _get_subnets_for_fixed_ips_on_port(self, context, port_data):
         # get the subnet id from the fixed ips of the port
@@ -1696,16 +1754,20 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 LOG.error("Unable to delete DHCP server mapping for "
                           "network %s", network_id)
 
-    def _filter_ipv4_dhcp_fixed_ips(self, context, fixed_ips):
+    def _filter_dhcp_fixed_ips(self, context, fixed_ips, version=None):
         ips = []
         for fixed_ip in fixed_ips:
-            if netaddr.IPNetwork(fixed_ip['ip_address']).version != 4:
+            if (version and
+                netaddr.IPNetwork(fixed_ip['ip_address']).version != version):
                 continue
             with db_api.CONTEXT_READER.using(context):
                 subnet = self.get_subnet(context, fixed_ip['subnet_id'])
             if subnet['enable_dhcp']:
                 ips.append(fixed_ip)
         return ips
+
+    def _filter_ipv4_dhcp_fixed_ips(self, context, fixed_ips):
+        return self._filter_dhcp_fixed_ips(context, fixed_ips, 4)
 
     def _add_port_mp_dhcp_binding(self, context, port):
         if not utils.is_port_dhcp_configurable(port):
