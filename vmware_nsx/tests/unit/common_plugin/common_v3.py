@@ -17,9 +17,12 @@ import contextlib
 
 import decorator
 
+
 from neutron.tests.unit.db import test_db_base_plugin_v2 as test_plugin
 
+import netaddr
 from neutron_lib import constants
+from webob import exc
 
 
 class FixExternalNetBaseTest(object):
@@ -400,8 +403,75 @@ class NsxV3TestPorts(test_plugin.TestPortsV2):
     def test_create_port_anticipating_allocation(self):
         self.skipTest('Multiple fixed ips on a port are not supported')
 
+    def test_create_port_additional_ip(self):
+        """Test that creation of port with additional IP fails."""
+        with self.subnet() as subnet:
+            data = {'port': {'network_id': subnet['subnet']['network_id'],
+                             'tenant_id': subnet['subnet']['tenant_id'],
+                             'fixed_ips': [{'subnet_id':
+                                            subnet['subnet']['id']},
+                                           {'subnet_id':
+                                            subnet['subnet']['id']}]}}
+            port_req = self.new_create_request('ports', data)
+            res = port_req.get_response(self.api)
+            self.assertEqual(exc.HTTPBadRequest.code,
+                             res.status_int)
+
+    def test_create_port_additional_ip_no_dhcp(self):
+        """Creation of port with additional IP succeeds with DHCP off."""
+        with self.subnet(enable_dhcp=False) as subnet:
+            data = {'port': {'network_id': subnet['subnet']['network_id'],
+                             'tenant_id': subnet['subnet']['tenant_id'],
+                             'fixed_ips': [{'subnet_id':
+                                            subnet['subnet']['id']},
+                                           {'subnet_id':
+                                            subnet['subnet']['id']}]}}
+            port_req = self.new_create_request('ports', data)
+            res = port_req.get_response(self.api)
+            port = self.deserialize(self.fmt, res)
+            ips = port['port']['fixed_ips']
+            self.assertEqual(2, len(ips))
+            self.assertNotEqual(ips[0]['ip_address'],
+                                ips[1]['ip_address'])
+            network_ip_net = netaddr.IPNetwork(subnet['subnet']['cidr'])
+            self.assertIn(ips[0]['ip_address'], network_ip_net)
+            self.assertIn(ips[1]['ip_address'], network_ip_net)
+
     def test_update_port_add_additional_ip(self):
-        self.skipTest('Multiple fixed ips on a port are not supported')
+        """Test update of port with additional IP fails."""
+        with self.subnet() as subnet:
+            with self.port(subnet=subnet) as port:
+                data = {'port': {'admin_state_up': False,
+                                 'fixed_ips': [{'subnet_id':
+                                                subnet['subnet']['id']},
+                                               {'subnet_id':
+                                                subnet['subnet']['id']}]}}
+                req = self.new_update_request('ports', data,
+                                              port['port']['id'])
+                res = req.get_response(self.api)
+                self.assertEqual(exc.HTTPBadRequest.code,
+                                 res.status_int)
+
+    def test_update_port_add_additional_ip_no_dhcp(self):
+        """Test update of port with additional IP succeeds if DHCP is off."""
+        with self.subnet(enable_dhcp=False) as subnet:
+            with self.port(subnet=subnet) as port:
+                data = {'port': {'admin_state_up': False,
+                                 'fixed_ips': [{'subnet_id':
+                                                subnet['subnet']['id']},
+                                               {'subnet_id':
+                                                subnet['subnet']['id']}]}}
+                req = self.new_update_request('ports', data,
+                                              port['port']['id'])
+                res = req.get_response(self.api)
+                port = self.deserialize(self.fmt, res)
+                ips = port['port']['fixed_ips']
+                self.assertEqual(2, len(ips))
+                self.assertNotEqual(ips[0]['ip_address'],
+                                    ips[1]['ip_address'])
+                network_ip_net = netaddr.IPNetwork(subnet['subnet']['cidr'])
+                self.assertIn(ips[0]['ip_address'], network_ip_net)
+                self.assertIn(ips[1]['ip_address'], network_ip_net)
 
     def test_delete_network_port_exists_owned_by_network_race(self):
         self.skipTest('Skip need to address in future')
