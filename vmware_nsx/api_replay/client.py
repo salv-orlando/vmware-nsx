@@ -413,6 +413,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     self.add_error("Failed to create security group (%(sg)s): "
                                    "%(e)s" % {'sg': sg, 'e': e})
+                    # Don't bother going to rules
+                    continue
 
                 # Use bulk rules creation for the rules of the SG
                 if not sg_rules:
