@@ -1032,8 +1032,7 @@ class EdgeManager(object):
             # Set gateway for static binding
             static_config['defaultGateway'] = subnet['gateway_ip']
             # set primary and secondary dns
-            name_servers = [dns['address']
-                            for dns in subnet['dns_nameservers']]
+            name_servers = subnet['dns_nameservers']
             # if no nameservers have been configured then use the ones
             # defined in the configuration
             name_servers = name_servers or cfg.CONF.nsxv.nameservers
