@@ -1,0 +1,16 @@
+---
+prelude: >
+    With NSXV plugin, deleting a router interface of a tenant subnet, which has
+    multiple routers attached, with use_routers_as_lbaas_platform enabled, in
+    the configuration may result with an error.
+issues:
+  - |
+    The configuration flag use_routers_as_lbaas_platform enables reuse NSXV
+    edge appliances which are allocated to routers, for load balancing.
+    When this flag is enabled, and a loadbalancer is created on a tenant
+    network which has multiple attached routers, an error may occur while
+    deleting a router interface on the subnet. This could happen even though
+    the loadbalancer is hosted on a different router than the one which is used
+    by the loadbalancer.
+    To work around this, the loadbalancer should be removed prior to the
+    deletion of the router interface.
