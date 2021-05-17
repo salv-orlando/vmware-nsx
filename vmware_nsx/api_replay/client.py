@@ -355,6 +355,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     body = self.prepare_qos_policy(pol)
                     new_pol = self.dest_neutron.create_qos_policy(
                         body={'policy': body})
+                    self.check_and_apply_tags(
+                        self.dest_neutron, 'qos/policies',
+                        pol['id'], pol)
                 except Exception as e:
                     self.add_error("Failed to create QoS policy %(pol)s: "
                                    "%(e)s" % {'pol': pol['id'], 'e': e})
@@ -406,6 +409,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     body = self.prepare_security_group(sg)
                     new_sg = self.dest_neutron.create_security_group(
                         {'security_group': body})
+                    self.check_and_apply_tags(
+                        self.dest_neutron, 'security-groups',
+                        sg['id'], sg)
                     LOG.info("Created security-group %(count)s/%(total)s: "
                              "%(sg)s",
                              {'count': count, 'total': total_num,
@@ -511,6 +517,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 try:
                     new_router = (self.dest_neutron.create_router(
                         {'router': body}))
+                    self.check_and_apply_tags(
+                        self.dest_neutron, 'routers',
+                        router['id'], router)
                     LOG.info("created router %(count)s/%(total)s: %(rtr)s",
                              {'count': count, 'total': total_num,
                               'rtr': new_router})
@@ -638,6 +647,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             try:
                 created_net = self.dest_neutron.create_network(
                     {'network': body})['network']
+                self.check_and_apply_tags(
+                    self.dest_neutron, 'networks', network['id'], network)
+
                 LOG.info("Created network %(count)s/%(total)s: %(net)s",
                          {'count': count, 'total': total_num,
                           'net': created_net})
@@ -695,6 +707,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 try:
                     created_subnet = self.dest_neutron.create_subnet(
                         {'subnet': body})['subnet']
+                    self.check_and_apply_tags(
+                        self.dest_neutron, 'subnets',
+                        subnet['id'], subnet)
                     LOG.info("Created subnet: %s", created_subnet['id'])
                     subnets_map[subnet_id] = created_subnet['id']
                     if enable_dhcp:
@@ -775,6 +790,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                             del body['device_id']
                             created_port = self.dest_neutron.create_port(
                                 {'port': body})['port']
+                            self.check_and_apply_tags(
+                                self.dest_neutron, 'ports',
+                                port['id'], port)
                             LOG.info("Created interface port %(port)s (subnet "
                                      "%(subnet)s, ip %(ip)s, mac %(mac)s)",
                                      {'port': created_port['id'],
@@ -802,6 +820,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     try:
                         created_port = self.dest_neutron.create_port(
                             {'port': body})['port']
+                        self.check_and_apply_tags(
+                            self.dest_neutron, 'ports',
+                            port['id'], port)
                     except Exception as e:
                         # NOTE(arosen): this occurs here if you run the
                         # script multiple times as we don't track this.
@@ -845,6 +866,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             body = self.prepare_floatingip(source_fip)
             try:
                 fip = self.dest_neutron.create_floatingip({'floatingip': body})
+                self.check_and_apply_tags(
+                    self.dest_neutron, 'floatingips',
+                    source_fip['id'], source_fip)
                 LOG.info("Created floatingip %(count)s/%(total)s : %(fip)s",
                          {'count': count, 'total': total_num, 'fip': fip})
             except Exception as e:
