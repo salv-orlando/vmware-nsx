@@ -508,6 +508,17 @@ def _validate_l2gw(admin_context):
                       "supported." % (len(l2gws), [l2gw.id for l2gw in l2gws]))
 
 
+def _ensure_ca_file():
+    # Ensure CA file is used if /etc/ssl/certs/vcenter.pem exists
+    # otherwise secure connection to vcenter will fail
+    if not cfg.CONF.dvs.ca_file:
+        ca_file_default = "/etc/ssl/certs/vcenter.pem"
+        if os.path.isfile(ca_file_default):
+            LOG.info("ca_file for vCenter unset, defaulting to: %s",
+                     ca_file_default)
+            cfg.CONF.set_override('ca_file', ca_file_default, 'dvs')
+
+
 def _validate_config():
     # General config options / per AZ which are unsupported
     config.register_nsxv_azs(cfg.CONF, cfg.CONF.nsxv.availability_zones)
@@ -536,15 +547,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
             transit_networks = [transit_network]
         strict = bool(properties.get('strict', 'false').lower() == 'true')
         out_file = properties.get('summary-file-name')
-
-    # Ensure ca_file in DVS section is always set otherwise secure connection
-    # to vcenter will fail
-    if not cfg.CONF.dvs.ca_file:
-        ca_file_default = "/etc/ssl/certs/vcenter.pem"
-        if os.path.isfile(ca_file_default):
-            LOG.info("ca_file for vCenter unset, defaulting to: %s",
-                     ca_file_default)
-            cfg.CONF.set_override('ca_file', ca_file_default, 'dvs')
+    _ensure_ca_file()
     LOG.info("Running migration config validation in %sstrict mode",
              '' if strict else 'non-')
 
@@ -560,6 +563,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
     admin_context = n_context.get_admin_context()
 
     _validate_config()
+    _ensure_ca_file()
 
     try:
         with utils.NsxVPluginWrapper() as plugin:
@@ -632,6 +636,7 @@ def list_ports_vif_ids(resource, event, trigger, **kwargs):
     admin_context = n_context.get_admin_context()
     table_results = []
     map_results = {}
+    _ensure_ca_file()
 
     with utils.NsxVPluginWrapper() as plugin:
         neutron_ports = plugin.get_ports(admin_context)
