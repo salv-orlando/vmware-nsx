@@ -78,6 +78,7 @@ class Operations(enum.Enum):
     UPDATE_TIER0 = 'update-tier0'
     UPDATE_FIREWALL_MATCH = 'update-nat-firewall-match'
     SET_STATUS_ERROR = 'set-status-error'
+    CHECK_COMPUTE_CLUSTERS = 'check-compute-clusters'
 
 
 ops = [op.value for op in Operations]
@@ -246,7 +247,8 @@ nsxv_resources = {
                                        [Operations.NSX_LIST.value,
                                         Operations.NSX_CLEAN.value]),
     constants.CONFIG: Resource(constants.CONFIG,
-                               [Operations.VALIDATE.value]),
+                               [Operations.VALIDATE.value,
+                                Operations.CHECK_COMPUTE_CLUSTERS.value]),
     constants.BGP_GW_EDGE: Resource(constants.BGP_GW_EDGE,
                                     [Operations.CREATE.value,
                                      Operations.DELETE.value,
