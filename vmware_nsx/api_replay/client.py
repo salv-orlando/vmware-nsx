@@ -393,6 +393,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                             body = self.prepare_security_group_rule(sg_rule)
                             self.dest_neutron.create_security_group_rule(
                                 {'security_group_rule': body})
+                            LOG.info("Created security group rule for SG "
+                                     "%s: %s", sg.get('id'), sg_rule.get('id'))
                         except n_exc.Conflict:
                             # NOTE(arosen): when you create a default
                             # security group it is automatically populated
@@ -452,8 +454,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             try:
                 rules = self.dest_neutron.create_security_group_rule(
                     {'security_group_rules': rules_dict[sg_id]})
-                LOG.debug("created %s security group rules for SG %s",
-                          len(rules), sg_id)
+                LOG.info("Created %d security group rules for SG %s: %s",
+                         len(rules), sg_id,
+                         ",".join([rule.get('id') for rule in rules]))
             except Exception as e:
                 self.add_error("Failed to create security group %s "
                                "rules: %s" % (sg_id, e))
@@ -538,9 +541,10 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             try:
                 self.dest_neutron.update_router(router_id,
                     {'router': {'routes': routes}})
-                LOG.info("Added routes to router %(rtr)s %(count)s/%(total)s:",
+                LOG.info("Added routes to router %(rtr)s "
+                         "%(count)s/%(total)s: %(routes)s",
                          {'count': count, 'total': total_num,
-                          'rtr': router_id})
+                          'rtr': router_id, 'routes': routes})
             except Exception as e:
                 self.add_error("Failed to add routes %(routes)s to router "
                                "%(rtr)s: %(e)s" %
