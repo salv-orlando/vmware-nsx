@@ -12,10 +12,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import sys
+
 from neutron_lib.callbacks import registry
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_vmware import vim_util
 
+from vmware_nsx.dvs import dvs
 from vmware_nsx.plugins.nsx_v.vshield.common import exceptions
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
@@ -39,6 +43,37 @@ def validate_configuration(resource, event, trigger, **kwargs):
         LOG.info("Configuration validation succeeded")
 
 
+def check_clusters(resource, event, trigger, **kwargs):
+    clusters_str = ""
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        clusters_str = properties.get('clusters', None)
+
+    if not clusters_str:
+        LOG.error("No cluster to look for was specified")
+        return
+
+    clusters = clusters_str.split(",")
+    mgr = dvs.VCManagerBase()
+    session = mgr.get_vc_session()
+    data = session.invoke_api(vim_util, 'get_objects', session.vim,
+                              'ClusterComputeResource', 100)
+    while data:
+        for item in data.objects:
+            if item.obj.value in clusters[:]:
+                clusters.remove(item.obj.value)
+        data = vim_util.continue_retrieval(session.vim, data)
+    if not clusters:
+        LOG.info("Clusters %s found on VC backend", clusters_str)
+    else:
+        LOG.error("Clusters %s not found on VC backend", ",".join(clusters))
+        sys.exit(1)
+
+
 registry.subscribe(validate_configuration,
                    constants.CONFIG,
                    shell.Operations.VALIDATE.value)
+
+registry.subscribe(check_clusters,
+                   constants.CONFIG,
+                   shell.Operations.CHECK_COMPUTE_CLUSTERS.value)
