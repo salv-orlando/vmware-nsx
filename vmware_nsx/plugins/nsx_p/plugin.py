@@ -2241,6 +2241,15 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     l3_port_check=True, l2gw_port_check=True,
                     force_delete_dhcp=False,
                     force_delete_vpn=False):
+
+        if not force_delete_dhcp:
+            # Send delete port notification to any interested service plugin
+            # DHCP ports should not have DNS entries
+            registry.publish(resources.PORT, events.BEFORE_DELETE, self,
+                             payload=events.DBEventPayload(
+                                 context, resource_id=port_id,
+                                 metadata={'port_check': l3_port_check}))
+
         # first update neutron (this will perform all types of validations)
         port_data = self.get_port(context, port_id)
         net_id = port_data['network_id']
