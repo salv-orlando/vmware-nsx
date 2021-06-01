@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 import time
 import xml.etree.ElementTree as et
 
@@ -58,10 +59,21 @@ class NeutronDbClient(object):
 
 class NsxVPluginWrapper(plugin.NsxVPlugin):
 
+    def _ensure_ca_file(self):
+        # Ensure CA file is used if /etc/ssl/certs/vcenter.pem exists
+        # otherwise secure connection to vcenter will fail
+        if not cfg.CONF.dvs.ca_file:
+            ca_file_default = "/etc/ssl/certs/vcenter.pem"
+            if os.path.isfile(ca_file_default):
+                LOG.info("ca_file for vCenter unset, defaulting to: %s",
+                        ca_file_default)
+                cfg.CONF.set_override('ca_file', ca_file_default, 'dvs')
+
     def __init__(self):
         config.register_nsxv_azs(cfg.CONF, cfg.CONF.nsxv.availability_zones)
         self.context = neutron_context.get_admin_context()
         self.filters = get_plugin_filters(self.context)
+        self._ensure_ca_file()
         super(NsxVPluginWrapper, self).__init__()
         # Make this the core plugin
         directory.add_plugin('CORE', self)
