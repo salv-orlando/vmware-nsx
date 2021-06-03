@@ -455,7 +455,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     {'security_group_rules': rules_dict[sg_id]})
                 LOG.info("Created %d security group rules for SG %s: %s",
                          len(rules), sg_id,
-                         ",".join([rule.get('id') for rule in rules]))
+                         ",".join([rule.get('id') for rule in
+                                   rules.get('security_group_rules', [])]))
             except Exception as e:
                 self.add_error("Failed to create security group %s "
                                "rules: %s" % (sg_id, e))
