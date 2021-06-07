@@ -15,6 +15,7 @@
 import netaddr
 from oslo_log import log as logging
 
+from neutron_lib.api.definitions import provider_net as pnet
 from neutron_lib.api import validators
 from neutron_lib import constants
 from neutron_lib.db import api as db_api
@@ -22,6 +23,7 @@ from neutron_lib import exceptions as n_exc
 from neutron_lib.exceptions import l3 as l3_exc
 
 from vmware_nsx.common import locking
+from vmware_nsx.common import utils as c_utils
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.extensions import routersize
 from vmware_nsx.plugins.nsx_v.drivers import (
@@ -92,6 +94,17 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
         is_routes_update = bool('routes' in r)
         gw_info = self.plugin._extract_external_gw(context, router,
                                                    is_extract=True)
+        # Do not validate if gw_info in None or mock
+        if isinstance(gw_info, dict) and gw_info.get('network_id'):
+            gw_net = self.plugin.get_network(context.elevated(),
+                                             gw_info['network_id'])
+            if gw_net.get(pnet.NETWORK_TYPE) == c_utils.NsxVNetworkTypes.FLAT:
+                msg = _("Gateway for distributer router %(r_id)s cannot be "
+                        "attached to provider network %(net_id)s of type "
+                        "FLAT") % {'r_id': router_id,
+                                   'net_id': gw_info['network_id']}
+                raise n_exc.InvalidInput(error_message=msg)
+
         super(nsx_v.NsxVPluginV2, self.plugin).update_router(
             context, router_id, router)
         if gw_info != constants.ATTR_NOT_SPECIFIED:
