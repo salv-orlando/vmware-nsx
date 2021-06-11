@@ -1148,6 +1148,121 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
                 mock_delete_binding.assert_called_once_with(
                     network['network']['id'], mock.ANY)
 
+    # Tests overriden from base class as they're expected to pass instead
+    # of failing with the policy plugin
+    def test_create_port_additional_ip(self):
+        """Test that creation of port with additional IP fails."""
+        self.plugin.use_policy_dhcp = True
+        with mock.patch.object(
+            self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+            'list') as mock_list_bindings:
+            with mock.patch.object(
+                self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+                'create_or_overwrite_v4') as mock_create_bindings:
+                with self.subnet() as subnet:
+                    data = {'port':
+                            {'network_id': subnet['subnet']['network_id'],
+                             'tenant_id': subnet['subnet']['tenant_id'],
+                             'device_owner': 'compute:meh',
+                             'fixed_ips': [{'subnet_id':
+                                            subnet['subnet']['id']},
+                                           {'subnet_id':
+                                            subnet['subnet']['id']}]}}
+                    port_req = self.new_create_request('ports', data)
+                    res = port_req.get_response(self.api)
+                    self.assertEqual(201, res.status_int)
+                    res = self.deserialize('json', res)
+                    fixed_ips = res['port']['fixed_ips']
+                    subnet_ids = set(item['subnet_id'] for item in fixed_ips)
+                    self.assertEqual(1, len(subnet_ids))
+                    self.assertIn(subnet['subnet']['id'], subnet_ids)
+                    mock_list_bindings.assert_called_once()
+                    mock_create_bindings.assert_called_once_with(
+                        mock.ANY, mock.ANY,
+                        binding_id=mock.ANY,
+                        gateway_address=subnet['subnet']['gateway_ip'],
+                        host_name=mock.ANY,
+                        ip_address=fixed_ips[0]['ip_address'],
+                        lease_time=mock.ANY,
+                        mac_address=res['port']['mac_address'],
+                        options=mock.ANY)
+
+    def test_update_port_add_additional_ip(self):
+        with self.subnet() as subnet:
+            post_data = {
+                'port': {
+                    'network_id': subnet['subnet']['network_id'],
+                    'tenant_id': subnet['subnet']['tenant_id'],
+                    'device_owner': 'compute:meh',
+                    'fixed_ips': [{'subnet_id':
+                                    subnet['subnet']['id']}]}}
+            post_req = self.new_create_request('ports', post_data)
+            res = post_req.get_response(self.api)
+            self.assertEqual(201, res.status_int)
+            port = self.deserialize('json', res)
+            orig_fixed_ip = (
+                port['port']['fixed_ips'][0]['ip_address'])
+            with mock.patch.object(
+                self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+                'list') as mock_list_bindings:
+                with mock.patch.object(
+                    self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+                    'create_or_overwrite_v4') as mock_create_bindings:
+                    mock_list_bindings.return_value = [
+                        {'ip_address': orig_fixed_ip}
+                    ]
+                    put_data = {
+                        'port': {
+                            'device_owner': 'compute:meh',
+                            'fixed_ips': [
+                                {'subnet_id': subnet['subnet']['id'],
+                                 'ip_address': orig_fixed_ip},
+                                {'subnet_id': subnet['subnet']['id']}]}}
+                    put_req = self.new_update_request(
+                        'ports', put_data, port['port']['id'])
+                    put_res = put_req.get_response(self.api)
+                    self.assertEqual(200, put_res.status_int)
+                    upd_port = self.deserialize('json', res)['port']
+                    fixed_ips = upd_port['fixed_ips']
+                    subnet_ids = set(item['subnet_id'] for item in fixed_ips)
+                    self.assertEqual(1, len(subnet_ids))
+                    self.assertIn(subnet['subnet']['id'], subnet_ids)
+                    mock_list_bindings.assert_called_once()
+                    mock_create_bindings.assert_not_called()
+
+    def test_update_port_clear_ip(self):
+        with self.subnet() as subnet:
+            post_data = {
+                'port': {
+                    'network_id': subnet['subnet']['network_id'],
+                    'tenant_id': subnet['subnet']['tenant_id'],
+                    'device_owner': 'compute:meh',
+                    'fixed_ips': [{'subnet_id': subnet['subnet']['id']},
+                                  {'subnet_id': subnet['subnet']['id']}]}}
+            post_req = self.new_create_request('ports', post_data)
+            res = post_req.get_response(self.api)
+            self.assertEqual(201, res.status_int)
+            port = self.deserialize('json', res)
+            with mock.patch.object(
+                self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+                'list') as mock_list_bindings:
+                with mock.patch.object(
+                    self.plugin.nsxpolicy.segment_dhcp_static_bindings,
+                    'create_or_overwrite_v4') as mock_create_bindings:
+                    put_data = {'port':
+                                {'fixed_ips': [],
+                                 secgrp.SECURITYGROUPS: []}}
+                    put_req = self.new_update_request(
+                        'ports', put_data, port['port']['id'])
+                    res = put_req.get_response(self.api)
+                    self.assertEqual(200, res.status_int)
+                    res = self.deserialize('json', res)
+                    fixed_ips = res['port']['fixed_ips']
+                    subnet_ids = set(item['subnet_id'] for item in fixed_ips)
+                    self.assertEqual(0, len(subnet_ids))
+                    mock_list_bindings.assert_not_called()
+                    mock_create_bindings.assert_not_called()
+
 
 class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                       NsxPPluginTestCaseMixin):

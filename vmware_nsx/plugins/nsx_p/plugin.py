@@ -1660,6 +1660,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             return []
 
         address_bindings = []
+        lladdr = None
         for fixed_ip in port_data['fixed_ips']:
             ip_addr = fixed_ip['ip_address']
             mac_addr = self._format_mac_address(port_data['mac_address'])
@@ -1670,7 +1671,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             # add address binding for link local ipv6 address, otherwise
             # neighbor discovery will be blocked by spoofguard.
             # for now only one ipv6 address is allowed
-            if netaddr.IPAddress(ip_addr).version == 6:
+            if netaddr.IPAddress(ip_addr).version == 6 and not lladdr:
                 lladdr = netaddr.EUI(mac_addr).ipv6_link_local()
                 binding = self.nsxpolicy.segment_port.build_address_binding(
                     lladdr, mac_addr)
@@ -1917,8 +1918,36 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             return
         net_id = port['network_id']
 
-        for fixed_ip in self._filter_ipv4_dhcp_fixed_ips(
-            context, port['fixed_ips']):
+        # If we have more than a single IP we need to fetch existing bindings
+        # before deciding which one we need to write for the current port
+        v4_fixed_ips = self._filter_ipv4_dhcp_fixed_ips(
+            context, port['fixed_ips'])
+        v6_fixed_ips = self._filter_ipv6_dhcp_fixed_ips(
+            context, port['fixed_ips'])
+        if len(v4_fixed_ips) > 1 or len(v6_fixed_ips) > 1:
+            cur_bindings = self.nsxpolicy.segment_dhcp_static_bindings.list(
+                segment_id)
+            for binding in cur_bindings:
+                # Careful about V4/V6 bindings!
+                binding_ip = None
+                try:
+                    binding_ip = binding['ip_address']
+                except KeyError:
+                    ips = binding.get('ip_addresses', [])
+                    if ips:
+                        binding_ip = ips[0]
+                if not binding_ip:
+                    continue
+                if any([binding_ip == ip_v4['ip_address']
+                        for ip_v4 in v4_fixed_ips]):
+                    # Prevent updating v4 binding. Keep current binding.
+                    v4_fixed_ips = []
+                if any([binding_ip == ip_v6['ip_address']
+                        for ip_v6 in v6_fixed_ips]):
+                    # Prevent updating v6 binding. Keep current binding.
+                    v6_fixed_ips = []
+
+        for fixed_ip in v4_fixed_ips:
             # There will be only one ipv4 ip here
             binding_id = port['id'] + '-ipv4'
             name = 'IPv4 binding for port %s' % port['id']
@@ -1942,9 +1971,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
                 mac_address=port['mac_address'],
                 options=options)
+            break
 
-        for fixed_ip in self._filter_ipv6_dhcp_fixed_ips(
-            context, port['fixed_ips']):
+        for fixed_ip in v6_fixed_ips:
             # There will be only one ipv6 ip here
             binding_id = port['id'] + '-ipv6'
             name = 'IPv6 binding for port %s' % port['id']
@@ -1960,12 +1989,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 ip_addresses=[ip],
                 lease_time=cfg.CONF.nsx_p.dhcp_lease_time,
                 mac_address=port['mac_address'])
+            break
 
     def _add_port_policy_dhcp_binding(self, context, port):
         net_id = port['network_id']
         if not self._is_dhcp_network(context, net_id):
             return
-
         segment_id = self._get_network_nsx_segment_id(context, net_id)
         self._add_or_overwrite_port_policy_dhcp_binding(
             context, port, segment_id)
@@ -2119,7 +2148,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
     def create_port(self, context, port, l2gw_port_check=False):
         port_data = port['port']
         # validate the new port parameters
-        self._validate_create_port(context, port_data)
+        self._validate_create_port(context, port_data,
+                                   relax_ip_validation=True)
         self._assert_on_resource_admin_state_down(port_data)
 
         # Validate the vnic type (the same types as for the NSX-T plugin)
@@ -2327,7 +2357,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             self._remove_provider_security_groups_from_list(original_port)
             port_data = port['port']
             self._validate_update_port(context, port_id, original_port,
-                                       port_data)
+                                       port_data, relax_ip_validation=True)
             self._assert_on_resource_admin_state_down(port_data)
             validate_port_sec = self._should_validate_port_sec_on_update_port(
                 port_data)
@@ -2335,12 +2365,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 context, original_port['network_id'])
             if is_external_net:
                 self._assert_on_external_net_with_compute(port_data)
-            device_owner = (port_data['device_owner']
-                            if 'device_owner' in port_data
-                            else original_port.get('device_owner'))
-            self._validate_max_ips_per_port(context,
-                                            port_data.get('fixed_ips', []),
-                                            device_owner)
 
             direct_vnic_type = self._validate_port_vnic_type(
                 context, port_data, original_port['network_id'])
