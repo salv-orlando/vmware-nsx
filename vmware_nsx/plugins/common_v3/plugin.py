@@ -615,11 +615,15 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 LOG.warning(err_msg)
                 raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _validate_max_ips_per_port(self, context, fixed_ip_list, device_owner):
+    def _validate_max_ips_per_port(self, context, fixed_ip_list, device_owner,
+                                   relax_ip_validation=False):
         """Validate the number of fixed ips on a port
 
         Do not allow multiple ip addresses on a port since the nsx backend
-        cannot add multiple static dhcp bindings with the same port
+        cannot add multiple static dhcp bindings with the same port, unless
+        relax_ip_validation is set to True.
+
+        In any case allow at most 1 IPv4 subnet and 1 IPv6 subnet
         """
         if (device_owner and
             nl_net_utils.is_port_trusted({'device_owner': device_owner})):
@@ -707,9 +711,9 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         # enabled and other IPs. Also ensure no more than one IP for any
         # DHCP subnet is requested. fixed_ip attribute does not have patch
         # behaviour, so all requested IP allocations must be included in it
-
-        for subnet_id, fixed_ips in subnet_fixed_ip_dict.items():
-            validate_subnet_dhcp_and_ipv6_state(subnet_id, fixed_ips)
+        if not relax_ip_validation:
+            for subnet_id, fixed_ips in subnet_fixed_ip_dict.items():
+                validate_subnet_dhcp_and_ipv6_state(subnet_id, fixed_ips)
 
     def _get_subnets_for_fixed_ips_on_port(self, context, port_data):
         # get the subnet id from the fixed ips of the port
@@ -721,10 +725,14 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     for subnet_id in subnet_ids)
         return []
 
-    def _validate_create_port(self, context, port_data):
+    def _validate_create_port(self, context, port_data,
+                              relax_ip_validation=False):
+        # Validate IP address settings. Relax IP validation parameter should
+        # be true to allow multiple IPs from the same subnet
         self._validate_max_ips_per_port(context,
                                         port_data.get('fixed_ips', []),
-                                        port_data.get('device_owner'))
+                                        port_data.get('device_owner'),
+                                        relax_ip_validation)
 
         is_external_net = self._network_is_external(
             context, port_data['network_id'])
@@ -813,7 +821,8 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                 LOG.warning(err_msg)
                 raise n_exc.InvalidInput(error_message=err_msg)
 
-    def _validate_update_port(self, context, id, original_port, port_data):
+    def _validate_update_port(self, context, id, original_port, port_data,
+                              relax_ip_validation=False):
         qos_selected = validators.is_attr_set(port_data.get
                                               (qos_consts.QOS_POLICY_ID))
         is_external_net = self._network_is_external(
@@ -842,9 +851,12 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         self._assert_on_device_owner_change(port_data, orig_dev_owner)
         self._assert_on_port_admin_state(port_data, device_owner)
         self._assert_on_port_sec_change(port_data, device_owner)
+        # Validate IP address settings. Relax IP validation parameter should
+        # be true to allow multiple IPs from the same subnet
         self._validate_max_ips_per_port(context,
                                         port_data.get('fixed_ips', []),
-                                        device_owner)
+                                        device_owner,
+                                        relax_ip_validation)
         self._validate_number_of_address_pairs(port_data)
         self._assert_on_vpn_port_change(original_port)
         self._assert_on_lb_port_fixed_ip_change(port_data, orig_dev_owner)
