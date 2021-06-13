@@ -1237,6 +1237,15 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
     def test_update_subnet_gw_outside_cidr_returns_200(self):
         self.skipTest("NSX subnet GW validation")
 
+    def test_create_subnet_allocation_pools_with_prefixlen_31(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_update_subnet_allocation_pools_with_prefixlen_31(self):
+        self.skipTest("NSX subnet GW validation")
+
+    def test_create_subnet_allocation_pools_with_prefixlen_32(self):
+        self.skipTest("NSX subnet GW validation")
+
     def test_create_subnet_ipv6_gw_validation(self):
         # Illegal GW as first ip in range
         gateway_ip = 'fe80::0'
