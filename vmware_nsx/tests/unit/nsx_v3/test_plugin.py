@@ -2229,6 +2229,9 @@ class TestL3NatTestCase(L3NatTest,
         super(TestL3NatTestCase,
               self).test_router_add_and_remove_gateway()
 
+    def test_router_set_gateway_cidr_overlapped_with_subnets(self):
+        self.skipTest('2 dhcp subnets not supported')
+
     def test_router_update_gateway_upon_subnet_create_max_ips_ipv6(self):
         self.skipTest('not supported')
 

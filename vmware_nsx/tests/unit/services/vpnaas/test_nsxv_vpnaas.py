@@ -250,7 +250,7 @@ class TestVpnaasDriver(test_plugin.NsxVPluginV2TestCase):
             self.router(router_type='exclusive',
                         external_gateway_info={'network_id':
                             ext_net['network']['id']}) as router,\
-            self.subnet() as sub:
+            self.subnet(cidr="20.0.0.0/24") as sub:
             # add an interface to the router
             self.l3plugin.add_router_interface(
                 self.context,
@@ -275,7 +275,7 @@ class TestVpnaasDriver(test_plugin.NsxVPluginV2TestCase):
             self.router(router_type='shared',
                         external_gateway_info={'network_id':
                             ext_net['network']['id']}) as router,\
-            self.subnet() as sub:
+            self.subnet(cidr="20.0.0.0/24") as sub:
             # add an interface to the router
             self.l3plugin.add_router_interface(
                 self.context,
@@ -320,7 +320,7 @@ class TestVpnaasDriver(test_plugin.NsxVPluginV2TestCase):
             self.router(router_type='exclusive',
                         external_gateway_info={'network_id':
                             ext_net['network']['id']}) as router,\
-            self.subnet() as sub:
+            self.subnet(cidr="20.0.0.0/24") as sub:
             # add an interface to the router
             self.l3plugin.add_router_interface(
                 self.context,

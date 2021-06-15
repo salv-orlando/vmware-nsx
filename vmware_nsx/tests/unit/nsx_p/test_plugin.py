@@ -1697,6 +1697,9 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                              enable_dhcp=False) as s:
                 self._test_router_add_interface_subnet(r, s)
 
+    def test_router_set_gateway_cidr_overlapped_with_subnets(self):
+        self.skipTest('2 dhcp subnets not supported')
+
     @common_v3.with_disable_dhcp
     def test_route_clear_routes_with_None(self):
         super(NsxPTestL3NatTestCase,

@@ -94,7 +94,7 @@ pycparser==2.18
 pyflakes==0.8.1
 Pygments==2.2.0
 pyinotify==0.9.6
-pylint==1.7.1
+pylint==1.7.6
 pyperclip==1.5.27
 python-dateutil==2.5.3
 python-designateclient==2.7.0

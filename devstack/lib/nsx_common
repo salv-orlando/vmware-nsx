@@ -84,6 +84,11 @@ function install_neutron_projects {
     if is_service_enabled octavia; then
        echo "service octavia is enabled explicitly by devstack"
     else
+        if [ "$NEUTRON_BRANCH" == "stable/stein" ]; then
+            OCTAVIA_BRANCH="stein-eol"
+        else
+            OCTAVIA_BRANCH=$NEUTRON_BRANCH
+        fi
         sudo -H pip install -e "git+https://opendev.org/openstack/octavia@${NEUTRON_BRANCH}#egg=octavia"
         sudo chown -R ${USER}:${USER} src/octavia
     fi
