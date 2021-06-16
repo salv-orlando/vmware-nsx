@@ -3044,7 +3044,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         gateway_ip = orig['gateway_ip']
         enable_dhcp = orig['enable_dhcp']
         orig_host_routes = orig['routes']
-        self._validate_external_subnet(context, orig['network_id'])
+        if s.get('enable_dhcp'):
+            self._validate_external_subnet(context, orig['network_id'])
         self._validate_host_routes_input(subnet,
                                          orig_enable_dhcp=enable_dhcp,
                                          orig_host_routes=orig_host_routes)
