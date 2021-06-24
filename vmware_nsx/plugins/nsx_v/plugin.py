@@ -2106,6 +2106,12 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         direct_vnic_type = self._validate_port_vnic_type(
             context, port_data, port_data['network_id'])
 
+        # Do this outside of the context writer scope so it can overcome
+        # failures
+        if port_data.get('tenant_id'):
+            self._ensure_default_security_group(context,
+                                                port_data['tenant_id'])
+
         with db_api.CONTEXT_WRITER.using(context):
             # First we allocate port in neutron database
             neutron_db = super(NsxVPluginV2, self).create_port(context, port)
@@ -4541,6 +4547,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
     def create_security_group(self, context, security_group, default_sg=False):
         """Create a security group."""
         sg_data = security_group['security_group']
+        if not default_sg:
+            self._ensure_default_security_group(context, sg_data['tenant_id'])
+
         sg_id = sg_data["id"] = str(uuidutils.generate_uuid())
         self._validate_security_group(context, sg_data, default_sg)
 
