@@ -180,9 +180,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             LOG.error("NSX migration is Done with %s errors:", self.n_errors)
             for err in self.errors:
                 LOG.error(err)
+            sys.exit(self.n_errors)
         else:
             LOG.info("NSX migration is Done with no errors")
-        sys.exit(self.n_errors)
 
     def _get_session(self, username, user_domain_id,
                      tenant_name, tenant_domain_id,
