@@ -11,6 +11,7 @@
 #    under the License.
 
 import copy
+from datetime import datetime
 import logging
 import socket
 import sys
@@ -184,6 +185,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         else:
             LOG.info("NSX migration is Done with no errors")
 
+    def _log_elapsed(self, start_ts, text, debug=True):
+        if debug:
+            func = LOG.debug
+        else:
+            func = LOG.info
+        elapsed = datetime.now() - start_ts
+        func("%s. Time taken: %s", text, elapsed)
+
     def _get_session(self, username, user_domain_id,
                      tenant_name, tenant_domain_id,
                      password, auth_url, cert_file):
@@ -266,12 +275,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.errors.append(msg)
 
     def migrate_quotas(self):
+        outer_start = datetime.now()
         source_quotas = self.source_neutron.list_quotas()['quotas']
         dest_quotas = self.dest_neutron.list_quotas()['quotas']
 
         total_num = len(source_quotas)
         LOG.info("Migrating %s neutron quotas", total_num)
         for count, quota in enumerate(source_quotas, 1):
+            inner_start = datetime.now()
             dest_quota = self.have_id(quota['project_id'], dest_quotas)
             if dest_quota is False:
                 body = self.prepare_quota(quota)
@@ -281,9 +292,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     LOG.info("created quota %(count)s/%(total)s: %(q)s",
                              {'count': count, 'total': total_num,
                               'q': new_quota})
+                    self._log_elapsed(
+                        inner_start,
+                        "Migrate quota for tenant %s" % quota['tenant_id'])
                 except Exception as e:
                     self.add_error("Failed to create quota %(q)s: %(e)s" %
                                    {'q': quota, 'e': e})
+        self._log_elapsed(outer_start, "Quota migration", debug=False)
 
     def migrate_qos_rule(self, dest_policy, source_rule):
         """Add the QoS rule from the source to the QoS policy
@@ -293,6 +308,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         """
         #TODO(asarfaty) also take rule direction into account once
         #ingress support is upstream
+        start = datetime.now()
         rule_type = source_rule.get('type')
         dest_rules = dest_policy.get('rules')
         if dest_rules:
@@ -318,11 +334,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             self.add_error("Failed to create QoS rule %(rule)s for policy "
                            "%(pol)s: %(e)s" % {'rule': body, 'pol': pol_id,
                                                'e': e})
+        self._log_elapsed(start, "Migrate QoS rule %s" % rule['id'])
 
     def migrate_qos_policies(self):
         """Migrates QoS policies from source to dest neutron."""
         # first fetch the QoS policies from both the
         # source and destination neutron server
+        start = datetime.now()
         try:
             dest_qos_pols = self.dest_neutron.list_qos_policies()['policies']
         except n_exc.NotFound:
@@ -339,6 +357,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             return
 
         for pol in source_qos_pols:
+            inner_start = datetime.now()
             dest_pol = self.have_id(pol['id'], dest_qos_pols)
             # If the policy already exists on the dest_neutron
             if dest_pol:
@@ -365,11 +384,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     LOG.info("Created QoS policy %s", new_pol)
                     for qos_rule in qos_rules:
                         self.migrate_qos_rule(new_pol['policy'], qos_rule)
+            self._log_elapsed(inner_start, "Migrate QoS policy %s" % pol['id'])
+        self._log_elapsed(start, "Migrate QoS policies", debug=False)
 
     def migrate_security_groups(self):
         """Migrates security groups from source to dest neutron."""
         # first fetch the security groups from both the
         # source and dest neutron server
+        start = datetime.now()
         source_sec_groups = self.source_neutron.list_security_groups()
         dest_sec_groups = self.dest_neutron.list_security_groups()
 
@@ -380,6 +402,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         LOG.info("Migrating %s security groups", total_num)
         rules_dict = {}
         for count, sg in enumerate(source_sec_groups, 1):
+            sg_start = datetime.now()
             dest_sec_group = self.have_id(sg['id'], dest_sec_groups)
             # If the security group already exists on the dest_neutron
             if dest_sec_group:
@@ -390,11 +413,16 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                     dest_sec_group['security_group_rules'])
                        is False):
                         try:
+                            rule_start = datetime.elapsed()
                             body = self.prepare_security_group_rule(sg_rule)
                             self.dest_neutron.create_security_group_rule(
                                 {'security_group_rule': body})
                             LOG.info("Created security group rule for SG "
                                      "%s: %s", sg.get('id'), sg_rule.get('id'))
+                            self._log_elapsed(
+                                rule_start,
+                                "Migrate security group rule %s" %
+                                sg_rule.get('id'))
                         except n_exc.Conflict:
                             # NOTE(arosen): when you create a default
                             # security group it is automatically populated
@@ -447,20 +475,27 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 # save rules to create once all the sgs are created
                 if rules:
                     rules_dict[sg['id']] = rules
+            self._log_elapsed(
+                sg_start, "Migrate security group %s" % sg['id'])
 
         # Create the rules after all security groups are created to allow
         # dependencies in remote_group_id
         for sg_id, sg in rules_dict.items():
             try:
+                rule_start = datetime.now()
                 rules = self.dest_neutron.create_security_group_rule(
                     {'security_group_rules': sg})
                 LOG.info("Created %d security group rules for SG %s: %s",
                          len(rules), sg_id,
                          ",".join([rule.get('id') for rule in
                                    rules.get('security_group_rules', [])]))
+                self._log_elapsed(
+                    rule_start,
+                    "Migrate security group rules for group %s" % sg_id)
             except Exception as e:
                 self.add_error("Failed to create security group %s "
                                "rules: %s" % (sg_id, e))
+        self._log_elapsed(start, "Migrate security groups", debug=False)
 
     def get_dest_availablity_zones(self, resource):
         azs = self.dest_neutron.list_availability_zones()['availability_zones']
@@ -475,6 +510,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         ports are set.
         And return a dictionary of external gateway info per router
         """
+        start = datetime.now()
         try:
             source_routers = self.source_neutron.list_routers()['routers']
         except Exception:
@@ -489,6 +525,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         total_num = len(source_routers)
         LOG.info("Migrating %s routers", total_num)
         for count, router in enumerate(source_routers, 1):
+            inner_start = datetime.now()
             if router.get('routes'):
                 update_routes[router['id']] = router['routes']
 
@@ -531,14 +568,20 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     self.add_error("Failed to create router %(rtr)s: %(e)s" %
                                    {'rtr': router, 'e': e})
+            self._log_elapsed(
+                inner_start, "Migrate router %s" % router['id'])
+        self._log_elapsed(start, "Migrate routers", debug=False)
         return update_routes, gw_info
 
     def migrate_routers_routes(self, routers_routes):
         """Add static routes to the created routers."""
+        start = datetime.now()
+
         total_num = len(routers_routes)
         LOG.info("Migrating %s routers routes", total_num)
         for count, (router_id, routes) in enumerate(
             routers_routes.items(), 1):
+            inner_start = datetime.now()
             try:
                 self.dest_neutron.update_router(router_id,
                     {'router': {'routes': routes}})
@@ -550,8 +593,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 self.add_error("Failed to add routes %(routes)s to router "
                                "%(rtr)s: %(e)s" %
                                {'routes': routes, 'rtr': router_id, 'e': e})
+            self._log_elapsed(
+                inner_start, "Migrate routes for router" % router_id)
+        self._log_elapsed(start, "Migrate Routers' routes", debug=False)
 
     def migrate_subnetpools(self):
+        start = datetime.now()
         subnetpools_map = {}
         try:
             source_subnetpools = self.source_neutron.list_subnetpools()[
@@ -587,10 +634,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     self.add_error("Failed to create subnetpool %(pool)s: "
                                    "%(e)s" % {'pool': pool, 'e': e})
+        self._log_elapsed(start, "Migrate subnet pools", debug=False)
         return subnetpools_map
 
     def migrate_networks_subnets_ports(self, routers_gw_info):
         """Migrates networks/ports/router-uplinks from src to dest neutron."""
+        start = datetime.now()
         source_ports = self.source_neutron.list_ports()['ports']
         source_subnets = self.source_neutron.list_subnets()['subnets']
         source_networks = self.source_neutron.list_networks()['networks']
@@ -630,6 +679,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  {'nets': total_num, 'subnets': len(source_subnets),
                   'ports': len(source_ports)})
         for count, network in enumerate(source_networks, 1):
+            start_net = datetime.now()
             external_net = network.get('router:external')
             body = self.prepare_network(
                 network, remove_qos=remove_qos,
@@ -667,7 +717,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             dhcp_subnets = []
             count_dhcp_subnet = 0
             for subnet_id in network['subnets']:
-
+                start_subnet = datetime.now()
                 # only create subnet if the dest server doesn't have it
                 if self.have_id(subnet_id, dest_subnets):
                     LOG.info("Skip network %s: Already exists on the "
@@ -724,11 +774,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except n_exc.BadRequest as e:
                     self.add_error("Failed to create subnet: %(subnet)s: "
                                    "%(e)s" % {'subnet': subnet, 'e': e})
+                self._log_elapsed(start_subnet,
+                                  "Migrate Subnet %s" % subnet['id'])
 
             # create the ports on the network
+            self._log_elapsed(start_net, "Migrate Network %s" % network['id'])
             ports = self.get_ports_on_network(network['id'], source_ports)
             for port in ports:
-
+                start_port = datetime.now()
                 # Ignore internal NSXV objects
                 if port['project_id'] == nsxv_constants.INTERNAL_TENANT_ID:
                     LOG.info("Skip port %s: Internal NSX-V port",
@@ -845,9 +898,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                   'subnet': subnet_id,
                                   'ip': ip_addr,
                                   'mac': created_port['mac_address']})
+                self._log_elapsed(
+                    start_port,
+                    "Migrate port %s" % port['id'])
 
             # Enable dhcp on the relevant subnets, and re-add host routes:
             for subnet in dhcp_subnets:
+                start_subnet_dhcp = datetime.now()
                 try:
                     data = {'enable_dhcp': True}
                     if subnet['host_routes']:
@@ -858,9 +915,15 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     self.add_error("Failed to enable DHCP on subnet "
                                    "%(subnet)s: %(e)s" %
                                    {'subnet': subnet['id'], 'e': e})
+                self._log_elapsed(
+                    start_subnet_dhcp,
+                    "Enabling DHCP on Subnet %s" % subnet['id'])
+        self._log_elapsed(start, "Migrate Networks, Subnets and Ports",
+                          debug=False)
 
     def migrate_floatingips(self):
         """Migrates floatingips from source to dest neutron."""
+        start = datetime.now()
         try:
             source_fips = self.source_neutron.list_floatingips()['floatingips']
         except Exception:
@@ -869,6 +932,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         total_num = len(source_fips)
         for count, source_fip in enumerate(source_fips, 1):
+            start_fip = datetime.now()
             body = self.prepare_floatingip(source_fip)
             try:
                 fip = self.dest_neutron.create_floatingip({'floatingip': body})
@@ -880,6 +944,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             except Exception as e:
                 self.add_error("Failed to create floating ip (%(fip)s) : "
                                "%(e)s" % {'fip': source_fip, 'e': e})
+            self._log_elapsed(
+                start_fip, "Migrate Floating IP %s" % source_fip['id'])
+        self._log_elapsed(start, "Migrate Floating IPs %s", debug=False)
 
     def _plural_res_type(self, resource_type):
         if resource_type.endswith('y'):
@@ -893,6 +960,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  self._plural_res_type(resource_type))
         for count, source_obj in enumerate(source_objects, 1):
             # Check if the object already exists
+            start_fwaas = datetime.now()
             if self.have_id(source_obj['id'], dest_objects):
                 LOG.info("Skipping %s %s as it already exists on the "
                          "destination server", resource_type, source_obj['id'])
@@ -915,9 +983,12 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                "%(e)s" %
                                {'resource': resource_type, 'obj': source_obj,
                                'e': e})
+            self._log_elapsed(
+                start_fwaas, "Migrate FWaaS resource %s" % source_obj['id'])
 
     def migrate_fwaas(self):
         """Migrates FWaaS V2 objects from source to dest neutron."""
+        start = datetime.now()
         try:
             # Reading existing source resources. Note that the firewall groups
             # should be read first, to make sure default objects were created.
@@ -946,21 +1017,25 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             return
 
         # Migrate all FWaaS objects:
+        start_rules = datetime.now()
         self._migrate_fwaas_resource(
             'firewall_rule', source_rules, dest_rules,
             self.prepare_fwaas_rule,
             self.dest_neutron.create_fwaas_firewall_rule)
-
+        self._log_elapsed(start_rules, "Migrate FWaaS rules", debug=False)
+        start_pol = datetime.now()
         self._migrate_fwaas_resource(
             'firewall_policy', source_polices, dest_polices,
             self.prepare_fwaas_policy,
             self.dest_neutron.create_fwaas_firewall_policy)
-
+        self._log_elapsed(start_pol, "Migrate FWaaS policies", debug=False)
+        start_group = datetime.now()
         self._migrate_fwaas_resource(
             'firewall_group', source_groups, dest_groups,
             self.prepare_fwaas_group,
             self.dest_neutron.create_fwaas_firewall_group)
-
+        self._log_elapsed(start_group, "Migrate FWaaS groups", debug=False)
+        self._log_elapsed(start, "Migrate FWaas V2", debug=False)
         LOG.info("FWaaS V2 migration done")
 
     def _delete_octavia_lb(self, body):
@@ -1001,6 +1076,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         # Creating all loadbalancers resources on the new nsx driver
         # using RPC calls to the plugin listener.
         # Create the loadbalancer:
+        start_lb = datetime.now()
         lb_body = self.prepare_lb_loadbalancer(lb)
         kw = {'loadbalancer': lb_body}
         if not self.octavia_rpc_client.call({}, 'loadbalancer_create', **kw):
@@ -1015,6 +1091,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         listeners_map = {}
         for listener_dict in lb.get('listeners', []):
+            start_listener = datetime.now()
             listener_id = listener_dict['id']
             listener = orig_map['listeners'][listener_id]
             cert = self._create_lb_certificate(listener)
@@ -1029,8 +1106,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 return
             listeners_map[listener_id] = body
             lb_body_for_deletion['listeners'].append(body)
+            self._log_elapsed(
+                start_listener, "Migrate Listener %s" % listener_id)
 
         for pool_dict in lb.get('pools', []):
+            start_pool = datetime.now()
             pool_id = pool_dict['id']
             pool = orig_map['pools'][pool_id]
             pool_body = self.prepare_lb_pool(pool, lb_body)
@@ -1080,11 +1160,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     self._delete_octavia_lb(lb_body_for_deletion)
                     return
                 lb_body_for_deletion['pools'][-1]['healthmonitor'] = body
+            self._log_elapsed(start_pool, "Migrate LB Pool %s" % pool_id)
 
             # Add listeners L7 policies
             for listener_id in listeners_map.keys():
                 listener = orig_map['listeners'][listener_id]
                 for l7pol_dict in listener.get('l7policies', []):
+                    start_l7pol = datetime.now()
                     l7_pol_id = l7pol_dict['id']
                     l7pol = orig_map['l7pols'][l7_pol_id]
                     pol_body = self.prepare_lb_l7policy(l7pol)
@@ -1104,7 +1186,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                        {'l7pol': l7pol})
                         self._delete_octavia_lb(lb_body_for_deletion)
                         return
-
+                    self._log_elapsed(
+                        start_l7pol, "Migrate L7 LB policy %s" % l7_pol_id)
+        self._log_elapsed(start_lb, "Migrate Load Balancer %s" % lb_id)
         LOG.info("Created loadbalancer %s/%s: %s", count, total_num, lb_id)
 
     def _map_orig_objects_of_type(self, source_objects):
@@ -1129,6 +1213,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         Using RPC connection to connect directly with the new plugin driver.
         """
         # Read all existing octavia resources
+        start = datetime.now()
         try:
             loadbalancers = self.octavia.load_balancer_list()['loadbalancers']
             listeners = self.octavia.listener_list()['listeners']
@@ -1183,3 +1268,4 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             else:
                 LOG.info("Skipping %s loadbalancer %s",
                          lb['provisioning_status'], lb['id'])
+        self._log_elapsed(start, "Migrate Octavia LBs", debug=False)
