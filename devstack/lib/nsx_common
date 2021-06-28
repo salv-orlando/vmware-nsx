@@ -89,7 +89,7 @@ function install_neutron_projects {
         else
             OCTAVIA_BRANCH=$NEUTRON_BRANCH
         fi
-        sudo -H pip install -e "git+https://opendev.org/openstack/octavia@${NEUTRON_BRANCH}#egg=octavia"
+        sudo -H pip install -e "git+https://opendev.org/openstack/octavia@${OCTAVIA_BRANCH}#egg=octavia"
         sudo chown -R ${USER}:${USER} src/octavia
     fi
 }
