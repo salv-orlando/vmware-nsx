@@ -80,6 +80,7 @@ class Operations(enum.Enum):
     UPDATE_FIREWALL_MATCH = 'update-nat-firewall-match'
     SET_STATUS_ERROR = 'set-status-error'
     CHECK_COMPUTE_CLUSTERS = 'check-compute-clusters'
+    CUTOVER_MAPPINGS = 'mappings-for-edge-cutover'
 
 
 ops = [op.value for op in Operations]
@@ -264,7 +265,8 @@ nsxv_resources = {
                                       [Operations.CREATE.value,
                                        Operations.DELETE.value]),
     constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
-                                        [Operations.VALIDATE.value]),
+                                        [Operations.VALIDATE.value,
+                                         Operations.CUTOVER_MAPPINGS.value]),
     constants.PORTS: Resource(constants.PORTS,
                               [Operations.LIST.value]),
     constants.LOADBALANCERS: Resource(constants.LOADBALANCERS,
