@@ -489,14 +489,15 @@ def _validate_network_has_subnet(resource, event, trigger, payload=None):
         raise n_exc.InvalidInput(error_message=msg)
 
 
-def _delete_sg_group_related_rules(resource, event, trigger, **kwargs):
+def _delete_sg_group_related_rules(resource, event, trigger, payload):
     """Upon SG deletion, call the explicit delete method for rules with that
     SG as the remote one.
     Otherwise those will be deleted with on_delete cascade, leaving the NSX
     backend unaware.
     """
-    sg_id = kwargs["security_group"]["id"]
-    context = kwargs["context"]
+    security_group = payload.latest_state
+    context = payload.context
+    sg_id = security_group["id"]
     core_plugin = directory.get_plugin()
     filters = {'remote_group_id': [sg_id]}
     rules = core_plugin.get_security_group_rules(context, filters=filters)
