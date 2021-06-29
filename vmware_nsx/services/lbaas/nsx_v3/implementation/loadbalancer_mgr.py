@@ -58,11 +58,12 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.Nsxv3LoadbalancerBaseManager):
                 self.flavor_plugin, context, lb.get('flavor_id'), None)
             if router_id:
                 # Make sure the NSX service router exists
+                e_ctx = context.elevated()
                 if not self.core_plugin.service_router_has_services(
-                        context, router_id):
-                    self.core_plugin.create_service_router(context, router_id)
+                        e_ctx, router_id):
+                    self.core_plugin.create_service_router(e_ctx, router_id)
                 lb_service = self._create_lb_service(
-                    context, service_client, lb['tenant_id'],
+                    e_ctx, service_client, lb['tenant_id'],
                     router_id, nsx_router_id, lb['id'], lb_size)
             else:
                 lb_service = self._create_lb_service_without_router(
