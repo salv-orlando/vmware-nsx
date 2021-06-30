@@ -393,7 +393,8 @@ class NSXOctaviaListenerEndpoint(object):
                     loadbalancer,
                     delete=True, cascade=True))
         except Exception as e:
-            LOG.error('NSX driver loadbalancer_delete_cascade failed %s', e)
+            LOG.error('NSX driver loadbalancer_delete_cascade failed (%s) %s',
+                      type(e), e)
             completor(success=False)
             return False
         return True
