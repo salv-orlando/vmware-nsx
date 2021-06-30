@@ -171,7 +171,7 @@ class EdgeHealthMonitorManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
         try:
             edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
-        except nsxv_exc.RequestBad:
+        except nsxv_exc.VcnsApiException:
             # Pool doesn't exist, so member is obviously gone
             LOG.warning('Edge pool %s does not exist on edge %s',
                         edge_pool_id, edge_id)
