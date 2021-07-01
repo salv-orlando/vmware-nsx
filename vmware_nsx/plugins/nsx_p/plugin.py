@@ -453,20 +453,20 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             NO_SLAAC_NDRA_PROFILE_ID: policy_constants.IPV6_RA_MODE_DISABLED
         }
 
-        for profile in ndra_profiles:
+        for profile_key, profile_value in ndra_profiles.items():
             try:
-                self.nsxpolicy.ipv6_ndra_profile.get(profile, silent=True)
+                self.nsxpolicy.ipv6_ndra_profile.get(profile_key, silent=True)
             except nsx_lib_exc.ResourceNotFound:
                 try:
                     self.nsxpolicy.ipv6_ndra_profile.create_or_overwrite(
-                        profile,
-                        profile_id=profile,
-                        ra_mode=ndra_profiles[profile],
+                        profile_key,
+                        profile_id=profile_key,
+                        ra_mode=profile_value,
                         tags=self.nsxpolicy.build_v3_api_version_tag())
                 except nsx_lib_exc.StaleRevision as e:
                     # This means that another controller is also creating this
                     LOG.info("Failed to configure ipv6_ndra_profile %s: %s",
-                             profile, e)
+                             profile_key, e)
 
         self.client_ssl_profile = None
 

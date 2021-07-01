@@ -108,7 +108,8 @@ class NsxAbstractIpamDriver(subnet_alloc.SubnetAllocator, NsxIpamBase):
         # override the OOB factory to add the network ID
         return NsxSubnetRequestFactory
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def _subnet_class(self):
         """Return the class of the subnet that should be used."""
         pass

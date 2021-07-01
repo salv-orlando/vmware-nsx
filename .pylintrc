@@ -101,7 +101,9 @@ disable=
  invalid-overridden-method,
  raising-format-tuple,
  comparison-with-callable,
- consider-using-with
+ consider-using-with,
+ unused-private-member,
+ arguments-renamed,
 
 [BASIC]
 # Variable names can be 1 to 31 characters long, with lowercase and underscores

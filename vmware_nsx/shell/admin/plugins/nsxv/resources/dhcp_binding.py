@@ -21,7 +21,7 @@ from oslo_log import log as logging
 
 from vmware_nsx.shell.admin.plugins.common import constants
 import vmware_nsx.shell.admin.plugins.common.utils as admin_utils
-import vmware_nsx.shell.admin.plugins.nsxv.resources.utils as utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 import vmware_nsx.shell.resources as shell
 
 from neutron_lib.callbacks import registry

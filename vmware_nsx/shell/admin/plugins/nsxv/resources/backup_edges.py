@@ -28,7 +28,7 @@ from vmware_nsx.plugins.nsx_v.vshield import edge_utils
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
 import vmware_nsx.shell.admin.plugins.common.utils as admin_utils
-import vmware_nsx.shell.admin.plugins.nsxv.resources.utils as utils
+from vmware_nsx.shell.admin.plugins.nsxv.resources import utils
 import vmware_nsx.shell.resources as shell
 
 
