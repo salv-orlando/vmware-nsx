@@ -431,8 +431,8 @@ def stats_getter(context, core_plugin, ignore_list=None):
                         stats = copy.copy(lb_const.LB_EMPTY_STATS)
                         stats['id'] = vs_bind.listener_id
                         stats['request_errors'] = 0  # currently unsupported
-                        for stat in lb_const.LB_STATS_MAP:
-                            lb_stat = lb_const.LB_STATS_MAP[stat]
+                        for stat, stat_value in lb_const.LB_STATS_MAP.items():
+                            lb_stat = stat_value
                             stats[stat] += vs_stats[lb_stat]
                         stat_list.append(stats)
 

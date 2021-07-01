@@ -197,15 +197,15 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
     def init_extensions(self):
         # Support all the extensions supported by any of the plugins
         extensions = []
-        for plugin in self.plugins:
-            extensions.extend(self.plugins[plugin].supported_extension_aliases)
+        for plugin in self.plugins.values():
+            extensions.extend(plugin.supported_extension_aliases)
         self.supported_extension_aliases.extend(list(set(extensions)))
 
         # mark extensions which are supported by only one of the plugins
         self._unsupported_fields = {}
-        for plugin in self.plugins:
+        for plugin in self.plugins.values():
             # TODO(asarfaty): add other resources here
-            plugin_type = self.plugins[plugin].plugin_type()
+            plugin_type = plugin.plugin_type()
             self._unsupported_fields[plugin_type] = {'router': [],
                                                      'port': [],
                                                      'security_group': []}
@@ -290,8 +290,7 @@ class NsxTVDPlugin(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
 
     def start_rpc_listeners(self):
         # Run the start_rpc_listeners of one of the sub-plugins
-        for plugin_type in self.plugins:
-            plugin = self.plugins[plugin_type]
+        for plugin in self.plugins.values():
             if plugin.rpc_workers_supported():
                 return plugin.start_rpc_listeners()
 

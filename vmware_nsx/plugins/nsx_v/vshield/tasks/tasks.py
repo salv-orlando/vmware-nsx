@@ -217,12 +217,11 @@ class TaskManager(object):
 
     def _check_pending_tasks(self):
         """Check all pending tasks status."""
-        for resource_id in self._tasks.keys():
+        for resource_id, tasks in self._tasks.items():
             if self._stopped:
                 # Task manager is stopped, return now
                 return
 
-            tasks = self._tasks[resource_id]
             # only the first task is executed and pending
             task = tasks[0]
             try:

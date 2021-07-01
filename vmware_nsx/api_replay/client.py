@@ -448,10 +448,10 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         # Create the rules after all security groups are created to allow
         # dependencies in remote_group_id
-        for sg_id in rules_dict:
+        for sg_id, sg in rules_dict.items():
             try:
                 rules = self.dest_neutron.create_security_group_rule(
-                    {'security_group_rules': rules_dict[sg_id]})
+                    {'security_group_rules': sg})
                 LOG.info("Created %d security group rules for SG %s: %s",
                          len(rules), sg_id,
                          ",".join([rule.get('id') for rule in
