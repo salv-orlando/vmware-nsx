@@ -650,9 +650,44 @@ def list_ports_vif_ids(resource, event, trigger, **kwargs):
         LOG.info("Mapping data saved into %s", filename)
 
 
+@admin_utils.output_header
+def build_edge_mapping_file(resource, event, trigger, **kwargs):
+    filename = None
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        filename = properties.get('map-file')
+    context = n_context.get_admin_context()
+    mappings = []
+    with utils.NsxVPluginWrapper() as plugin:
+        routers = plugin.get_routers(context)
+        for router in routers:
+            if router.get('distributed'):
+                binding = nsxv_db.get_nsxv_router_binding(context.session,
+                                                          router['id'])
+                if binding:
+                    edge_id = binding['edge_id']
+                    mappings.append(
+                        {'v_edges': [edge_id],
+                         'policy_gateway_name': router['id']})
+    data = [{'name': 'dlr_edges_to_migrate',
+             'v_edges_to_policy_gateways_mappings': mappings}]
+    LOG.info(formatters.output_formatter(
+        "DLR/Neutron router id mappings", mappings,
+        ['v_edges', 'policy_gateway_name']))
+    if filename:
+        f = open(filename, "w")
+        f.write("%s" % jsonutils.dumps(data))
+        f.close()
+        LOG.info("Edge mapping data saved into %s", filename)
+
+
 registry.subscribe(validate_config_for_migration,
                    constants.NSX_MIGRATE_V_T,
                    shell.Operations.VALIDATE.value)
+
+registry.subscribe(build_edge_mapping_file,
+                   constants.NSX_MIGRATE_V_T,
+                   shell.Operations.CUTOVER_MAPPINGS.value)
 
 registry.subscribe(list_ports_vif_ids,
                    constants.PORTS,
