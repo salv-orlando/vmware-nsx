@@ -126,8 +126,14 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                 context.session, binding['edge_id'])
 
             # set LB default rule
-            lb_common.set_lb_firewall_default_rule(
-                self.vcns, binding['edge_id'], 'deny')
+            try:
+                lb_common.set_lb_firewall_default_rule(
+                    self.vcns, binding['edge_id'], 'deny')
+            except nsxv_exc.VcnsApiException as e:
+                LOG.error('Failed to set loadbalancer %(lb)s '
+                          'FW rule. exception is %(exc)s',
+                          {'lb': lb['id'], 'exc': e})
+
             if edge_binding:
                 old_lb = lb_common.is_lb_on_router_edge(
                     context, self.core_plugin, binding['edge_id'])
