@@ -320,6 +320,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         tenant_id = dest_policy.get('tenant_id')
         body = self.prepare_qos_rule(source_rule, tenant_id=tenant_id)
         try:
+            rule = None
             if rule_type == 'bandwidth_limit':
                 rule = self.dest_neutron.create_bandwidth_limit_rule(
                     pol_id, body={'bandwidth_limit_rule': body})
@@ -330,12 +331,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 LOG.info("QoS rule type %(rule)s is not supported for policy "
                          "%(pol)s",
                          {'rule': rule_type, 'pol': pol_id})
-            LOG.info("created QoS policy %s rule %s", pol_id, rule)
+            if rule:
+                LOG.info("created QoS policy %s rule %s", pol_id, rule)
+                self._log_elapsed(start, "Migrate QoS rule %s" % rule['id'])
         except Exception as e:
             self.add_error("Failed to create QoS rule %(rule)s for policy "
                            "%(pol)s: %(e)s" % {'rule': body, 'pol': pol_id,
                                                'e': e})
-        self._log_elapsed(start, "Migrate QoS rule %s" % rule['id'])
 
     def migrate_qos_policies(self):
         """Migrates QoS policies from source to dest neutron."""
