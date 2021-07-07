@@ -1670,6 +1670,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 self._format_mac_address(pair['mac_address']))
             address_bindings.append(binding)
 
+        for binding1 in address_bindings[:]:
+            for binding2 in address_bindings[:]:
+                cidr1 = netaddr.IPNetwork(binding1.ip_address)
+                cidr2 = netaddr.IPNetwork(binding2.ip_address)
+                if cidr1 != cidr2 and cidr1 in cidr2:
+                    address_bindings.remove(binding1)
         return address_bindings
 
     def _get_network_nsx_id(self, context, network_id):
