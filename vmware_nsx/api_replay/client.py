@@ -14,6 +14,7 @@ import copy
 from datetime import datetime
 import logging
 import socket
+import sys
 
 import six
 
@@ -182,9 +183,9 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
             LOG.error("NSX migration is Done with %s errors:", self.n_errors)
             for err in self.errors:
                 LOG.error(err)
+            sys.exit(self.n_errors)
         else:
             LOG.info("NSX migration is Done with no errors")
-        exit(self.n_errors)
 
     def _log_elapsed(self, start_ts, text, debug=True):
         if debug:
