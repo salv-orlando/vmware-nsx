@@ -2856,6 +2856,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         tags = self.nsxpolicy.build_v3_tags_payload(
             r, resource_type='os-neutron-router-id',
             project_name=context.tenant_name)
+
+        # Upon API replay make sure a transit LS is always created
+        # to ensure also "standalone" routers can be migrated from NSX-V
+        if cfg.CONF.api_replay_mode:
+            tags.append({"tag": "v2t-gateway-transit-ls"})
+
         try:
             def _do_create_router():
                 self.nsxpolicy.tier1.create_or_overwrite(
