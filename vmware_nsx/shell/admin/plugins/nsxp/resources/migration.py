@@ -198,8 +198,10 @@ def migration_validate_external_cidrs(resource, event, trigger, **kwargs):
         net_cidr = netaddr.IPNetwork(external_cidrs[net_id]).cidr
         tier0 = external_networks.get(net_id)
         if not tier0:
-            LOG.warning("Could not find network %s in %s",
-                        net_id, ext_net_file)
+            LOG.error("Could not find network %s in %s. Please ensure "
+                      "external networks are correctly listed in "
+                      "migrator configuration ", net_id, ext_net_file)
+            sys.exit(1)
         else:
             tier0_cidrs = nsxpolicy.tier0.get_uplink_cidrs(tier0)
             for cidr in tier0_cidrs:
