@@ -1544,6 +1544,68 @@ class TestPortsV2(common_v3.NsxV3SubnetMixin,
                 self.plugin.update_port(self.ctx, port['id'], data)
                 get_profile.assert_called_once_with(self.ctx, policy_id)
 
+    def test_update_port_ip_in_allowed_pair_cidr(self):
+        with self.network() as network:
+            with self.subnet(network) as subnet:
+                data = {'port': {
+                            'network_id': network['network']['id'],
+                            'tenant_id': self._tenant_id,
+                            'admin_state_up': True,
+                            'name': 'meh',
+                            'device_id': 'fake_device',
+                            'device_owner': 'fake_owner',
+                            'fixed_ips': [
+                                {'subnet_id': subnet['subnet']['id']}],
+                            'mac_address': '00:00:00:00:00:01'}
+                        }
+            port = self.plugin.create_port(self.ctx, data)
+            with mock.patch.object(self.plugin.nsxlib.logical_port,
+                                   'update') as mock_port:
+                self.plugin.update_port(
+                    self.ctx, port['id'],
+                    {'port': {
+                        'allowed_address_pairs': [
+                            {'ip_address': subnet['subnet']['cidr']}
+                        ]}})
+                self.assertEqual(1, len(mock_port.mock_calls))
+                _n, _a, kwargs = mock_port.mock_calls[0]
+                actual_binding = kwargs['address_bindings'][0]
+                self.assertEqual(
+                    subnet['subnet']['cidr'],
+                    actual_binding.ip_address)
+
+    def test_update_port_ip_not_in_allowed_pair_cidr(self):
+        with self.network() as network:
+            with self.subnet(network) as subnet:
+                data = {'port': {
+                            'network_id': network['network']['id'],
+                            'tenant_id': self._tenant_id,
+                            'admin_state_up': True,
+                            'name': 'meh',
+                            'device_id': 'fake_device',
+                            'device_owner': 'fake_owner',
+                            'fixed_ips': [
+                                {'subnet_id': subnet['subnet']['id']}],
+                            'mac_address': '00:00:00:00:00:01'}
+                        }
+            port = self.plugin.create_port(self.ctx, data)
+            fixed_ip = port['fixed_ips'][0]['ip_address']
+            with mock.patch.object(self.plugin.nsxlib.logical_port,
+                                   'update') as mock_port:
+                self.plugin.update_port(
+                    self.ctx, port['id'],
+                    {'port': {
+                        'allowed_address_pairs': [
+                            {'ip_address': u'1.2.3.0/24'}
+                        ]}})
+                self.assertEqual(1, len(mock_port.mock_calls))
+                _n, _a, kwargs = mock_port.mock_calls[0]
+                actual_bindings = kwargs['address_bindings']
+                addresses = set([b.ip_address for b in actual_bindings])
+                self.assertEqual(
+                    set([fixed_ip, '1.2.3.0/24']),
+                    addresses)
+
     def _get_ports_with_fields(self, tenid, fields, expected_count):
         pl = directory.get_plugin()
         ctx = context.Context(user_id=None, tenant_id=tenid,
