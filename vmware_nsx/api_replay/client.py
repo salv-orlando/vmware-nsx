@@ -598,7 +598,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                "%(rtr)s: %(e)s" %
                                {'routes': routes, 'rtr': router_id, 'e': e})
             self._log_elapsed(
-                inner_start, "Migrate routes for router" % router_id)
+                inner_start, "Migrate routes for router %s" % router_id)
         self._log_elapsed(start, "Migrate Routers' routes", debug=False)
 
     def migrate_subnetpools(self):
