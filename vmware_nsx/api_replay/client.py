@@ -97,7 +97,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_name=dest_os_tenant_name,
                 password=dest_os_password,
                 auth_url=dest_os_auth_url)
-        elif dest_os_endpoint_url:
+        elif dest_os_endpoint_url and not dest_os_password:
             self.dest_neutron = self.connect_to_local_client(
                 endpoint_url=dest_os_endpoint_url)
         else:
@@ -108,7 +108,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 tenant_domain_id=dest_os_tenant_domain_id,
                 password=dest_os_password,
                 auth_url=dest_os_auth_url,
-                cert_file=cert_file)
+                cert_file=cert_file,
+                endpoint_url=dest_os_endpoint_url)
 
         if octavia_os_auth_url:
             self.octavia = self.connect_to_octavia(
@@ -206,18 +207,19 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
     def connect_to_client(self, username, user_domain_id,
                           tenant_name, tenant_domain_id,
-                          password, auth_url, cert_file):
+                          password, auth_url, cert_file,
+                          endpoint_url=None):
         sess = self._get_session(username, user_domain_id,
                                  tenant_name, tenant_domain_id,
                                  password, auth_url, cert_file)
-        neutron = client.Client(session=sess)
+        neutron = client.Client(session=sess,
+                                endpoint_override=endpoint_url)
         return neutron
 
     def connect_to_local_client(self, endpoint_url):
         neutron = client.Client(endpoint_url=endpoint_url,
                                 insecure=True,
                                 auth_strategy='noauth')
-        # test the connection:
         return neutron
 
     def connect_to_octavia(self, username, user_domain_id,
