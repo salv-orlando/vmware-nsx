@@ -279,8 +279,9 @@ class ExtendedSecurityGroupPropertiesMixin(object):
             context, port_data, only_warn=True)
 
         # get the 2 separate lists of security groups
-        sgids = self._get_security_groups_on_port(
+        sg_data = self._get_security_groups_on_port(
             context, port) or []
+        sgids = [sg.id for sg in sg_data]
         psgids = self._get_provider_security_groups_on_port(
             context, port) or []
         had_sgs = len(sgids) > 0
@@ -288,14 +289,18 @@ class ExtendedSecurityGroupPropertiesMixin(object):
         # remove provider security groups which were specified also in the
         # regular sg list
         sgids = list(set(sgids) - set(psgids))
+        # We should return the list of security group objects and a list
+        # of provider security groups ids. This is why the two lists
+        # returned by this routine have a different nature
+        sg_data_2 = [sg for sg in sg_data if sg.id in sgids]
         if not len(sgids) and had_sgs:
             # Add the default sg of the tenant if no other remained
             tenant_id = port_data.get('tenant_id')
             default_sg = self._ensure_default_security_group(
                 context, tenant_id)
-            sgids.append(default_sg)
+            sg_data_2.append(default_sg)
 
-        return (sgids, psgids)
+        return (sg_data_2, psgids)
 
     def _process_port_create_provider_security_group(self, context, p,
                                                      security_group_ids):
