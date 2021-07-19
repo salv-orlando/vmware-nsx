@@ -2568,6 +2568,13 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             resource_type = (None if overlay_net else
                              nsxlib_consts.LROUTERPORT_CENTRALIZED)
 
+            # Centralized router port require a service router
+            if resource_type == nsxlib_consts.LROUTERPORT_CENTRALIZED:
+                if not self.verify_sr_at_backend(
+                    context, router_id):
+                    self.create_service_router(
+                        context, router_id, router=router_db)
+
             # Validate the TZ of the new subnet match the one of the router
             tier0_uuid = self._get_tier0_uuid_by_router(context.elevated(),
                                                         router_db)
