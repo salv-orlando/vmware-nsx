@@ -421,7 +421,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                     dest_sec_group['security_group_rules'])
                        is False):
                         try:
-                            rule_start = datetime.elapsed()
+                            rule_start = datetime.now()
                             body = self.prepare_security_group_rule(sg_rule)
                             self.dest_neutron.create_security_group_rule(
                                 {'security_group_rule': body})
@@ -462,7 +462,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 # Use bulk rules creation for the rules of the SG
                 if not sg_rules:
                     continue
-                rules = []
+                # SG rules must be grouped per tenant
+                rules = {}
                 for sg_rule in sg_rules:
                     # skip the default rules that were already created
                     skip = False
@@ -478,8 +479,10 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                             break
                     if not skip:
                         body = self.prepare_security_group_rule(sg_rule)
-                        rules.append({'security_group_rule': body})
-
+                        tenant_id = sg_rule.get('tenant_id', 'default')
+                        tenant_rules = rules.get(tenant_id, [])
+                        tenant_rules.append({'security_group_rule': body})
+                        rules[tenant_id] = tenant_rules
                 # save rules to create once all the sgs are created
                 if rules:
                     rules_dict[sg['id']] = rules
@@ -488,15 +491,17 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         # Create the rules after all security groups are created to allow
         # dependencies in remote_group_id
-        for sg_id, sg in rules_dict.items():
+        for sg_id, sg_rules in rules_dict.items():
             try:
                 rule_start = datetime.now()
-                rules = self.dest_neutron.create_security_group_rule(
-                    {'security_group_rules': sg})
-                LOG.info("Created %d security group rules for SG %s: %s",
-                         len(rules), sg_id,
-                         ",".join([rule.get('id') for rule in
-                                   rules.get('security_group_rules', [])]))
+                for tenant_id, tenant_rules in sg_rules.items():
+                    rules = self.dest_neutron.create_security_group_rule(
+                        {'security_group_rules': tenant_rules})
+                    LOG.info("Created %d security group rules for "
+                             "SG %s and tenant %s: %s",
+                            len(rules), sg_id, tenant_id,
+                            ",".join([rule.get('id') for rule in
+                                    rules.get('security_group_rules', [])]))
                 self._log_elapsed(
                     rule_start,
                     "Migrate security group rules for group %s" % sg_id)
