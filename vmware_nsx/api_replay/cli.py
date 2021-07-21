@@ -49,6 +49,7 @@ class ApiReplayCli(object):
             dest_os_auth_url=args.dest_os_auth_url,
             dest_os_endpoint_url=args.dest_os_endpoint_url,
             dest_plugin=args.dest_plugin,
+            enable_barbican=args.enable_barbican,
             use_old_keystone=args.use_old_keystone,
             octavia_os_tenant_name=args.octavia_os_project_name,
             octavia_os_tenant_domain_id=args.octavia_os_project_domain_id,
@@ -201,6 +202,11 @@ class ApiReplayCli(object):
             "--max-retry",
             default=10,
             help="Maximum number of retrying different operations.")
+        parser.add_argument(
+            "--enable-barbican",
+            default=False,
+            action='store_true',
+            help="Meh")
 
         # NOTE: this will return an error message if any of the
         # require options are missing.
