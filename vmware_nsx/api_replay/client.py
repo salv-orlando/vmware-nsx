@@ -52,6 +52,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  dest_os_username, dest_os_user_domain_id,
                  dest_os_tenant_name, dest_os_tenant_domain_id,
                  dest_os_password, dest_os_auth_url, dest_os_endpoint_url,
+                 enable_barbican,
                  dest_plugin, use_old_keystone,
                  octavia_os_username, octavia_os_user_domain_id,
                  octavia_os_tenant_name, octavia_os_tenant_domain_id,
@@ -120,14 +121,17 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 password=octavia_os_password,
                 auth_url=octavia_os_auth_url,
                 cert_file=cert_file)
-            self.barbican = self.connect_to_barbican(
-                username=octavia_os_username,
-                user_domain_id=octavia_os_user_domain_id,
-                tenant_name=octavia_os_tenant_name,
-                tenant_domain_id=octavia_os_tenant_domain_id,
-                password=octavia_os_password,
-                auth_url=octavia_os_auth_url,
-                cert_file=cert_file)
+            if enable_barbican:
+                self.barbican = self.connect_to_barbican(
+                    username=octavia_os_username,
+                    user_domain_id=octavia_os_user_domain_id,
+                    tenant_name=octavia_os_tenant_name,
+                    tenant_domain_id=octavia_os_tenant_domain_id,
+                    password=octavia_os_password,
+                    auth_url=octavia_os_auth_url,
+                    cert_file=cert_file)
+            else:
+                self.barbican = None
         else:
             self.octavia = None
             self.barbican = None
@@ -1068,7 +1072,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                     cert_data.private_key_passphrase.payload)
             return None
 
-        if listener_dict.get('default_tls_container_ref'):
+        if listener_dict.get('default_tls_container_ref') and self.barbican:
             cert_data = self.barbican.containers.get(
                 container_ref=listener_dict['default_tls_container_ref'])
             return {'ref': listener_dict['default_tls_container_ref'],
