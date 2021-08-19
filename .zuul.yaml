@@ -7,7 +7,6 @@
       - openstack-cover-jobs
     check:
       jobs:
-        - vmware-tox-lower-constraints
         - openstack-tox-pep8:
             required-projects:
               - openstack/neutron
@@ -17,7 +16,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py36:
             timeout: 5400
@@ -29,7 +28,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py37:
             timeout: 5400
@@ -41,7 +40,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py38:
             timeout: 5400
@@ -53,7 +52,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-cover:
             timeout: 5400
@@ -65,13 +64,12 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
             voting: false
     gate:
       queue: vmware-nsx
       jobs:
-        - vmware-tox-lower-constraints
         - openstack-tox-pep8:
             required-projects:
               - openstack/neutron
@@ -81,7 +79,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py36:
             timeout: 5400
@@ -93,7 +91,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py37:
             timeout: 5400
@@ -105,7 +103,7 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
         - openstack-tox-py38:
             timeout: 5400
@@ -117,20 +115,5 @@
               - openstack/neutron-fwaas
               - openstack/neutron-dynamic-routing
               - openstack/neutron-vpnaas
-              - x/tap-as-a-service
+              - openstack/tap-as-a-service
               - openstack/octavia
-
-- job:
-    name: vmware-tox-lower-constraints
-    parent: openstack-tox-lower-constraints
-    timeout: 5400
-    required-projects:
-      - openstack/neutron
-      - x/networking-l2gw
-      - openstack/networking-sfc
-      - x/vmware-nsxlib
-      - openstack/neutron-fwaas
-      - openstack/neutron-dynamic-routing
-      - openstack/neutron-vpnaas
-      - x/tap-as-a-service
-      - openstack/octavia
