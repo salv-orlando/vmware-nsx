@@ -33,7 +33,7 @@ from vmware_nsx.extensions import projectpluginmap
 from vmware_nsx.services.dynamic_routing.nsx_v import driver as nsxv_driver
 
 LOG = logging.getLogger(__name__)
-PLUGIN_NAME = bgp_ext.BGP_EXT_ALIAS + '_nsx_svc_plugin'
+PLUGIN_NAME = 'bgp_nsx_svc_plugin'
 
 
 class NSXBgpPlugin(service_base.ServicePluginBase, bgp_db.BgpDbMixin):
@@ -42,8 +42,7 @@ class NSXBgpPlugin(service_base.ServicePluginBase, bgp_db.BgpDbMixin):
     Currently only the nsx-v is supported. other plugins will be refused.
     """
 
-    supported_extension_aliases = [bgp_ext.BGP_EXT_ALIAS,
-                                   ext_esg.ALIAS]
+    supported_extension_aliases = ['bgp', ext_esg.ALIAS]
 
     def __init__(self):
         super(NSXBgpPlugin, self).__init__()
@@ -65,7 +64,7 @@ class NSXBgpPlugin(service_base.ServicePluginBase, bgp_db.BgpDbMixin):
         return PLUGIN_NAME
 
     def get_plugin_type(self):
-        return bgp_ext.BGP_EXT_ALIAS
+        return 'bgp'
 
     def get_plugin_description(self):
         """returns string description of the plugin."""
@@ -115,7 +114,7 @@ class NSXBgpPlugin(service_base.ServicePluginBase, bgp_db.BgpDbMixin):
             speaker = self.get_bgp_speaker(context, bgp_speaker_id)
         except Exception:
             msg = _("BGP speaker %s could not be found") % bgp_speaker_id
-            raise n_exc.BadRequest(resource=bgp_ext.BGP_SPEAKER_RESOURCE_NAME,
+            raise n_exc.BadRequest(resource='bgp-speaker',
                                    msg=msg)
         return self._get_driver_by_project(context, speaker['tenant_id'])
 
@@ -236,7 +235,7 @@ class NSXBgpPlugin(service_base.ServicePluginBase, bgp_db.BgpDbMixin):
         """Make sure the network belongs to the NSX0-V plugin"""
         if not network_info.get('network_id'):
             msg = _("network_id must be specified")
-            raise n_exc.BadRequest(resource=bgp_ext.BGP_SPEAKER_RESOURCE_NAME,
+            raise n_exc.BadRequest(resource='bgp-speaker',
                                    msg=msg)
         net_id = network_info['network_id']
         p = self._core_plugin._get_plugin_from_net_id(context, net_id)

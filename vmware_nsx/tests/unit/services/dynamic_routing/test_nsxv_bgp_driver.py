@@ -40,7 +40,7 @@ class TestNSXvBgpPlugin(test_plugin.NsxVPluginV2TestCase,
                         test_bgp_db.BgpTests):
     def setUp(self):
         extensions.append_api_extensions_path(dr_extensions.__path__)
-        service_plugins = {ext_bgp.BGP_EXT_ALIAS: BGP_PLUGIN}
+        service_plugins = {'bgp': BGP_PLUGIN}
         super(TestNSXvBgpPlugin, self).setUp(service_plugins=service_plugins)
         self.bgp_plugin = bgp_plugin.NSXvBgpPlugin()
         self.nsxv_driver = self.bgp_plugin.drivers['nsx-v']
