@@ -669,6 +669,10 @@ def build_edge_mapping_file(resource, event, trigger, **kwargs):
                     mappings.append(
                         {'v_edges': [edge_id],
                          'policy_gateway_name': router['id']})
+    if not mappings:
+        LOG.info("No edge mapping available. Not producing output file")
+        return
+
     data = [{'name': 'dlr_edges_to_migrate',
              'v_edges_to_policy_gateways_mappings': mappings}]
     LOG.info(formatters.output_formatter(
