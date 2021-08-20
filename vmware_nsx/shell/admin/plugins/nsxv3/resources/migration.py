@@ -211,6 +211,22 @@ def verify_component_status(nsxlib, component_number):
     return COMPONENT_STATUS_OK
 
 
+def wait_for_component_success(nsxlib, component_number):
+    while True:
+        status = get_migration_status(nsxlib)
+        try:
+            component_status = (
+                status['component_status'][component_number].get('status'))
+        except IndexError:
+            LOG.error("Unable to fetch component #%d. Migrator status: %s",
+                      component_number, status)
+        if component_status == POLICY_API_STATUS_SUCCESS:
+            return
+        LOG.debug("Component #%d status is %s. Waiting 5 seconds",
+                  component_number, component_status)
+        time.sleep(5)
+
+
 def wait_on_overall_migration_status_to_pause(nsxlib):
     while True:
         status = get_migration_status(nsxlib)
@@ -218,7 +234,7 @@ def wait_on_overall_migration_status_to_pause(nsxlib):
         if (migration_status == POLICY_API_STATUS_PAUSED or
             migration_status == POLICY_API_STATUS_SUCCESS):
             break
-        time.sleep(1)
+        time.sleep(5)
 
 
 def printable_resource_name(resource):
@@ -376,7 +392,10 @@ def migrate_objects(nsxlib, data, use_admin=False):
         global ROLLBACK_DATA
         # rollback should be done in the reverse order
         ROLLBACK_DATA = [data] + ROLLBACK_DATA
-
+    LOG.debug("Ensuring MP_TO_POLICY_MIGRATION component is success "
+              "before moving on to next migration")
+    wait_for_component_success(nsxlib, 1)
+    LOG.debug("Migration completed for %d objects", len(data['resource_ids']))
     return True
 
 
