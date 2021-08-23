@@ -91,7 +91,7 @@ class ExtendedSecurityGroupPropertiesMixin(object):
             'is_default': default_sg,
         }
 
-        self._registry_notify(resources.SECURITY_GROUP, events.BEFORE_CREATE,
+        self._registry_publish(resources.SECURITY_GROUP, events.BEFORE_CREATE,
                               exc_cls=ext_sg.SecurityGroupConflict,
                               payload=events.DBEventPayload(
                                   context, metadata={'is_default': default_sg},

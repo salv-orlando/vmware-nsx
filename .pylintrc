@@ -41,6 +41,7 @@ disable=
  super-init-not-called,
  super-on-old-class,
  unpacking-non-sequence,
+ unspecified-encoding,
  unused-argument,
  unused-import,
  unused-variable,

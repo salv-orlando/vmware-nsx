@@ -64,7 +64,7 @@ class Lsn(api_extensions.ExtensionDescriptor):
         plugin = directory.get_plugin()
         resource_name = ALIAS
         collection_name = resource_name.replace('_', '-') + "s"
-        params = RESOURCE_ATTRIBUTE_MAP.get(COLLECTION_NAME, dict())
+        params = RESOURCE_ATTRIBUTE_MAP.get(COLLECTION_NAME, {})
         controller = base.create_resource(collection_name,
                                           resource_name,
                                           plugin, params, allow_bulk=False)

@@ -1041,7 +1041,7 @@ register_nsxp_azs(cfg.CONF, cfg.CONF.nsx_p.availability_zones)
 
 
 def _get_nsx_az_opts(az, opts):
-    az_info = dict()
+    az_info = {}
     group = 'az:%s' % az
     if group not in cfg.CONF:
         raise nsx_exc.NsxInvalidConfiguration(
