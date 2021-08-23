@@ -115,16 +115,17 @@ from vmware_nsxlib.v3 import utils as nsxlib_utils
 
 
 LOG = log.getLogger(__name__)
-NSX_V3_NO_PSEC_PROFILE_NAME = 'nsx-default-spoof-guard-vif-profile'
+# Hardcoded NSX Profile IDs
+NSX_V3_NO_PSEC_PROFILE_ID = 'fad98876-d7ff-11e4-b9d6-1681e6b88ec1'
+NSX_V3_NON_VIF_PROFILE_ID = '47ffda0e-035f-4900-83e4-0a2086813ede'
+NSX_V3_NON_VIF_ENS_PROFILE_ID = '04b4dd63-0eba-47f2-a310-2dde25471c51'
+# Plugin-created profiles and firewall sections
 NSX_V3_MAC_LEARNING_PROFILE_NAME = 'neutron_port_mac_learning_profile'
 NSX_V3_MAC_DISABLED_PROFILE_NAME = 'neutron_port_mac_learning_disabled_profile'
 NSX_V3_FW_DEFAULT_SECTION = 'OS Default Section for Neutron Security-Groups'
 NSX_V3_FW_DEFAULT_NS_GROUP = 'os_default_section_ns_group'
 NSX_V3_DEFAULT_SECTION = 'OS-Default-Section'
 NSX_V3_EXCLUDED_PORT_NSGROUP_NAME = 'neutron_excluded_port_nsgroup'
-NSX_V3_NON_VIF_PROFILE = 'nsx-default-switch-security-non-vif-profile'
-NSX_V3_NON_VIF_ENS_PROFILE = \
-    'nsx-default-switch-security-non-vif-profile-for-ens'
 NSX_V3_SERVER_SSL_PROFILE = 'nsx-default-server-ssl-profile'
 NSX_V3_CLIENT_SSL_PROFILE = 'nsx-default-client-ssl-profile'
 
@@ -488,11 +489,10 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             msg = _("Unable to initialize NSX v3 port spoofguard switching "
                     "profile: %s") % v3_utils.NSX_V3_PSEC_PROFILE_NAME
             raise nsx_exc.NsxPluginException(err_msg=msg)
-        profile_client = self.nsxlib.switching_profile
-        no_psec_prof = profile_client.find_by_display_name(
-            NSX_V3_NO_PSEC_PROFILE_NAME)[0]
-        self._no_psec_profile_id = profile_client.build_switch_profile_ids(
-            profile_client, no_psec_prof)[0]
+
+        self._no_psec_profile_id = nsx_resources.SwitchingProfileTypeId(
+            profile_type=(nsx_resources.SwitchingProfileTypes.SPOOF_GUARD),
+            profile_id=NSX_V3_NO_PSEC_PROFILE_ID)
 
         LOG.debug("Initializing NSX v3 DHCP switching profile")
         try:
@@ -519,14 +519,13 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                             {'name': NSX_V3_MAC_LEARNING_PROFILE_NAME,
                              'reason': e})
 
-        no_switch_security_prof = profile_client.find_by_display_name(
-                NSX_V3_NON_VIF_PROFILE)[0]
-        self._no_switch_security = profile_client.build_switch_profile_ids(
-            profile_client, no_switch_security_prof)[0]
-        no_switch_security_prof = profile_client.find_by_display_name(
-                NSX_V3_NON_VIF_ENS_PROFILE)[0]
-        self._no_switch_security_ens = profile_client.build_switch_profile_ids(
-            profile_client, no_switch_security_prof)[0]
+        self._no_switch_security = nsx_resources.SwitchingProfileTypeId(
+            profile_type=(nsx_resources.SwitchingProfileTypes.SWITCH_SECURITY),
+            profile_id=NSX_V3_NON_VIF_PROFILE_ID)
+
+        self._no_switch_security_ens = nsx_resources.SwitchingProfileTypeId(
+            profile_type=(nsx_resources.SwitchingProfileTypes.SWITCH_SECURITY),
+            profile_id=NSX_V3_NON_VIF_ENS_PROFILE_ID)
 
         self.server_ssl_profile = None
         self.client_ssl_profile = None
