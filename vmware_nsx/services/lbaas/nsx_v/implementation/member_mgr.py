@@ -29,6 +29,35 @@ from vmware_nsx.services.lbaas.nsx_v import lbaas_common as lb_common
 LOG = logging.getLogger(__name__)
 
 
+def _member_to_backend_member(member):
+    return {
+            'ipAddress': member['address'],
+            'weight': member['weight'],
+            'port': member['protocol_port'],
+            'monitorPort': member['protocol_port'],
+            'name': lb_common.get_member_id(member['id']),
+            'condition': 'enabled' if member['admin_state_up'] else 'disabled'}
+
+
+def _validate_pool_members(pool, edge_pool):
+    member_ips = set([m['address'] for m in pool.get('members', [])])
+    edge_ips = set(
+        [m['ipAddress'] for m in edge_pool.get('member', [])])
+
+    # Remove redundant IPs from edge pool
+    for ip in edge_ips - member_ips:
+        for edge_member in edge_pool['member']:
+            if ip == edge_member['ipAddress']:
+                edge_pool['member'].remove(edge_member)
+
+    # Add missing members on edge
+    for ip in member_ips - edge_ips:
+        for member in pool['members']:
+            if ip == member['address']:
+                edge_pool['member'].append(
+                    _member_to_backend_member(member))
+
+
 class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
     @log_helpers.log_method_call
     def __init__(self, vcns_driver):
@@ -89,14 +118,8 @@ class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                         member['tenant_id'])
 
             edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
-            edge_member = {
-                'ipAddress': member['address'],
-                'weight': member['weight'],
-                'port': member['protocol_port'],
-                'monitorPort': member['protocol_port'],
-                'name': lb_common.get_member_id(member['id']),
-                'condition':
-                    'enabled' if member['admin_state_up'] else 'disabled'}
+            _validate_pool_members(member['pool'], edge_pool)
+            edge_member = _member_to_backend_member(member)
 
             if edge_pool.get('member'):
                 edge_pool['member'].append(edge_member)
@@ -144,6 +167,7 @@ class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
 
         with locking.LockManager.get_lock(edge_id):
             edge_pool = self.vcns.get_pool(edge_id, edge_pool_id)[1]
+            _validate_pool_members(new_member['pool'], edge_pool)
 
             if edge_pool.get('member'):
                 for i, m in enumerate(edge_pool['member']):
@@ -222,6 +246,7 @@ class EdgeMemberManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                             edge_pool_id, edge_id)
                 completor(success=True)
                 return
+            _validate_pool_members(member['pool'], edge_pool)
 
             for i, m in enumerate(edge_pool['member']):
                 if m['name'] == lb_common.get_member_id(member['id']):
