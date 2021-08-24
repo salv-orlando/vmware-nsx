@@ -30,8 +30,8 @@ from octavia.db import api as db_apis
 from octavia.db import repositories
 from octavia_lib.api.drivers import driver_lib
 from octavia_lib.api.drivers import exceptions
-
 from octavia_lib.api.drivers import provider_base as driver_base
+from octavia_lib.common import constants as o_const
 
 from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.octavia import constants as d_const
@@ -723,6 +723,14 @@ class NSXOctaviaDriverEndpoint(driver_lib.DriverLibrary):
         except exceptions.UpdateStatisticsError as e:
             LOG.error("Failed to update Octavia listener statistics. "
                       "Stats %s, Error %s", statistics, e.fault_string)
+
+    @log_helpers.log_method_call
+    def get_active_loadbalancers(self, ctxt):
+        # refresh the driver lib session
+        self.db_session = db_apis.get_session()
+        lbs, _ = self.repositories.load_balancer.get_all(
+            self.db_session, provisioning_status=o_const.ACTIVE)
+        return [lb.id for lb in lbs]
 
 
 @log_helpers.log_method_call
