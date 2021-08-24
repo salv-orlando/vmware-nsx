@@ -878,27 +878,6 @@ class TestSubnetsV2(common_v3.NsxV3TestSubnets, NsxV3PluginTestCaseMixin):
                                    network_req.get_response(self.api))
         return network
 
-    def test_create_subnet_with_conflicting_t0_address(self):
-        network = self._create_external_network()
-        data = {'subnet': {'network_id': network['network']['id'],
-                           'cidr': '172.20.1.0/24',
-                           'name': 'sub1',
-                           'enable_dhcp': False,
-                           'dns_nameservers': None,
-                           'allocation_pools': None,
-                           'tenant_id': 'tenant_one',
-                           'host_routes': None,
-                           'ip_version': 4}}
-        ports = [{'subnets': [{'ip_addresses': [u'172.20.1.60'],
-                               'prefix_length': 24}],
-                  'resource_type': 'LogicalRouterUpLinkPort'}]
-        with mock.patch.object(self.plugin.nsxlib.logical_router_port,
-                               'get_by_router_id',
-                               return_value=ports):
-            self.assertRaises(n_exc.InvalidInput,
-                              self.plugin.create_subnet,
-                              context.get_admin_context(), data)
-
     def test_subnet_native_dhcp_subnet_enabled(self):
         self._enable_native_dhcp_md()
         with self.network() as network:
