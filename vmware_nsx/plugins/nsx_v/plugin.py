@@ -386,7 +386,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
             self.octavia_stats_collector = (
                 octavia_listener.NSXOctaviaStatisticsCollector(
                     self,
-                    self._get_octavia_stats_getter()))
+                    self._get_octavia_stats_getter(),
+                    self._get_octavia_status_getter()))
 
     def init_complete(self, resource, event, trigger, payload=None):
         with locking.LockManager.get_lock('plugin-init-complete'):
@@ -445,6 +446,9 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
 
     def _get_octavia_stats_getter(self):
         return listener_mgr.stats_getter
+
+    def _get_octavia_status_getter(self):
+        return loadbalancer_mgr.status_getter
 
     def _validate_nsx_version(self):
         ver = self.nsx_v.vcns.get_version()
