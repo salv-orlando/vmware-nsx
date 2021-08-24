@@ -2782,26 +2782,6 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                     LOG.error(msg)
                     raise n_exc.InvalidInput(error_message=msg)
 
-        # Ensure that the NSX uplink cidr does not lie on the same subnet as
-        # the external subnet
-        filters = {'id': [subnet['network_id']],
-                   'router:external': [True]}
-        external_nets = self.get_networks(context, filters=filters)
-        tier0_routers = [ext_net[pnet.PHYSICAL_NETWORK]
-                         for ext_net in external_nets
-                         if ext_net.get(pnet.PHYSICAL_NETWORK)]
-
-        for tier0_rtr in set(tier0_routers):
-            tier0_cidrs = self._get_tier0_uplink_cidrs(tier0_rtr)
-            for cidr in tier0_cidrs:
-                tier0_subnet = netaddr.IPNetwork(cidr).cidr
-                for subnet_network in subnet_networks:
-                    if self._cidrs_overlap(tier0_subnet, subnet_network):
-                        msg = _("External subnet cannot overlap with T0 "
-                                "router cidr %s") % cidr
-                        LOG.error(msg)
-                        raise n_exc.InvalidInput(error_message=msg)
-
     def _need_router_no_dnat_rules(self, subnet):
         # NAT is not supported for IPv6
         return (subnet['ip_version'] == 4)

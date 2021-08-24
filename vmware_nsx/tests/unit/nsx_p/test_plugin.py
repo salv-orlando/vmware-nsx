@@ -1362,41 +1362,6 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
         kwargs.update({'override': overrides})
         return self._create_bulk(fmt, number, 'subnet', base_data, **kwargs)
 
-    def test_create_external_subnet_with_conflicting_t0_address(self):
-        with self._create_l3_ext_network() as network:
-            data = {'subnet': {'network_id': network['network']['id'],
-                               'cidr': '172.20.1.0/24',
-                               'name': 'sub1',
-                               'enable_dhcp': False,
-                               'dns_nameservers': None,
-                               'allocation_pools': None,
-                               'tenant_id': 'tenant_one',
-                               'host_routes': None,
-                               'ip_version': 4}}
-            with mock.patch.object(self.plugin.nsxpolicy.tier0,
-                                   'get_uplink_cidrs',
-                                   return_value=['172.20.1.60/24']):
-                self.assertRaises(n_exc.InvalidInput,
-                                  self.plugin.create_subnet,
-                                  context.get_admin_context(), data)
-
-    def test_create_external_subnet_with_non_conflicting_t0_address(self):
-        with self._create_l3_ext_network() as network:
-            data = {'subnet': {'network_id': network['network']['id'],
-                               'cidr': '172.20.1.0/24',
-                               'name': 'sub1',
-                               'enable_dhcp': False,
-                               'dns_nameservers': None,
-                               'allocation_pools': None,
-                               'tenant_id': 'tenant_one',
-                               'host_routes': None,
-                               'ip_version': 4}}
-            with mock.patch.object(self.plugin.nsxpolicy.tier0,
-                                   'get_uplink_ips',
-                                   return_value=['172.20.2.60']):
-                self.plugin.create_subnet(
-                    context.get_admin_context(), data)
-
     @common_v3.with_disable_dhcp_once
     def test_create_subnet_ipv6_slaac_with_port_on_network(self):
         super(NsxPTestSubnets,
