@@ -1150,6 +1150,18 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         dhcp_port = self._get_net_dhcp_port(context, net_id)
         return True if dhcp_port else False
 
+    def _get_segment_subnets_versions(self, context, net_id):
+        # Find networks DHCP enabled subnets
+        versions = set()
+        with db_api.CONTEXT_READER.using(context):
+            network = self._get_network(context, net_id)
+        for subnet in network.subnets:
+            if(subnet.enable_dhcp and
+                (subnet.ip_version == 4 or
+                subnet.ipv6_address_mode != const.IPV6_SLAAC)):
+                versions.add(subnet.ip_version)
+        return versions
+
     def _get_segment_subnets(self, context, net_id, net_az=None,
                              interface_subnets=None,
                              deleted_dhcp_subnets=None):
@@ -1242,12 +1254,19 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # Update the DHCP server on the segment
         net_id = network['id']
         segment_id = self._get_network_nsx_segment_id(context, net_id)
-
+        seg_subnets_ip_ver = self._get_segment_subnets_versions(
+            context, net_id)
         seg_subnets = self._get_segment_subnets(context, net_id, net_az=az)
         dhcp_config = self._get_segment_dhcp_server_config(segment_id, az)
+        # Multicast cannot be enabled on segments with v6 subnets only
+        if len(seg_subnets_ip_ver) == 1 and seg_subnets_ip_ver.pop() == 6:
+            multicast = False
+        else:
+            multicast = True
         # Update dhcp server config on the segment
         self.nsxpolicy.segment.update(
             segment_id=segment_id,
+            multicast=multicast,
             dhcp_server_config_id=dhcp_config,
             subnets=seg_subnets)
 
