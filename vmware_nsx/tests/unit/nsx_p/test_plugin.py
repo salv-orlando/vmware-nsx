@@ -1480,6 +1480,7 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
             # verify backend calls
             seg_update.assert_called_once_with(
                 dhcp_server_config_id=NSX_DHCP_PROFILE_ID,
+                multicast=False,
                 segment_id=subnet['subnet']['network_id'],
                 subnets=[mock.ANY])
 
