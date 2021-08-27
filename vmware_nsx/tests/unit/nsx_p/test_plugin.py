@@ -1494,6 +1494,7 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                 seg_update.assert_called_with(
                     dhcp_server_config_id=NSX_DHCP_PROFILE_ID,
                     segment_id=subnet['subnet']['network_id'],
+                    multicast=False,
                     subnets=[mock.ANY])
 
     def test_subnet_disable_dhcpv6(self):
@@ -1513,6 +1514,7 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                 seg_update.assert_called_once_with(
                     dhcp_server_config_id=None,
                     segment_id=subnet['subnet']['network_id'],
+                    multicast=False,
                     subnets=[])
 
     def test_delete_ipv6_dhcp_subnet(self):
@@ -1531,6 +1533,7 @@ class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                 seg_update.assert_called_once_with(
                     dhcp_server_config_id=None,
                     segment_id=subnet['subnet']['network_id'],
+                    multicast=False,
                     subnets=[])
 
 
@@ -2081,6 +2084,7 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                     # We expect two subnet objects on segment
                     seg_update.assert_called_with(
                         n['network']['id'],
+                        multicast=True,
                         subnets=[mock.ANY, mock.ANY],
                         tier1_id=r['router']['id'])
 
