@@ -660,6 +660,23 @@ class TestEdgeLbaasV2Pool(BaseTestEdgeLbaasV2):
             self.assertTrue(self.last_completor_succees)
 
 
+def _nsx_member(ip_address):
+    return {'ipAddress': ip_address,
+            'weight': 1,
+            'port': 80,
+            'monitorPort': 80,
+            'name': 'member-test',
+            'condition': 'enabled'}
+
+
+def _lbaas_member(ip_address):
+    return {'address': ip_address,
+            'weight': 1,
+            'protocol_port': 80,
+            'id': 'test',
+            'admin_state_up': True}
+
+
 class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
     def setUp(self):
         super(TestEdgeLbaasV2Member, self).setUp()
@@ -711,7 +728,7 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
             edge_pool_def = EDGE_POOL_DEF.copy()
             edge_pool_def['member'] = [EDGE_MEMBER_DEF]
             mock_get_pool.return_value = (None, edge_pool_def)
-
+            new_member_dict['pool']['members'] = [{'address': MEMBER_ADDRESS}]
             self.edge_driver.member.update(
                 self.context, self.member_dict,
                 new_member_dict, self.completor)
@@ -758,6 +775,33 @@ class TestEdgeLbaasV2Member(BaseTestEdgeLbaasV2):
                 self.context, self.core_plugin, LB_ID, None)
             self.assertTrue(self.last_completor_called)
             self.assertTrue(self.last_completor_succees)
+
+    def _do_member_validation_test(self, in_ips, in_edge_ips, out_edge_ips):
+        pool = self.pool_dict.copy()
+        edge_pool = EDGE_POOL_DEF.copy()
+
+        pool['members'] = [_lbaas_member(m) for m in in_ips]
+
+        edge_pool['member'] = [_nsx_member(m) for m in in_edge_ips]
+
+        member_mgr._validate_pool_members(pool, edge_pool)
+        self.assertEqual(edge_pool['member'], [_nsx_member(m)
+                                               for m in out_edge_ips])
+
+    def test_validate_pool_members_valid_lists(self):
+        self._do_member_validation_test(['10.0.0.10', '10.0.0.11'],
+                                        ['10.0.0.10', '10.0.0.11'],
+                                        ['10.0.0.10', '10.0.0.11'])
+
+    def test_validate_pool_members_nsx_extra(self):
+        self._do_member_validation_test(['10.0.0.10'],
+                                        ['10.0.0.10', '10.0.0.11'],
+                                        ['10.0.0.10'])
+
+    def test_validate_pool_members_lbaas_extra(self):
+        self._do_member_validation_test(['10.0.0.10', '10.0.0.11'],
+                                        ['10.0.0.10'],
+                                        ['10.0.0.10', '10.0.0.11'])
 
 
 class TestEdgeLbaasV2HealthMonitor(BaseTestEdgeLbaasV2):
