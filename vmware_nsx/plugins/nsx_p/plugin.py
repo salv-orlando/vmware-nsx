@@ -1156,11 +1156,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         with db_api.CONTEXT_READER.using(context):
             network = self._get_network(context, net_id)
         for subnet in network.subnets:
-            if(subnet.enable_dhcp and
-                (subnet.ip_version == 4 or
-                subnet.ipv6_address_mode != const.IPV6_SLAAC)):
-                versions.add(subnet.ip_version)
+            versions.add(subnet.ip_version)
         return versions
+
+    def _get_segment_multicast_setting(self, context, net_id):
+        seg_subnets_ip_ver = self._get_segment_subnets_versions(
+            context, net_id)
+        # Multicast cannot be enabled on segments with v6 subnets only
+        if len(seg_subnets_ip_ver) == 1 and seg_subnets_ip_ver.pop() == 6:
+            return False
+        return True
 
     def _get_segment_subnets(self, context, net_id, net_az=None,
                              interface_subnets=None,
@@ -1254,15 +1259,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         # Update the DHCP server on the segment
         net_id = network['id']
         segment_id = self._get_network_nsx_segment_id(context, net_id)
-        seg_subnets_ip_ver = self._get_segment_subnets_versions(
-            context, net_id)
+        multicast = self._get_segment_multicast_setting(context, net_id)
         seg_subnets = self._get_segment_subnets(context, net_id, net_az=az)
         dhcp_config = self._get_segment_dhcp_server_config(segment_id, az)
-        # Multicast cannot be enabled on segments with v6 subnets only
-        if len(seg_subnets_ip_ver) == 1 and seg_subnets_ip_ver.pop() == 6:
-            multicast = False
-        else:
-            multicast = True
         # Update dhcp server config on the segment
         self.nsxpolicy.segment.update(
             segment_id=segment_id,
@@ -1285,6 +1284,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         net_id = network['id']
         net_dhcp_subnets = self._get_net_dhcp_subnets(context, net_id)
         segment_id = self._get_network_nsx_segment_id(context, net_id)
+        multicast = self._get_segment_multicast_setting(context, net_id)
 
         if subnet_id and len(net_dhcp_subnets) > 1:
             # remove dhcp only from this subnet
@@ -1292,6 +1292,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 context, net_id, deleted_dhcp_subnets=[subnet_id])
             self.nsxpolicy.segment.update(
                 segment_id,
+                multicast=multicast,
                 subnets=seg_subnets)
             self._delete_subnet_dhcp_port(context, net_id, subnet_id=subnet_id)
         else:
@@ -1300,6 +1301,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 context, net_id, deleted_dhcp_subnets=net_dhcp_subnets)
             self.nsxpolicy.segment.update(
                 segment_id=segment_id,
+                multicast=multicast,
                 subnets=seg_subnets,
                 dhcp_server_config_id=None)
 
@@ -1337,9 +1339,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         ports = self.get_ports(context, filters=filters)
         dhcp_server_config = self._get_segment_dhcp_server_config(
             segment_id, az)
+        multicast = self._get_segment_multicast_setting(context, net_id)
         self.nsxpolicy.segment.update(
             segment_id=segment_id,
             dhcp_server_config_id=dhcp_server_config,
+            multicast=multicast,
             subnets=seg_subnets)
 
         # Update DHCP bindings for all the ports.
@@ -3201,8 +3205,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 # overlay interface
                 pol_subnets = self._get_segment_subnets(
                     context, network_id, interface_subnets=rtr_subnets)
+                multicast = self._get_segment_multicast_setting(
+                    context, network_id)
                 self.nsxpolicy.segment.update(segment_id,
                                               tier1_id=router_id,
+                                              multicast=multicast,
                                               subnets=pol_subnets)
 
                 # will update the router only if needed
@@ -3291,7 +3298,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 # (it is possible to have both IPv4 & 6 subnets)
                 seg_subnets = self._get_segment_subnets(
                     context, network_id, interface_subnets=net_rtr_subnets)
-
+                multicast = self._get_segment_multicast_setting(
+                    context, network_id)
                 if not net_rtr_subnets and not seg_subnets:
                     # Remove the tier1 connectivity of this segment
                     # This must be done is a separate call as it uses PUT
@@ -3307,6 +3315,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     # update remaining (DHCP/ipv4/6) subnets
                     if seg_subnets:
                         self.nsxpolicy.segment.update(segment_id,
+                                                      multicast=multicast,
                                                       subnets=seg_subnets)
 
                 # will update the router only if needed
