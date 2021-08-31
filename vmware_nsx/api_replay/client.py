@@ -1103,11 +1103,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         lb_body_for_deletion = copy.deepcopy(lb_body)
         lb_body_for_deletion['listeners'] = []
         lb_body_for_deletion['pools'] = []
+        LOG.debug("Migrating load balancer: %s", lb_id)
 
         listeners_map = {}
         for listener_dict in lb.get('listeners', []):
             start_listener = datetime.now()
             listener_id = listener_dict['id']
+            LOG.debug("Migrating listener: %s", listener_id)
             listener = orig_map['listeners'][listener_id]
             cert = self._create_lb_certificate(listener)
             body = self.prepare_lb_listener(listener, lb_body)
@@ -1127,6 +1129,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         for pool_dict in lb.get('pools', []):
             start_pool = datetime.now()
             pool_id = pool_dict['id']
+            LOG.debug("Migrating pool: %s", pool_id)
             pool = orig_map['pools'][pool_id]
             pool_body = self.prepare_lb_pool(pool, lb_body)
             # Update listeners in pool
@@ -1177,32 +1180,33 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 lb_body_for_deletion['pools'][-1]['healthmonitor'] = body
             self._log_elapsed(start_pool, "Migrate LB Pool %s" % pool_id)
 
-            # Add listeners L7 policies
-            for listener_id in listeners_map.keys():
-                listener = orig_map['listeners'][listener_id]
-                for l7pol_dict in listener.get('l7policies', []):
-                    start_l7pol = datetime.now()
-                    l7_pol_id = l7pol_dict['id']
-                    l7pol = orig_map['l7pols'][l7_pol_id]
-                    pol_body = self.prepare_lb_l7policy(l7pol)
+        # Add listeners L7 policies
+        for listener_id in listeners_map.keys():
+            listener = orig_map['listeners'][listener_id]
+            for l7pol_dict in listener.get('l7policies', []):
+                start_l7pol = datetime.now()
+                l7_pol_id = l7pol_dict['id']
+                LOG.debug("Migrating L7 policy %s for listener %s",
+                          l7_pol_id, listener_id)
+                l7pol = orig_map['l7pols'][l7_pol_id]
+                pol_body = self.prepare_lb_l7policy(l7pol)
 
-                    # Add the rules of this policy
-                    source_l7rules = self.octavia.l7rule_list(
-                        l7_pol_id)['rules']
-                    for rule in source_l7rules:
-                        rule_body = self.prepare_lb_l7rule(rule)
-                        pol_body['rules'].append(rule_body)
+                # Add the rules of this policy
+                source_l7rules = self.octavia.l7rule_list(
+                    l7_pol_id)['rules']
+                for rule in source_l7rules:
+                    rule_body = self.prepare_lb_l7rule(rule)
+                    pol_body['rules'].append(rule_body)
 
-                    kw = {'l7policy': pol_body}
-                    if not self.octavia_rpc_client.call(
-                            {}, 'l7policy_create', **kw):
-                        self.add_error("Failed to create l7policy "
-                                       "(%(l7pol)s)" %
-                                       {'l7pol': l7pol})
-                        self._delete_octavia_lb(lb_body_for_deletion)
-                        return
-                    self._log_elapsed(
-                        start_l7pol, "Migrate L7 LB policy %s" % l7_pol_id)
+                kw = {'l7policy': pol_body}
+                if not self.octavia_rpc_client.call(
+                        {}, 'l7policy_create', **kw):
+                    self.add_error("Failed to create l7policy "
+                                   "(%(l7pol)s)" % {'l7pol': l7pol})
+                    self._delete_octavia_lb(lb_body_for_deletion)
+                    return
+                self._log_elapsed(
+                    start_l7pol, "Migrate L7 LB policy %s" % l7_pol_id)
         self._log_elapsed(start_lb, "Migrate Load Balancer %s" % lb_id)
         LOG.info("Created loadbalancer %s/%s: %s", count, total_num, lb_id)
 
