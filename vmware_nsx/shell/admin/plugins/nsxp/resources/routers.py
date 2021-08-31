@@ -120,6 +120,94 @@ def update_tier0(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+def recover_tier0(resource, event, trigger, **kwargs):
+    """
+    Reconfigure the tier1 routers with tier0 GW at NSX backend and update the
+    neutron external network's physical network binding
+    """
+    errmsg = ("Need to specify tier0 ID and availability-zone. "
+              "Add --property tier0=<id> --property az=<name>")
+    if not kwargs.get('property'):
+        LOG.error("%s", errmsg)
+        return
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    tier0 = properties.get('tier0')
+    az = properties.get('az')
+    if not tier0 or not az:
+        LOG.error("%s", errmsg)
+        raise SystemExit(errmsg)
+    # Verify the id of the tier0
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+    try:
+        nsxpolicy.tier0.get(tier0)
+    except Exception as e:
+        LOG.error("An error occurred while retrieving Tier0 gw router %s: %s",
+                  tier0, e)
+        raise SystemExit(e)
+    tier0_edge_cluster = nsxpolicy.tier0.get_edge_cluster_path(tier0)
+    if not tier0_edge_cluster:
+        LOG.error("Tier0 gw router %s does not have an edge cluster "
+                  "configured", tier0)
+        return
+    ctx = context.get_admin_context()
+    plugin = RoutersPlugin()
+    neutron_routers = plugin.get_routers(ctx)
+    if not neutron_routers:
+        LOG.info("There are not any neutron routers found")
+    with p_utils.NsxPolicyPluginWrapper() as core_plugin:
+        for router in neutron_routers:
+            router_obj = core_plugin._get_router(ctx, router['id'])
+            router_az = core_plugin._get_router_az_obj(router_obj)
+            if router_obj.gw_port_id and az == router_az.name:
+                old_tier0_path = nsxpolicy.tier1.get(router['id']).\
+                    get('tier0_path')
+                if old_tier0_path:
+                    old_tier0_edge_cluster_path = nsxpolicy.tier0.\
+                        get_edge_cluster_path(old_tier0_path.split('/')[-1])
+                # Update tier1 routers GW to point to the tier0 in the backend
+                try:
+                    nsxpolicy.tier1.update(router['id'], tier0=tier0)
+                except Exception as e:
+                    LOG.error("Failed to update T0 uplink for router %s: %s",
+                              router['id'], e)
+                    raise SystemExit(e)
+                else:
+                    LOG.info("Updated router %s uplink port", router['id'])
+                # Update tier1 routers' edge cluster information to new
+                # tier0's edge cluster only if the tier1 router's old edge
+                # cluster bind to the same edge cluster of old tier0 router
+                old_tier1_edge_cluster_path = nsxpolicy.tier1.\
+                    get_edge_cluster_path(router['id'])
+                if old_tier1_edge_cluster_path and \
+                        (old_tier1_edge_cluster_path ==
+                         old_tier0_edge_cluster_path):
+                    try:
+                        nsxpolicy.tier1.\
+                            set_edge_cluster_path(router['id'],
+                                                  tier0_edge_cluster)
+                    except Exception as e:
+                        LOG.error("Failed to update router %s edge cluster:"
+                                  " %s", router['id'], e)
+                        raise SystemExit(e)
+                    else:
+                        LOG.info("Updated router %s edge cluster",
+                                 router['id'])
+
+        # Update Neutron external network's physical network binding
+        nets = core_plugin.get_networks(ctx)
+        for net in nets:
+            network_az = core_plugin.get_network_az_by_net_id(ctx, net['id'])
+            if az == network_az.name and net.get('router:external'):
+                with ctx.session.begin(subtransactions=True):
+                    bindings = ctx.session.query(nsx_models.TzNetworkBinding).\
+                        filter_by(network_id=net['id']).first()
+                    bindings.phy_uuid = tier0
+                    LOG.info("Updated neutron external network %s binding "
+                             "physical network", net['id'])
+    LOG.info("Successfully updated all the tier0 GW binding information.")
+
+
+@admin_utils.output_header
 def update_nat_firewall_match(resource, event, trigger, **kwargs):
     """Update the firewall_match value in neutron nat rules with a new value"""
     errmsg = ("Need to specify internal/external firewall_match value. "
@@ -130,7 +218,7 @@ def update_nat_firewall_match(resource, event, trigger, **kwargs):
     properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
     firewall_match_str = properties.get('firewall-match')
     if (not firewall_match_str or
-        firewall_match_str.lower() not in ('internal', 'external')):
+            firewall_match_str.lower() not in ('internal', 'external')):
         LOG.error("%s", errmsg)
         return
 
@@ -183,6 +271,10 @@ def update_nat_firewall_match(resource, event, trigger, **kwargs):
 registry.subscribe(update_tier0,
                    constants.ROUTERS,
                    shell.Operations.UPDATE_TIER0.value)
+
+registry.subscribe(recover_tier0,
+                   constants.ROUTERS,
+                   shell.Operations.RECOVER_TIER0.value)
 
 registry.subscribe(update_nat_firewall_match,
                    constants.ROUTERS,
