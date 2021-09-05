@@ -30,9 +30,11 @@ from oslo_log import log as logging
 import oslo_messaging as messaging
 from oslo_messaging.rpc import dispatcher
 
+from vmware_nsx.services.lbaas import lb_const
 from vmware_nsx.services.lbaas.octavia import constants
 
 LOG = logging.getLogger(__name__)
+STATUS_CHECKER_COUNT = 10
 
 
 class NSXOctaviaListener(object):
@@ -303,6 +305,10 @@ class NSXOctaviaListenerEndpoint(object):
     def update_loadbalancer_status(self, status):
         kw = {'status': status}
         self.client.cast({}, 'update_loadbalancer_status', **kw)
+
+    def get_active_loadbalancers(self):
+        kw = {}
+        return self.client.call({}, 'get_active_loadbalancers', **kw)
 
     @log_helpers.log_method_call
     def loadbalancer_create(self, ctxt, loadbalancer):
@@ -729,6 +735,7 @@ class NSXOctaviaStatisticsCollector(object):
         self.core_plugin = core_plugin
         self.listener_stats_getter = listener_stats_getter
         self.loadbalancer_status_getter = loadbalancer_status_getter
+        self.status_checker_counter = 0
         if cfg.CONF.octavia_stats_interval:
             eventlet.spawn_n(self.thread_runner,
                              cfg.CONF.octavia_stats_interval)
@@ -761,4 +768,24 @@ class NSXOctaviaStatisticsCollector(object):
         if self.loadbalancer_status_getter:
             loadbalancer_status = self.loadbalancer_status_getter(
                 context, self.core_plugin)
+
+            if self.status_checker_counter == 0:
+                self.status_checker_counter = STATUS_CHECKER_COUNT
+                octavia_lb_ids = []
+                try:
+                    octavia_lb_ids = endpoint.get_active_loadbalancers()
+                except Exception as e:
+                    LOG.error('Fetching loadbalancer list from Octavia failed '
+                              'with error %e', e)
+                if octavia_lb_ids:
+                    nsx_lb_ids = [
+                        lb['id'] for lb in
+                        loadbalancer_status[lb_const.LOADBALANCERS]]
+                    missing_ids = list(set(octavia_lb_ids) - set(nsx_lb_ids))
+                    loadbalancer_status[lb_const.LOADBALANCERS] += [
+                        {'id': lb_id, 'operating_status': lb_const.OFFLINE}
+                        for lb_id in missing_ids]
+            else:
+                self.status_checker_counter -= 1
+
             endpoint.update_loadbalancer_status(loadbalancer_status)
