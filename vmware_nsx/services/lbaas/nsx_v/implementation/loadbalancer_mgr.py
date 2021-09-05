@@ -310,3 +310,59 @@ def _get_edge_loadbalancer_statistics(vcns, edge_id):
         stats['total_connections'] += pool_stats.get('totalSessions', 0)
 
     return stats
+
+
+def status_getter(context, core_plugin):
+    lb_statuses = []
+    lsn_statuses = []
+    pool_statuses = []
+    member_statuses = []
+
+    lb_bindings = nsxv_db.get_nsxv_lbaas_loadbalancer_bindings(context.session)
+    for lb_binding in lb_bindings:
+        lb_status = lb_const.ONLINE
+        try:
+            _, lb_stats = core_plugin.nsx_v.vcns.get_loadbalancer_statistics(
+                lb_binding['edge_id'])
+
+            for vs in lb_stats.get('virtualServer', []):
+                if vs['name'].startswith('vip_'):
+                    vs_id = vs['name'].replace('vip_', '')
+                    vs_status = lb_const.OFFLINE
+                    if vs['status'] == 'OPEN':
+                        vs_status = lb_const.ONLINE
+                    lsn_statuses.append({
+                        'id': vs_id, 'operating_status': vs_status})
+
+            for pool in lb_stats.get('pool', []):
+                if pool['name'].startswith('pool_'):
+                    pool_id = pool['name'].replace('pool_', '')
+                    pool_status = lb_const.OFFLINE
+                    if pool['status'] == 'UP':
+                        pool_status = lb_const.ONLINE
+                    pool_statuses.append({
+                        'id': pool_id,
+                        'operating_status': pool_status})
+
+                    for member in pool.get('member', []):
+                        if member['name'].startswith('member-'):
+                            member_status = lb_const.OFFLINE
+                            if member['status'] == 'UP':
+                                member_status = lb_const.ONLINE
+                            member_statuses.append({
+                                'pool_id': pool_id,
+                                'member_ip': member.get('ipAddress'),
+                                'operating_status': member_status})
+
+        except Exception as e:
+            lb_status = lb_const.OFFLINE
+            LOG.error('Failed to fetch loadbalancer status from edge %s with '
+                      'exception %s', lb_binding['edge_id'], e)
+
+        lb_statuses.append({'id': lb_binding['loadbalancer_id'],
+                            'operating_status': lb_status})
+
+    return {lb_const.LOADBALANCERS: lb_statuses,
+            lb_const.LISTENERS: lsn_statuses,
+            lb_const.POOLS: pool_statuses,
+            lb_const.MEMBERS: member_statuses}
