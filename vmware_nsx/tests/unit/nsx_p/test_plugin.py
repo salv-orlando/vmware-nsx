@@ -2102,7 +2102,7 @@ class NsxPTestL3NatTestCase(NsxPTestL3NatTest,
                     # We expect two subnet objects on segment
                     seg_update.assert_called_with(
                         n['network']['id'],
-                        multicast=True,
+                        multicast=mock.ANY,
                         subnets=[mock.ANY, mock.ANY],
                         tier1_id=r['router']['id'])
 

@@ -103,6 +103,7 @@ from vmware_nsxlib.v3 import exceptions as nsx_lib_exc
 from vmware_nsxlib.v3 import nsx_constants as nsxlib_consts
 from vmware_nsxlib.v3.policy import constants as policy_constants
 from vmware_nsxlib.v3.policy import core_defs as policy_defs
+from vmware_nsxlib.v3.policy import core_resources
 from vmware_nsxlib.v3.policy import transaction as policy_trans
 from vmware_nsxlib.v3.policy import utils as p_utils
 from vmware_nsxlib.v3 import utils as nsxlib_utils
@@ -1149,12 +1150,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return versions
 
     def _get_segment_multicast_setting(self, context, net_id):
+        # Multicast must be explicitly disabled for v6-only subnets
         seg_subnets_ip_ver = self._get_segment_subnets_versions(
             context, net_id)
         # Multicast cannot be enabled on segments with v6 subnets only
         if len(seg_subnets_ip_ver) == 1 and seg_subnets_ip_ver.pop() == 6:
             return False
-        return True
+        # Ignore value of multicast setting (go with defaults)
+        return core_resources.IGNORE
 
     def _get_segment_subnets(self, context, net_id, net_az=None,
                              interface_subnets=None,
