@@ -69,7 +69,6 @@ n_warnings = 0
 
 
 def log_error(msg):
-    global all_errors
     global n_errors
     LOG.info("ERROR: %s", msg)
     all_errors.append(msg)
@@ -77,7 +76,6 @@ def log_error(msg):
 
 
 def log_warning(msg):
-    global all_warnings
     global n_warnings
     LOG.info("WARNING: %s", msg)
     all_warnings.append(msg)
