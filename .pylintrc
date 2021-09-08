@@ -52,6 +52,7 @@ disable=
 # bad-continuation,
  consider-iterating-dictionary,
  consider-using-enumerate,
+ consider-using-f-string,
  invalid-name,
  len-as-condition,
 # misplaced-comparison-constant,

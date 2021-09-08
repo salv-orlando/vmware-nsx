@@ -1161,7 +1161,6 @@ def migrate_edge_firewalls(nsxlib, nsxpolicy, plugin):
     plugin.nsxpolicy = nsxpolicy
     ctx = context.get_admin_context()
     routers = plugin.get_routers(ctx)
-    global NSX_ROUTER_SECTIONS
     for rtr in routers:
         nsx_router_id = db.get_nsx_router_id(ctx.session, rtr['id'])
         nsx_rtr = nsxlib.logical_router.get(nsx_router_id)
@@ -1322,19 +1321,29 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin,
         start_migration_process(nsxlib)
 
         # Migration order derives from the dependencies between resources
-        public_switches, tier0s = migrate_tier0s(nsxlib, nsxpolicy, plugin)
-        migrate_md_proxies(nsxlib, nsxpolicy, plugin)
-        migrate_switch_profiles(nsxlib, nsxpolicy, plugin)
-        migrate_groups(nsxlib, nsxpolicy)
+        # Migrate DHCP server
         migrate_dhcp_servers(nsxlib, nsxpolicy)
+        # Migrate Tier0 routers
+        public_switches, tier0s = migrate_tier0s(nsxlib, nsxpolicy, plugin)
+        # Migrate Tier1 routers
         mp_routers = migrate_routers(nsxlib, nsxpolicy)
+        # Migrate switch profiles
+        migrate_switch_profiles(nsxlib, nsxpolicy, plugin)
+        # Migrate MD Proxies
+        migrate_md_proxies(nsxlib, nsxpolicy, plugin)
+        # Migrate logical switches
         mp_networks = migrate_networks(nsxlib, nsxpolicy, plugin,
                                        public_switches)
+        # Migrate logical ports including Tier1 router ports
         migrate_ports(nsxlib, nsxpolicy, plugin, mp_networks)
+        # Migrate static routes and NAT config
         migrate_routers_config(nsxlib, nsxpolicy, plugin, mp_routers)
+        # Migrate Tier0 router ports and configuration
         migrate_tier0_config(nsxlib, nsxpolicy, tier0s)
+        # Migrate NS groups
+        migrate_groups(nsxlib, nsxpolicy)
+        # Migrate Lb profiles, monitors, pools, virtual servers, and services
         migrate_lb_resources(nsxlib, nsxpolicy)
-
         # Migrate firewall sections last as those take the longest to rollback
         # in case of error
         migrate_dfw_sections(nsxlib, nsxpolicy, plugin)
@@ -1359,7 +1368,6 @@ def migrate_t_resources_2_p(nsxlib, nsxpolicy, plugin,
             except Exception as e:
                 LOG.error("Abort migration failed: %s", e)
 
-            global ROLLBACK_DATA
             if ROLLBACK_DATA:
                 LOG.info("Rolling migration back %s", ROLLBACK_DATA)
                 send_rollback_request({'migration_data': ROLLBACK_DATA})
@@ -1541,7 +1549,6 @@ def post_migration_actions(nsxlib, nsxpolicy, nsxpolicy_admin, plugin):
                 break
 
     # -- Delete MP edge firewall rules
-    global NSX_ROUTER_SECTIONS
     for section in NSX_ROUTER_SECTIONS:
         # make sure the policy section was already realized
         # with runtime_status=SUCESS
