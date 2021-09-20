@@ -340,7 +340,8 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                          {'rule': rule_type, 'pol': pol_id})
             if rule:
                 LOG.info("created QoS policy %s rule %s", pol_id, rule)
-                self._log_elapsed(start, "Migrate QoS rule %s" % rule['id'])
+                self._log_elapsed(
+                    start, "Migrate QoS rule for policy %s" % pol_id)
         except Exception as e:
             self.add_error("Failed to create QoS rule %(rule)s for policy "
                            "%(pol)s: %(e)s" % {'rule': body, 'pol': pol_id,
