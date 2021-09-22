@@ -2984,23 +2984,32 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
         if not self.nsxlib:
             return []
         restricted_vlans = []
+        known_profiles = []
         # Get all transport nodes of this transport zone
         tns = self.nsxlib.transport_node.list()['results']
         for tn in tns:
-            # Check if it belongs to the current TZ
-            tzs = [ep.get('transport_zone_id') for ep in
-                   tn.get('transport_zone_endpoints', [])]
-            if tz_uuid not in tzs:
-                continue
+            # Find desired transport zone in host switches
             if ('host_switch_spec' in tn and
                 'host_switches' in tn['host_switch_spec']):
                 for hs in tn['host_switch_spec']['host_switches']:
+                    # Check if it belongs to the current TZ
+                    tzs = [ep.get('transport_zone_id') for ep in
+                        hs.get('transport_zone_endpoints', [])]
+                    if tz_uuid not in tzs:
+                        # Move to next host switch for transport node
+                        continue
                     profile_attrs = hs.get('host_switch_profile_ids', [])
                     for profile_attr in profile_attrs:
                         if profile_attr['key'] == 'UplinkHostSwitchProfile':
+                            profile_id = profile_attr['value']
+                            if profile_id in known_profiles:
+                                LOG.debug("Profile %s has already been "
+                                          "loaded, skipping", profile_id)
+                                continue
                             profile = self.nsxlib.host_switch_profiles.get(
-                                profile_attr['value'])
+                                profile_id)
                             vlan_id = profile.get('transport_vlan')
+                            known_profiles.append(profile_id)
                             if vlan_id:
                                 restricted_vlans.append(vlan_id)
 
