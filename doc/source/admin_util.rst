@@ -671,6 +671,10 @@ NSX Policy Plugin
 
     nsxadmin -r networks -o nsx-update-state
 
+- Update the metadata proxy configuration of all segments for specified availability zone::
+
+    nsxadmin -r networks -o update-metadata --property metadata-proxy=<id> --property az=<name>
+
 - List all the neutron routers together with their NSX Policy objects and realization state::
 
     nsxadmin -r routers -o list
@@ -687,8 +691,16 @@ NSX Policy Plugin
 
     nsxadmin -r routers -o  update-nat-firewall-match --property firewall-match=external/internal
 
+- Reconfigure the tier1 routers with tier0 GW at NSX backend and update the network binding neutron DB with new tier0 GW for an availability zone::
+
+    nsxadmin -r routers -o recover-tier0 --property tier0=<id> --property az=<name>
+
 - Migrate networks DHCP from MP to Policy (for NSX 3.0 upgrades)::
     nsxadmin -r dhcp-binding -o migrate-to-policy --property dhcp-config=<id>
+
+- Bind the specified dhcp profile to the edge clusters of the specified tier0 GW::
+
+    nsxadmin -r dhcp-binding -o update-dhcp-profile-edge --property dhcp-profile=<id> --property tier0=<id>
 
 - Update tags on a loadbalancer service
     nsxadmin -r lb-services -o nsx-update-tags

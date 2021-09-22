@@ -76,6 +76,9 @@ class Operations(enum.Enum):
     VALIDATE = 'validate'
     REUSE = 'reuse'
     UPDATE_TIER0 = 'update-tier0'
+    RECOVER_TIER0 = 'recover-tier0'
+    UPDATE_METADATA = 'update-metadata'
+    UPDATE_DHCP_EDGE = 'update-dhcp-profile-edge'
     UPDATE_FIREWALL_MATCH = 'update-nat-firewall-match'
     SET_STATUS_ERROR = 'set-status-error'
     CHECK_COMPUTE_CLUSTERS = 'check-compute-clusters'
@@ -122,7 +125,8 @@ nsxv3_resources = {
             Operations.NSX_UPDATE_RULES.value,
             Operations.NSX_UPDATE_DHCP_RELAY.value,
             Operations.NSX_ENABLE_STANDBY_RELOCATION.value,
-            Operations.UPDATE_TIER0.value]),
+            Operations.UPDATE_TIER0.value,
+            Operations.RECOVER_TIER0.value]),
     constants.DHCP_BINDING: Resource(constants.DHCP_BINDING,
                                      [Operations.LIST.value,
                                       Operations.NSX_RECREATE.value]),
@@ -282,12 +286,15 @@ nsxp_resources = {
                                         [Operations.LIST.value]),
     constants.NETWORKS: Resource(constants.NETWORKS,
                                  [Operations.LIST.value,
-                                  Operations.NSX_UPDATE_STATE.value]),
+                                  Operations.NSX_UPDATE_STATE.value,
+                                  Operations.UPDATE_METADATA.value]),
     constants.DHCP_BINDING: Resource(constants.DHCP_BINDING,
-                                 [Operations.MIGRATE_TO_POLICY.value]),
+                                 [Operations.MIGRATE_TO_POLICY.value,
+                                  Operations.UPDATE_DHCP_EDGE.value]),
     constants.ROUTERS: Resource(constants.ROUTERS,
                                 [Operations.LIST.value,
                                  Operations.UPDATE_TIER0.value,
+                                 Operations.RECOVER_TIER0.value,
                                  Operations.UPDATE_FIREWALL_MATCH.value]),
     constants.LB_SERVICES: Resource(constants.LB_SERVICES,
                                 [Operations.NSX_UPDATE_TAGS.value]),
@@ -348,11 +355,11 @@ def _get_choices():
 def _get_resources():
     plugin = get_plugin()
     if plugin == 'nsxv3':
-        return 'NSX-V3 resources: %s' % (', '.join(nsxv3_resources_names))
+        return f"NSX-V3 resources: {(', '.join(nsxv3_resources_names))}"
     if plugin == 'nsxv':
-        return 'NSX-V resources: %s' % (', '.join(nsxv_resources_names))
+        return f"NSX-V resources: {(', '.join(nsxv_resources_names))}"
     if plugin == 'nsxtvd':
-        return 'NSX-TVD resources: %s' % (', '.join(nsxtvd_resources_names))
+        return f"NSX-TVD resources: {(', '.join(nsxtvd_resources_names))}"
 
 
 cli_opts = [cfg.StrOpt('fmt',
@@ -366,8 +373,8 @@ cli_opts = [cfg.StrOpt('fmt',
                        help=_get_resources()),
             cfg.StrOpt('operation',
                        short='o',
-                       help='Supported list of operations: {}'
-                             .format(', '.join(ops))),
+                       help=f"Supported list of operations:"
+                            f" {(', '.join(ops))}"),
             cfg.StrOpt('plugin',
                        help='nsxv or nsxv3 if the tvd plugin is used'),
             cfg.BoolOpt('force',
@@ -414,11 +421,11 @@ def init_resource_plugin(plugin_name, plugin_dir):
                 continue
             # load the resource
             importlib.import_module(
-                "vmware_nsx.shell.admin.plugins."
-                "{}.resources.".format(plugin_name) + resource)
+                f"vmware_nsx.shell.admin.plugins."
+                f"{plugin_name}.resources." + resource)
 
 
 def get_plugin_dir(plugin_name):
     plugin_dir = (os.path.dirname(os.path.realpath(__file__)) +
                   "/admin/plugins")
-    return '{}/{}/resources'.format(plugin_dir, plugin_name)
+    return f"{plugin_dir}/{plugin_name}/resources"

@@ -415,7 +415,11 @@ class TestNsxpAdminUtils(AbstractTestAdminUtils,
                 "dhcp-config=dumyuuid",
                 "old-tier0=olduuid",
                 "new-tier0=newuuid",
-                "firewall-match=internal"]
+                "firewall-match=internal",
+                "tier0=newuuid",
+                "metadata-proxy=mdproxy",
+                "az=default",
+                "dhcp-profile=openstack_dchp_profile"]
         # Create some neutron objects for the utilities to run on
         self._create_router()
         with self._create_l3_ext_network() as network:

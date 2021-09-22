@@ -143,6 +143,92 @@ def update_admin_state(resource, event, trigger, **kwargs):
             nsxpolicy.segment_port.set_admin_state(seg_id, port['id'], False)
 
 
+@admin_utils.output_header
+def update_metadata(resource, event, trigger, **kwargs):
+    """
+    Update the metadata proxy configuration of segments
+    """
+    errmsg = ("Need to specify metadata proxy ID and availability-zone. "
+              "Add --property metadata-proxy=<id> --property az=<name>")
+    if not kwargs.get('property'):
+        LOG.error("%s", errmsg)
+        return
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    metaproxy = properties.get('metadata-proxy')
+    az = properties.get('az')
+    if not metaproxy or not az:
+        LOG.error("%s", errmsg)
+        raise SystemExit(errmsg)
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+    try:
+        nsxpolicy.md_proxy.get(metaproxy)
+    except Exception as e:
+        LOG.error("Error while retrieving NSX metadata proxy %s: %s",
+                  metaproxy, e)
+        raise SystemExit(e)
+    ctx = context.get_admin_context()
+    with p_utils.NsxPolicyPluginWrapper() as plugin:
+        nets = plugin.get_networks(ctx)
+        for net in nets:
+            if plugin._network_is_external(ctx, net['id']):
+                continue
+            network_az = plugin.get_network_az_by_net_id(ctx, net['id'])
+            if az == network_az.name:
+                seg_id = plugin._get_network_nsx_segment_id(ctx, net['id'])
+                try:
+                    nsxpolicy.segment.update(seg_id,
+                                             metadata_proxy_id=metaproxy)
+                except Exception as e:
+                    LOG.error("Failed to update segment %s metadata proxy"
+                              " configuration: %s",
+                              seg_id, e)
+                    raise SystemExit(e)
+                else:
+                    LOG.info("Updated segment %s to metadata proxy %s",
+                             seg_id, metaproxy)
+        LOG.info("Successfully updated all the networks' metadata proxy"
+                 " configuration.")
+
+
+@admin_utils.output_header
+def update_dhcp_profile_edge(resource, event, trigger, **kwargs):
+    """
+    Bind the specified dhcp profile to the edge clusters of tier0 GW
+    """
+    errmsg = ("Need to specify dhcp profile ID and tier0 GW ID. Add "
+              "--property dhcp-profile=<id> --property tier0=<id>")
+    if not kwargs.get('property'):
+        LOG.error("%s", errmsg)
+        return
+    properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+    dhcp_profile = properties.get('dhcp-profile')
+    tier0 = properties.get('tier0')
+    if not dhcp_profile or not tier0:
+        LOG.error("%s", errmsg)
+        raise SystemExit(errmsg)
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+    try:
+        nsxpolicy.tier0.get(tier0)
+    except Exception as e:
+        LOG.error("Tier0 logical router %s was not found: %s", tier0, e)
+        raise SystemExit(e)
+    edge_path = nsxpolicy.tier0.get_edge_cluster_path(tier0)
+    if edge_path:
+        try:
+            nsxpolicy.dhcp_server_config.update(dhcp_profile,
+                                                edge_cluster_path=edge_path)
+        except Exception as e:
+            LOG.error("Failed to bind dhcp profile %s to edge cluster %s: %s",
+                      dhcp_profile, edge_path, e)
+            raise SystemExit(e)
+        else:
+            LOG.info("Successfully updated dhcp profile %s to edge cluster %s",
+                     dhcp_profile, edge_path)
+    else:
+        LOG.error("Tier0 logical router %s miss the edge clusters binding."
+                  "Skip the dhcp profile update action", tier0)
+
+
 registry.subscribe(update_admin_state,
                    constants.NETWORKS,
                    shell.Operations.NSX_UPDATE_STATE.value)
@@ -150,3 +236,11 @@ registry.subscribe(update_admin_state,
 registry.subscribe(migrate_dhcp_to_policy,
                    constants.DHCP_BINDING,
                    shell.Operations.MIGRATE_TO_POLICY.value)
+
+registry.subscribe(update_metadata,
+                   constants.NETWORKS,
+                   shell.Operations.UPDATE_METADATA.value)
+
+registry.subscribe(update_dhcp_profile_edge,
+                   constants.DHCP_BINDING,
+                   shell.Operations.UPDATE_DHCP_EDGE.value)
