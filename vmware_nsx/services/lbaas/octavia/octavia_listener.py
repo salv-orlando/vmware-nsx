@@ -744,6 +744,9 @@ class NSXOctaviaStatisticsCollector(object):
         LOG.info("NSXOctaviaStatisticsCollector thread_runner is running")
         while True:
             time.sleep(interval)
+            if cfg.CONF.api_replay_mode:
+                LOG.debug("Not collecting Octavia stats in API replay mode")
+                continue
             try:
                 self.collect()
             except Exception as e:
