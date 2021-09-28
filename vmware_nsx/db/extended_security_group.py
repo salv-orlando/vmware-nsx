@@ -335,13 +335,25 @@ class ExtendedSecurityGroupPropertiesMixin(object):
                 original_port.get(provider_sg.PROVIDER_SECURITYGROUPS, []))
 
         if provider_sg_changed or sg_changed:
-            if not sg_changed:
+            has_security_groups = self._check_update_has_security_groups(port)
+            del_security_groups = self._check_update_deletes_security_groups(
+                port)
+            if not (has_security_groups or del_security_groups):
+                # In this case we need to delete the bindings
                 query = context.session.query(
                     securitygroups_db.SecurityGroupPortBinding)
                 for sg in original_port[provider_sg.PROVIDER_SECURITYGROUPS]:
+                    # use one_or_none because we don't want to fail if the
+                    # binding does not exist
                     binding = query.filter_by(
-                        port_id=p['id'], security_group_id=sg).one()
-                    context.session.delete(binding)
+                        port_id=p['id'], security_group_id=sg).one_or_none()
+                    if binding:
+                        context.session.delete(binding)
+                    else:
+                        LOG.debug("Security group binding for sg %s and "
+                                  "port %s not found. Skipping",
+                                  sg, p['id'])
+
             self._process_port_create_provider_security_group(
                 context, updated_port,
                 updated_port[provider_sg.PROVIDER_SECURITYGROUPS])
