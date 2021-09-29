@@ -1334,6 +1334,48 @@ class NsxPTestPorts(common_v3.NsxV3TestPorts,
                     set([fixed_ip, '1.2.3.0/24']),
                     addresses)
 
+    def test_update_port_allowed_pair_cidr(self):
+        with self.subnet() as subnet:
+            post_data = {
+                'port': {
+                    'network_id': subnet['subnet']['network_id'],
+                    'tenant_id': subnet['subnet']['tenant_id'],
+                    'allowed_address_pairs': [
+                        {'ip_address': '10.4.0.32',
+                         'mac_address': '00:00:5e:00:01:fa'},
+                        {'ip_address': '10.40.1.125',
+                         'mac_address': 'fa:16:3e:ef:b1:be'}],
+                    'device_owner': 'compute:meh',
+                    'fixed_ips': [{'subnet_id':
+                                    subnet['subnet']['id']}]}}
+            post_req = self.new_create_request('ports', post_data)
+            res = post_req.get_response(self.api)
+            self.assertEqual(201, res.status_int)
+            port = self.deserialize('json', res)
+            fixed_ip = (
+                port['port']['fixed_ips'][0]['ip_address'])
+            with mock.patch.object(
+                self.plugin.nsxpolicy.segment_port,
+                'create_or_overwrite') as mock_port:
+                put_data = {
+                    'port': {
+                        'allowed_address_pairs': [
+                            {'ip_address': '10.4.0.0/24'}
+                        ]
+                    }
+                }
+                put_req = self.new_update_request(
+                    'ports', put_data, port['port']['id'])
+                put_res = put_req.get_response(self.api)
+                self.assertEqual(200, put_res.status_int)
+                self.assertEqual(1, len(mock_port.mock_calls))
+                _n, _a, kwargs = mock_port.mock_calls[0]
+                actual_bindings = kwargs['address_bindings']
+                addresses = set([b.ip_address for b in actual_bindings])
+                self.assertEqual(
+                    set([fixed_ip, '10.4.0.0/24']),
+                    addresses)
+
 
 class NsxPTestSubnets(common_v3.NsxV3TestSubnets,
                       NsxPPluginTestCaseMixin):
