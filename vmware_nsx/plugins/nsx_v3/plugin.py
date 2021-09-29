@@ -1205,7 +1205,11 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                 cidr1 = netaddr.IPNetwork(binding1.ip_address)
                 cidr2 = netaddr.IPNetwork(binding2.ip_address)
                 if cidr1 != cidr2 and cidr1 in cidr2:
-                    address_bindings.remove(binding1)
+                    try:
+                        address_bindings.remove(binding1)
+                    except ValueError:
+                        # item already removed
+                        pass
 
         return address_bindings
 
