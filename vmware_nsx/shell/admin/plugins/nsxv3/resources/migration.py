@@ -214,6 +214,8 @@ def verify_component_status(nsxlib, component_number):
 
 
 def wait_for_component_success(nsxlib, component_number):
+    delay = 0.1
+    max_delay = 2.0
     while True:
         status = get_migration_status(nsxlib)
         try:
@@ -224,19 +226,25 @@ def wait_for_component_success(nsxlib, component_number):
                       component_number, status)
         if component_status == POLICY_API_STATUS_SUCCESS:
             return
-        LOG.debug("Component #%d status is %s. Waiting 5 seconds",
+        LOG.debug("Component #%d status is %s. Waiting 1 second",
                   component_number, component_status)
-        time.sleep(5)
+        time.sleep(delay)
+        delay = min(delay * 2, max_delay)
 
 
 def wait_on_overall_migration_status_to_pause(nsxlib):
+    delay = 0.1
+    max_delay = 2.0
     while True:
         status = get_migration_status(nsxlib)
         migration_status = status.get('overall_migration_status')
         if (migration_status == POLICY_API_STATUS_PAUSED or
             migration_status == POLICY_API_STATUS_SUCCESS):
             break
-        time.sleep(5)
+        LOG.debug("Overall migration status is %s. Waiting 1 second.",
+                  migration_status)
+        time.sleep(delay)
+        delay = min(delay * 2, max_delay)
 
 
 def printable_resource_name(resource):
