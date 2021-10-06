@@ -1721,12 +1721,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             try:
                 nsx_id = self.nsxpolicy.segment.get_realized_logical_switch_id(
                     segment_id)
-                # Add result to caches
-                NET_NEUTRON_2_NSX_ID_CACHE[network_id] = nsx_id
-                NET_NSX_2_NEUTRON_ID_CACHE[nsx_id] = network_id
+                # Add result to caches - never cache an empty nsx_id
+                if nsx_id:
+                    NET_NEUTRON_2_NSX_ID_CACHE[network_id] = nsx_id
+                    NET_NSX_2_NEUTRON_ID_CACHE[nsx_id] = network_id
                 return nsx_id
             except nsx_lib_exc.ManagerError:
-                LOG.error("Network %s was not realized", network_id)
+                LOG.error("Network %s was not realized. Cannot fetch "
+                          "logical switch for segment", network_id)
                 # Do not cache this result
         else:
             # Add empty result to cache
