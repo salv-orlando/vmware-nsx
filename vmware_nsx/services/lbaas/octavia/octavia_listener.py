@@ -753,7 +753,7 @@ class NSXOctaviaStatisticsCollector(object):
                 LOG.error("Octavia stats collect failed with %s", e)
 
     def collect(self):
-        if not self.core_plugin.octavia_listener:
+        if not self.core_plugin.octavia_listener or cfg.CONF.api_replay_mode:
             LOG.warning("Octavia stats collector cannot run with plugin %s",
                         self.core_plugin)
             return

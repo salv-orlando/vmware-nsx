@@ -1274,6 +1274,10 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 # Do nothing
                 pass
 
+            def get_active_loadbalancers(self, **kw):
+                # Do nothing
+                pass
+
         endpoints = [MigrationOctaviaDriverEndpoint]
         access_policy = dispatcher.DefaultRPCAccessPolicy
         self.octavia_rpc_server = messaging.get_rpc_server(
