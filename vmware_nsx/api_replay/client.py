@@ -177,12 +177,13 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.migrate_security_groups()
         self.migrate_qos_policies()
         routers_routes, routers_gw_info = self.migrate_routers()
-        self.migrate_networks_subnets_ports(routers_gw_info)
+        source_networks = self.source_neutron.list_networks()['networks']
+        self.migrate_networks_subnets_ports(routers_gw_info, source_networks)
         self.migrate_floatingips()
         self.migrate_routers_routes(routers_routes)
         self.migrate_fwaas()
         if self.octavia:
-            self.migrate_octavia()
+            self.migrate_octavia(source_networks)
 
         if self.n_errors:
             LOG.error("NSX migration is Done with %s errors:", self.n_errors)
@@ -653,12 +654,14 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self._log_elapsed(start, "Migrate subnet pools", debug=False)
         return subnetpools_map
 
-    def migrate_networks_subnets_ports(self, routers_gw_info):
+    def migrate_networks_subnets_ports(self, routers_gw_info,
+                                       source_networks=None):
         """Migrates networks/ports/router-uplinks from src to dest neutron."""
         start = datetime.now()
         source_ports = self.source_neutron.list_ports()['ports']
         source_subnets = self.source_neutron.list_subnets()['subnets']
-        source_networks = self.source_neutron.list_networks()['networks']
+        if not source_networks:
+            source_networks = self.source_neutron.list_networks()['networks']
         dest_networks = self.dest_neutron.list_networks()['networks']
         dest_ports = self.dest_neutron.list_ports()['ports']
         dest_subnets = self.dest_neutron.list_subnets()['subnets']
@@ -1227,7 +1230,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         }
         return result
 
-    def migrate_octavia(self):
+    def migrate_octavia(self, source_networks):
         """Migrates Octavia NSX objects to the new neutron driver.
         The Octavia process & DB will remain unchanged.
         Using RPC connection to connect directly with the new plugin driver.
@@ -1282,10 +1285,40 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                              hms, l7pols)
         total_num = len(loadbalancers)
         LOG.info("Migrating %d loadbalancer(s)", total_num)
-        for count, lb in enumerate(loadbalancers, 1):
-            if lb['provisioning_status'] == 'ACTIVE':
-                self._migrate_octavia_lb(lb, orig_map, count, total_num)
+        # In order to avoid failures in NSX-T, migrate the external LB first.
+        # Otherwise neutron might create a new LBS and try to attach it to
+        # a T1 GW where another LBS is already attached'
+        network_dict = {network['id']: network for network in source_networks}
+        external_lb = []
+        internal_lb = []
+        for lb in loadbalancers:
+            network_id = lb.get('vip_network_id')
+            if not network_id:
+                LOG.warning("Load balancer %s does not have vip_network_id."
+                            "Considering it as LB on internal network",
+                            lb['id'])
+                internal_lb.append(lb)
+                continue
+            network = network_dict.get(network_id)
+            if not network:
+                self.add_error(
+                    "Load balancer %s is configured on network %s, "
+                    "whichs seem to not exist in neutron" %
+                    (lb['id'], network_id))
+                continue
+            if network['router:external']:
+                external_lb.append(lb)
             else:
-                LOG.info("Skipping %s loadbalancer %s",
-                         lb['provisioning_status'], lb['id'])
+                internal_lb.append(lb)
+
+        LOG.info("Migrating %d loadbalancers on external networks and then "
+                 "%d loadbalancers on internal networks",
+                 len(external_lb), len(internal_lb))
+        for lb_list in [external_lb, internal_lb]:
+            for count, lb in enumerate(lb_list, 1):
+                if lb['provisioning_status'] == 'ACTIVE':
+                    self._migrate_octavia_lb(lb, orig_map, count, total_num)
+                else:
+                    LOG.info("Skipping %s loadbalancer %s",
+                            lb['provisioning_status'], lb['id'])
         self._log_elapsed(start, "Migrate Octavia LBs", debug=False)
