@@ -185,7 +185,7 @@ class NsxvAvailabilityZonesTestCase(base.BaseTestCase):
         self.assertEqual(DEF_GLOBAL_POOL, az.backup_edge_pool)
 
     def test_availability_zone_missing_metadata(self):
-        self._config_az(mgt_net_proxy_ips=None)
+        self._config_az(mgt_net_proxy_ips=None, dvs_id=None)
         az = nsx_az.NsxVAvailabilityZone(self.az_name)
         self.assertIsNone(az.mgt_net_moid)
         self.assertEqual([], az.mgt_net_proxy_ips)
