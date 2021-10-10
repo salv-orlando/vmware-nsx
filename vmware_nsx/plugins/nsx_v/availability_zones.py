@@ -175,6 +175,14 @@ class NsxVAvailabilityZone(common_az.ConfiguredAvailabilityZone):
                 self.mgt_net_default_gateway = (
                     cfg.CONF.nsxv.mgt_net_default_gateway)
 
+        elif (az_info.get('dvs_id') and
+              az_info['dvs_id'] != cfg.CONF.nsxv.dvs_id):
+            raise nsx_exc.NsxInvalidConfiguration(
+                opt_name="mgt_net_proxy_ips",
+                opt_value='None',
+                reason=(_("mgt_net_proxy_ips for availability zone "
+                          "%s must specified when DVS id is non-default") %
+                        az_name))
         else:
             self.az_metadata_support = False
             self.mgt_net_moid = None
