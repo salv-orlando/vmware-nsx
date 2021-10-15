@@ -22,6 +22,7 @@ from oslo_config import cfg
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def generate_cert(resource, event, trigger, **kwargs):
     """Generate self signed client certificate and private key
     """
@@ -29,24 +30,28 @@ def generate_cert(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def delete_cert(resource, event, trigger, **kwargs):
     """Delete client certificate and private key """
     return v3_common_cert.delete_cert(cfg.CONF.nsx_p, **kwargs)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def show_cert(resource, event, trigger, **kwargs):
     """Show client certificate details """
     return v3_common_cert.show_cert(cfg.CONF.nsx_p, **kwargs)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def import_cert(resource, event, trigger, **kwargs):
     """Import client certificate that was generated externally"""
     return v3_common_cert.import_cert(cfg.CONF.nsx_p, **kwargs)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def show_nsx_certs(resource, event, trigger, **kwargs):
     """Show client certificates associated with openstack identity in NSX"""
     return v3_common_cert.show_nsx_certs(cfg.CONF.nsx_p, **kwargs)

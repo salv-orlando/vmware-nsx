@@ -2217,8 +2217,11 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         self._remove_provider_security_groups_from_list(port_data)
         self._extend_nsx_port_dict_binding(context, port_data)
 
-        kwargs = {'context': context, 'port': neutron_db}
-        registry.notify(resources.PORT, events.AFTER_CREATE, self, **kwargs)
+        payload = events.DBEventPayload(
+            context,
+            states=(neutron_db,))
+        registry.publish(resources.PORT, events.AFTER_CREATE, self,
+                         payload=payload)
         return port_data
 
     def _make_port_dict(self, port, fields=None,
@@ -2676,13 +2679,14 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                     LOG.error("Unable to update mac learning for port %s, "
                               "reason: %s", id, e)
 
-        kwargs = {
-            'context': context,
-            'port': ret_port,
-            'mac_address_updated': False,
-            'original_port': original_port,
-        }
-        registry.notify(resources.PORT, events.AFTER_UPDATE, self, **kwargs)
+        registry.publish(
+            resources.PORT, events.AFTER_UPDATE, self,
+            payload=events.DBEventPayload(
+                context,
+                resource_id=id,
+                metadata={'mac_address_updated': False},
+                states=(original_port, ret_port,)))
+
         return ret_port
 
     def _extend_get_port_dict_qos_and_binding(self, context, port):

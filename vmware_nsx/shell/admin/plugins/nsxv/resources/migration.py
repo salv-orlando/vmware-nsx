@@ -520,6 +520,7 @@ def _validate_config():
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def validate_config_for_migration(resource, event, trigger, **kwargs):
     """Validate the nsxv configuration before migration to nsx-t"""
     # Read the command line parameters
@@ -612,6 +613,7 @@ def validate_config_for_migration(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_ports_vif_ids(resource, event, trigger, **kwargs):
     filename = None
     if kwargs.get('property'):
@@ -649,6 +651,7 @@ def list_ports_vif_ids(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def build_edge_mapping_file(resource, event, trigger, **kwargs):
     filename = None
     if kwargs.get('property'):

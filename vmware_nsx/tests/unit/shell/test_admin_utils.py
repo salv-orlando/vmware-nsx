@@ -33,6 +33,7 @@ from vmware_nsx._i18n import _
 from vmware_nsx.common import config  # noqa
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs_utils
+from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as nsxp_utils
 from vmware_nsx.shell.admin.plugins.nsxv.resources import migration
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as nsxv_utils
@@ -96,9 +97,10 @@ class AbstractTestAdminUtils(base.BaseTestCase, metaclass=abc.ABCMeta):
             self.fail(msg=msg)
 
     def _test_resource_with_errors(self, res_name, op, **kwargs):
+        payload = admin_utils.MetadataEventPayload(kwargs)
         # Must call the internal notify_loop in order to get the errors
         return registry._get_callback_manager()._notify_loop(
-            res_name, op, 'nsxadmin', **kwargs)
+            res_name, op, 'nsxadmin', payload=payload)
 
     def _test_resources(self, res_dict):
         for res in res_dict.keys():
@@ -281,10 +283,11 @@ class TestNsxvAdminUtils(AbstractTestAdminUtils,
 
     def test_migration_validation(self):
         # check that validation fails
-        args = {'property': ["transit-network=1.1.1.0/24"]}
+        payload = admin_utils.MetadataEventPayload(
+            {'property': ["transit-network=1.1.1.0/24"]})
         try:
             migration.validate_config_for_migration(
-                'nsx-migrate-v2t', 'validate', None, **args)
+                'nsx-migrate-v2t', 'validate', None, payload)
         except SystemExit:
             return
         else:

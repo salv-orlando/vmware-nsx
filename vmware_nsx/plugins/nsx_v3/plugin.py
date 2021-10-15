@@ -1575,8 +1575,13 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         if not cfg.CONF.nsx_v3.native_dhcp_metadata:
             with db_api.CONTEXT_WRITER.using(context):
                 nsx_rpc.handle_port_metadata_access(self, context, neutron_db)
-        kwargs = {'context': context, 'port': neutron_db}
-        registry.notify(resources.PORT, events.AFTER_CREATE, self, **kwargs)
+
+        registry.publish(
+            resources.PORT, events.AFTER_CREATE, self,
+            payload=events.DBEventPayload(
+                context, resource_id=port_data['id'],
+                states=(neutron_db,)))
+
         return port_data
 
     def _pre_delete_port_check(self, context, port_id, l2gw_port_check):
@@ -1886,14 +1891,14 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
             updated_port['revision_number'] = port_model.revision_number
 
         # Notifications must be sent after the above transaction is complete
-        kwargs = {
-            'context': context,
-            'port': updated_port,
-            'mac_address_updated': False,
-            'original_port': original_port,
-        }
+        registry.publish(
+            resources.PORT, events.AFTER_UPDATE, self,
+            payload=events.DBEventPayload(
+                context,
+                resource_id=id,
+                metadata={'mac_address_updated': False},
+                states=(original_port, updated_port,)))
 
-        registry.notify(resources.PORT, events.AFTER_UPDATE, self, **kwargs)
         return updated_port
 
     def _extend_get_port_dict_qos_and_binding(self, context, port):

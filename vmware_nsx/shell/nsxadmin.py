@@ -35,6 +35,7 @@ import requests
 
 from vmware_nsx.common import config  # noqa
 from vmware_nsx.shell.admin.plugins.common import constants
+from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin import version
 from vmware_nsx.shell import resources
 
@@ -162,9 +163,14 @@ def main(argv=sys.argv[1:]):
     _validate_resource_choice(cfg.CONF.resource, selected_plugin)
     _validate_op_choice(cfg.CONF.operation, selected_plugin)
 
-    registry.notify(cfg.CONF.resource, cfg.CONF.operation, 'nsxadmin',
-                    force=cfg.CONF.force, property=cfg.CONF.property,
-                    verbose=cfg.CONF.verbose)
+    # build event payload - no context
+    payload = admin_utils.MetadataEventPayload(
+        None,
+        {'force': cfg.CONF.force,
+         'property': cfg.CONF.property,
+         'verbose': cfg.CONF.verbose})
+    registry.publish(cfg.CONF.resource, cfg.CONF.operation,
+                     'nsxadmin', payload=payload)
 
 
 if __name__ == "__main__":

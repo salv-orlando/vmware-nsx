@@ -135,6 +135,7 @@ def _assemble_gw_edge(name, size, external_iface_info, internal_iface_info,
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def create_bgp_gw(resource, event, trigger, **kwargs):
     """Creates a new BGP GW edge"""
     usage = ("nsxadmin -r bgp-gw-edge -o create "
@@ -203,6 +204,7 @@ def create_bgp_gw(resource, event, trigger, **kwargs):
     LOG.info(formatters.output_formatter('BGP GW Edge', [res], headers))
 
 
+@admin_utils.unpack_payload
 def delete_bgp_gw(resource, event, trigger, **kwargs):
     usage = ("nsxadmin -r bgp-gw-edge -o delete "
              "--property gw-edge-id=<EDGE_ID>")
@@ -219,6 +221,7 @@ def delete_bgp_gw(resource, event, trigger, **kwargs):
         return
 
 
+@admin_utils.unpack_payload
 def list_bgp_edges(resource, event, trigger, **kwargs):
     bgp_edges = []
     edges = v_utils.get_nsxv_backend_edges()
@@ -237,6 +240,7 @@ def list_bgp_edges(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def create_redis_rule(resource, event, trigger, **kwargs):
     usage = ("nsxadmin -r routing-redistribution-rule -o create "
              "--property gw-edge-ids=<GW_EDGE_ID>[,...] "
@@ -293,6 +297,7 @@ def create_redis_rule(resource, event, trigger, **kwargs):
         'Routing redistribution rule', res, headers))
 
 
+@admin_utils.unpack_payload
 def delete_redis_rule(resource, event, trigger, **kwargs):
     usage = ("nsxadmin -r routing-redistribution-rule -o delete "
              "--property gw-edge-ids=<GW_EDGE_ID>[,...]"
@@ -316,6 +321,7 @@ def delete_redis_rule(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def add_bgp_neighbour(resource, event, trigger, **kwargs):
     usage = ("nsxadmin -r bgp-neighbour -o create "
              "--property gw-edge-ids=<GW_EDGE_ID>[,...] "
@@ -356,6 +362,7 @@ def add_bgp_neighbour(resource, event, trigger, **kwargs):
                                          res, headers))
 
 
+@admin_utils.unpack_payload
 def remove_bgp_neighbour(resource, event, trigger, **kwargs):
     usage = ("nsxadmin -r bgp-neighbour -o delete "
              "--property gw-edge-ids=<GW_EDGE_ID>[,...] "

@@ -2278,8 +2278,12 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             LOG.exception(msg)
             raise nsx_exc.NsxPluginException(err_msg=msg)
 
-        kwargs = {'context': context, 'port': neutron_db}
-        registry.notify(resources.PORT, events.AFTER_CREATE, self, **kwargs)
+        registry.publish(
+            resources.PORT, events.AFTER_CREATE, self,
+            payload=events.DBEventPayload(
+                context, resource_id=port_data['id'],
+                states=(neutron_db,)))
+
         return port_data
 
     def _delete_port_on_backend(self, context, net_id, port_id):
@@ -2486,13 +2490,14 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             updated_port['revision_number'] = port_model.revision_number
 
         # Notifications must be sent after the above transaction is complete
-        kwargs = {
-            'context': context,
-            'port': updated_port,
-            'mac_address_updated': False,
-            'original_port': original_port,
-        }
-        registry.notify(resources.PORT, events.AFTER_UPDATE, self, **kwargs)
+        registry.publish(
+            resources.PORT, events.AFTER_UPDATE, self,
+            payload=events.DBEventPayload(
+                context,
+                resource_id=port_id,
+                metadata={'mac_address_updated': False},
+                states=(original_port, updated_port,)))
+
         return updated_port
 
     def get_port(self, context, id, fields=None):

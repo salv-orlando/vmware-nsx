@@ -21,10 +21,40 @@ from vmware_nsx.db import db
 from vmware_nsx.shell import resources as nsxadmin
 
 from neutron.common import profiler  # noqa
+from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
+
+
+class MetadataEventPayload(events.EventPayload):
+    """An event type where only metadata metters.
+
+    Event metadata will be accessed like a dictionary.
+    """
+
+    def __init__(self, metadata):
+        super().__init__(None, metadata=metadata)
+
+    def __getitem__(self, key):
+        return self.metadata[key]
+
+
+def unpack_payload(func):
+    """Decorator to run admin shell functions.
+
+    Unpacks payload metadata and passess them as kwargs to the
+    actual callback
+    """
+
+    def wrapper(resource, event, trigger, payload):
+        # Use only with MetadataEventPayload
+        if payload:
+            func(resource, event, trigger, **payload.metadata)
+        else:
+            func(resource, event, trigger)
+    return wrapper
 
 
 def output_header(func):

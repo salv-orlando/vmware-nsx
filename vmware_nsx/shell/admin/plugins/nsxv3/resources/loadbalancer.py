@@ -30,6 +30,7 @@ LOG = logging.getLogger(__name__)
 
 @admin_utils.list_handler(constants.LB_SERVICES)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_lb_services(resource, event, trigger, **kwargs):
     """List LB services on NSX backend"""
 
@@ -43,6 +44,7 @@ def nsx_list_lb_services(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.LB_VIRTUAL_SERVERS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_lb_virtual_servers(resource, event, trigger, **kwargs):
     """List LB virtual servers on NSX backend"""
 
@@ -56,6 +58,7 @@ def nsx_list_lb_virtual_servers(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.LB_POOLS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_lb_pools(resource, event, trigger, **kwargs):
 
     nsxlib = utils.get_connected_nsxlib()
@@ -68,6 +71,7 @@ def nsx_list_lb_pools(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.LB_MONITORS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_lb_monitors(resource, event, trigger, **kwargs):
 
     nsxlib = utils.get_connected_nsxlib()
@@ -79,6 +83,7 @@ def nsx_list_lb_monitors(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_update_router_lb_advertisement(resource, event, trigger, **kwargs):
     """The implementation of the VIP advertisement changed.
 

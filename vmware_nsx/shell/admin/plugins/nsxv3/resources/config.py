@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def validate_configuration(resource, event, trigger, **kwargs):
     """Validate the nsxv3 configuration"""
     try:

@@ -38,6 +38,7 @@ def get_network_nsx_id(context, neutron_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_networks(resource, event, trigger, **kwargs):
     """List neutron networks that are missing the NSX backend network
     """
@@ -72,6 +73,7 @@ def list_missing_networks(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_orphaned_networks(resource, event, trigger, **kwargs):
     nsxlib = utils.get_connected_nsxlib()
     admin_cxt = neutron_context.get_admin_context()
@@ -82,6 +84,7 @@ def list_orphaned_networks(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def delete_backend_network(resource, event, trigger, **kwargs):
     errmsg = ("Need to specify nsx-id property. Add --property nsx-id=<id>")
     if not kwargs.get('property'):

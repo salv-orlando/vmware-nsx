@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def set_loadbalancer_status_error(resource, event, trigger, **kwargs):
     usage_msg = ("Loadbalancer id should be specified with "
                  "--property loadbalancer-id=<id>")

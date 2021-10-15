@@ -26,6 +26,7 @@ neutron_client = securitygroups_db.SecurityGroupDbMixin()
 
 @admin_utils.list_handler(constants.SECURITY_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_security_groups(resource, event, trigger, **kwargs):
     """List neutron security groups
 

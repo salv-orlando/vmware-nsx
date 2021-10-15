@@ -85,11 +85,6 @@ class ExtendedSecurityGroupPropertiesMixin(object):
         enable egress traffic which normal neutron security groups do.
         """
         s = security_group['security_group']
-        kwargs = {
-            'context': context,
-            'security_group': s,
-            'is_default': default_sg,
-        }
 
         self._registry_publish(resources.SECURITY_GROUP, events.BEFORE_CREATE,
                               exc_cls=ext_sg.SecurityGroupConflict,
@@ -119,9 +114,12 @@ class ExtendedSecurityGroupPropertiesMixin(object):
         secgroup_dict = self._make_security_group_dict(sg)
         secgroup_dict[sg_policy.POLICY] = s.get(sg_policy.POLICY)
         secgroup_dict[provider_sg.PROVIDER] = is_provider
-        kwargs['security_group'] = secgroup_dict
-        registry.notify(resources.SECURITY_GROUP, events.AFTER_CREATE, self,
-                        **kwargs)
+        registry.publish(resources.SECURITY_GROUP, events.AFTER_CREATE, self,
+                         payload=events.DBEventPayload(
+                             context,
+                             request_body=security_group,
+                             metadata={'is_default': default_sg},
+                             states=(s, secgroup_dict,)))
         return secgroup_dict
 
     def _process_security_group_properties_create(self, context,

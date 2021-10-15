@@ -34,11 +34,14 @@ LOG = logging.getLogger(__name__)
 @admin_utils.output_header
 def cleanup_db_mappings(resource, event, trigger, **kwargs):
     """Delete all entries from nsx-t mapping tables in DB"""
-    return migration. MP2Policy_cleanup_db_mappings(
+    # Don't annotate with unpack_payload because this is just a wrapper for
+    # another callback!
+    return migration.MP2Policy_cleanup_db_mappings(
          resource, event, trigger, **kwargs)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def post_v2t_migration_cleanups(resource, event, trigger, **kwargs):
     """Cleanup unneeded migrated resources after v2t migration is done"""
     nsxpolicy = p_utils.get_connected_nsxpolicy()
@@ -68,6 +71,7 @@ def post_v2t_migration_cleanups(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def migration_tier0_redistribute(resource, event, trigger, **kwargs):
     """Disable/Restore tier0s route redistribution during V2T migration"""
     errmsg = ("Need to specify --property action=disable/restore and a comma "
@@ -166,6 +170,7 @@ def _cidrs_overlap(cidr0, cidr1):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def migration_validate_external_cidrs(resource, event, trigger, **kwargs):
     """Before V2T migration, validate that the external subnets cidrs
     do not overlap the tier0 uplinks

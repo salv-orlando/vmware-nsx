@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def find_cluster_managers_ips(resource, event, trigger, **kwargs):
     """Show the current NSX rate limit."""
 

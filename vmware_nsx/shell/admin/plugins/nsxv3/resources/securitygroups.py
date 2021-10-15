@@ -110,6 +110,7 @@ def _log_info(resource, data, attrs=['display_name', 'id']):
 
 @admin_utils.list_handler(constants.SECURITY_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_security_groups_mappings(resource, event, trigger, **kwargs):
     """List neutron security groups"""
     sg_mappings = plugin_utils.get_security_groups_mappings(neutron_sg.context)
@@ -121,6 +122,7 @@ def list_security_groups_mappings(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.FIREWALL_SECTIONS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_dfw_sections(resource, event, trigger, **kwargs):
     """List NSX backend firewall sections"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -131,6 +133,7 @@ def nsx_list_dfw_sections(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.FIREWALL_NSX_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_security_groups(resource, event, trigger, **kwargs):
     """List NSX backend security groups"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -155,6 +158,7 @@ def _find_missing_security_groups():
 
 @admin_utils.list_mismatches_handler(constants.FIREWALL_NSX_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_security_groups(resource, event, trigger, **kwargs):
     """List security groups with sections missing on the NSX backend"""
     sgs_with_missing_nsx_group = _find_missing_security_groups()
@@ -186,6 +190,7 @@ def _find_missing_sections():
 
 @admin_utils.list_mismatches_handler(constants.FIREWALL_SECTIONS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_firewall_sections(resource, event, trigger, **kwargs):
     """List security groups with missing sections on the NSX backend"""
     sgs_with_missing_section = _find_missing_sections()
@@ -200,6 +205,7 @@ def list_missing_firewall_sections(resource, event, trigger, **kwargs):
 
 @admin_utils.fix_mismatches_handler(constants.SECURITY_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def fix_security_groups(resource, event, trigger, **kwargs):
     """Fix mismatch security groups by recreating missing sections & NS groups
     on the NSX backend
@@ -259,6 +265,7 @@ def fix_security_groups(resource, event, trigger, **kwargs):
             plugin.save_security_group_rule_mappings(context_, rules['rules'])
 
 
+@admin_utils.unpack_payload
 def list_orphaned_sections(resource, event, trigger, **kwargs):
     """List orphaned firewall sections"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -268,6 +275,7 @@ def list_orphaned_sections(resource, event, trigger, **kwargs):
               attrs=['id', 'display_name'])
 
 
+@admin_utils.unpack_payload
 def list_orphaned_section_rules(resource, event, trigger, **kwargs):
     """List orphaned firewall section rules"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -278,6 +286,7 @@ def list_orphaned_section_rules(resource, event, trigger, **kwargs):
                      'section-id', 'rule-id'])
 
 
+@admin_utils.unpack_payload
 def clean_orphaned_sections(resource, event, trigger, **kwargs):
     """Delete orphaned firewall sections from the NSX backend"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -295,6 +304,7 @@ def clean_orphaned_sections(resource, event, trigger, **kwargs):
             LOG.info("Backend firewall section %s was deleted.", sec['id'])
 
 
+@admin_utils.unpack_payload
 def clean_orphaned_section_rules(resource, event, trigger, **kwargs):
     """Delete orphaned firewall section rules from the NSX backend"""
     nsxlib = v3_utils.get_connected_nsxlib()
@@ -315,6 +325,7 @@ def clean_orphaned_section_rules(resource, event, trigger, **kwargs):
             LOG.info("Backend firewall rule %s was deleted.", rule['rule-id'])
 
 
+@admin_utils.unpack_payload
 def update_security_groups_logging(resource, event, trigger, **kwargs):
     """Update allowed traffic logging for all neutron security group rules"""
     errmsg = ("Need to specify log-allowed-traffic property. Add --property "
@@ -351,6 +362,7 @@ def update_security_groups_logging(resource, event, trigger, **kwargs):
                               "for rule in section %s", section_id)
 
 
+@admin_utils.unpack_payload
 def reuse_default_section(resource, event, trigger, **kwargs):
     """Reuse existing NSX default section & NS group that might already exist
     on the NSX from a previous installation.

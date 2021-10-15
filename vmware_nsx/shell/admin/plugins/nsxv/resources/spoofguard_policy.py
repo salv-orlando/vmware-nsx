@@ -45,6 +45,7 @@ def get_spoofguard_policy_data(policy_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_spoofguard_policies(resource, event, trigger, **kwargs):
     """List spoofguard policies from NSXv backend"""
     policies = get_spoofguard_policies()
@@ -59,6 +60,7 @@ def get_spoofguard_policy_network_mappings():
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def neutron_list_spoofguard_policy_mappings(resource, event, trigger,
                                             **kwargs):
     mappings = get_spoofguard_policy_network_mappings()
@@ -81,6 +83,7 @@ def get_missing_spoofguard_policy_mappings(reverse=None):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_missing_spoofguard_policies(resource, event, trigger,
                                          **kwargs):
     """List missing spoofguard policies on NSXv.
@@ -167,6 +170,7 @@ def nsx_list_mismatch_addresses_for_net(context, plugin, network_id,
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_mismatch_addresses(resource, event, trigger, **kwargs):
     """List missing spoofguard policies approved addresses on NSXv.
 
@@ -209,6 +213,7 @@ def nsx_list_mismatch_addresses(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_fix_mismatch_addresses(resource, event, trigger, **kwargs):
     """Fix missing spoofguard policies approved addresses for a port."""
 
@@ -235,6 +240,7 @@ def nsx_fix_mismatch_addresses(resource, event, trigger, **kwargs):
         LOG.info("Done.")
 
 
+@admin_utils.unpack_payload
 def nsx_clean_spoofguard_policy(resource, event, trigger, **kwargs):
     """Delete spoofguard policy"""
     errmsg = ("Need to specify policy-id. Add --property "

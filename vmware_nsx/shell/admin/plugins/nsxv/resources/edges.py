@@ -47,6 +47,7 @@ INTERNAL_SUBNET = "169.254"
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_edges(resource, event, trigger, **kwargs):
     """List edges from NSXv backend"""
 
@@ -70,6 +71,7 @@ def extend_edge_info(edges):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def neutron_list_router_edge_bindings(resource, event, trigger, **kwargs):
     """List NSXv edges from Neutron DB"""
     edges = utils.get_router_edge_bindings()
@@ -79,6 +81,7 @@ def neutron_list_router_edge_bindings(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def clean_orphaned_router_bindings(resource, event, trigger, **kwargs):
     """Delete nsx router bindings entries without real objects behind them"""
     orphaned_list = get_orphaned_router_bindings()
@@ -110,6 +113,7 @@ def clean_orphaned_router_bindings(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_orphaned_router_bindings(resource, event, trigger, **kwargs):
     """List nsx router bindings entries without real objects behind them"""
     orphaned_list = get_orphaned_router_bindings()
@@ -210,6 +214,7 @@ def router_binding_obj_exist(context, binding, net_ids, rtr_ids, plr_tlr_ids):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_orphaned_edges(resource, event, trigger, **kwargs):
     """List orphaned Edges on NSXv.
 
@@ -231,6 +236,7 @@ def nsx_list_orphaned_edges(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_delete_orphaned_edges(resource, event, trigger, **kwargs):
     """Delete orphaned edges from NSXv backend"""
     orphaned_edges = utils.get_orphaned_edges()
@@ -273,6 +279,7 @@ def get_router_edge_vnic_bindings(edge_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_missing_edges(resource, event, trigger, **kwargs):
     """List missing edges and networks serviced by those edges.
 
@@ -544,6 +551,7 @@ def change_edge_hostgroup(properties):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_update_edge(resource, event, trigger, **kwargs):
     """Update edge properties"""
     usage_msg = ("Need to specify edge-id parameter and "
@@ -601,6 +609,7 @@ def nsx_update_edge(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_update_edges(resource, event, trigger, **kwargs):
     """Update all edges with the given property"""
     if not kwargs.get('property'):
@@ -772,11 +781,13 @@ def _update_edges_connectivity(disconnect=True):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_disconnect_edges(resource, event, trigger, **kwargs):
     return _update_edges_connectivity(disconnect=True)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_reconnect_edges(resource, event, trigger, **kwargs):
     return _update_edges_connectivity(disconnect=False)
 

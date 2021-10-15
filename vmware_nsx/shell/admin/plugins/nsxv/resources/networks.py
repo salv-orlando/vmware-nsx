@@ -56,6 +56,7 @@ def get_networks_name_map():
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def neutron_list_networks(resource, event, trigger,
                           **kwargs):
     LOG.info(formatters.output_formatter(constants.NETWORKS,
@@ -64,6 +65,7 @@ def neutron_list_networks(resource, event, trigger,
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_update_switch(resource, event, trigger, **kwargs):
     nsxv_c = utils.get_nsxv_client()
     if not kwargs.get('property'):
@@ -114,6 +116,7 @@ def nsx_update_switch(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_networks(resource, event, trigger, **kwargs):
     """List the neutron networks which are missing the backend moref
     """
@@ -145,6 +148,7 @@ def list_missing_networks(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_orphaned_networks(resource, event, trigger, **kwargs):
     """List the NSX networks which are missing the neutron DB
     """
@@ -174,6 +178,7 @@ def _get_nsx_portgroups(dvs_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_nsx_portgroups(resource, event, trigger, **kwargs):
     if not cfg.CONF.dvs.host_ip:
         LOG.info("Please configure the dvs section in the nsx configuration "
@@ -188,6 +193,7 @@ def list_nsx_portgroups(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def delete_nsx_portgroups(resource, event, trigger, **kwargs):
     if not cfg.CONF.dvs.host_ip:
         LOG.info("Please configure the dvs section in the nsx configuration "
@@ -273,6 +279,7 @@ def list_neutron_virtual_wires(vws):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
     filename = None
     internal = False
@@ -298,6 +305,7 @@ def list_nsx_virtual_wires(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def delete_backend_network(resource, event, trigger, **kwargs):
     """Delete a backend network by its moref
     """

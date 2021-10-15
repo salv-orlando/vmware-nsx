@@ -166,6 +166,7 @@ def nsx_recreate_router(router_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_recreate_router_or_edge(resource, event, trigger, **kwargs):
     """Recreate a router edge with all the data on a new NSXv edge"""
     if not kwargs.get('property'):
@@ -188,6 +189,7 @@ def nsx_recreate_router_or_edge(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def migrate_distributed_routers_dhcp(resource, event, trigger, **kwargs):
     context = n_context.get_admin_context()
     nsxv = utils.get_nsxv_client()
@@ -224,6 +226,7 @@ def migrate_distributed_routers_dhcp(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_edge_firewalls(resource, event, trigger, **kwargs):
     context = n_context.get_admin_context()
     updated_routers = []
@@ -292,6 +295,7 @@ def is_router_conflicting_on_edge(context, driver, router_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def redistribute_routers(resource, event, trigger, **kwargs):
     """If any of the shared routers are on a conflicting edge move them"""
     context = n_context.get_admin_context()
@@ -309,6 +313,7 @@ def redistribute_routers(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_orphaned_vnics(resource, event, trigger, **kwargs):
     """List router orphaned router vnics where the port was deleted"""
     orphaned_vnics = get_orphaned_vnics()
@@ -359,6 +364,7 @@ def get_orphaned_vnics():
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def clean_orphaned_vnics(resource, event, trigger, **kwargs):
     """List router orphaned router vnics where the port was deleted"""
     orphaned_vnics = get_orphaned_vnics()

@@ -39,6 +39,7 @@ class RoutersPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
 @admin_utils.list_handler(constants.ROUTERS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_routers(resource, event, trigger, **kwargs):
     """List neutron routers
 
@@ -63,6 +64,7 @@ def list_routers(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_tier0(resource, event, trigger, **kwargs):
     """Replace old tier0 with a new one on the neutron DB and NSX backend"""
     errmsg = ("Need to specify old and new tier0 ID. Add --property "
@@ -120,6 +122,7 @@ def update_tier0(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def recover_tier0(resource, event, trigger, **kwargs):
     """
     Reconfigure the tier1 routers with tier0 GW at NSX backend and update the
@@ -208,6 +211,7 @@ def recover_tier0(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_nat_firewall_match(resource, event, trigger, **kwargs):
     """Update the firewall_match value in neutron nat rules with a new value"""
     errmsg = ("Need to specify internal/external firewall_match value. "

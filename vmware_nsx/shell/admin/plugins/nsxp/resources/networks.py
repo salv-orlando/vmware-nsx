@@ -27,6 +27,7 @@ LOG = logging.getLogger(__name__)
 
 @admin_utils.list_handler(constants.NETWORKS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_networks(resource, event, trigger, **kwargs):
     """List neutron networks
 
@@ -55,6 +56,7 @@ def list_networks(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def migrate_dhcp_to_policy(resource, event, trigger, **kwargs):
     errmsg = ("Need to specify policy dhcp config id. Add "
               "--property dhcp-config=<id>")
@@ -116,6 +118,7 @@ def migrate_dhcp_to_policy(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_admin_state(resource, event, trigger, **kwargs):
     """Upon upgrade to NSX3 update policy segments & ports
     So that the neutron admin state will match the policy one
@@ -144,6 +147,7 @@ def update_admin_state(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_metadata(resource, event, trigger, **kwargs):
     """
     Update the metadata proxy configuration of segments
@@ -191,6 +195,7 @@ def update_metadata(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_dhcp_profile_edge(resource, event, trigger, **kwargs):
     """
     Bind the specified dhcp profile to the edge clusters of tier0 GW

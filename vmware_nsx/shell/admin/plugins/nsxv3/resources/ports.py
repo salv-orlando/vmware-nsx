@@ -67,6 +67,7 @@ def get_network_nsx_id(session, neutron_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_ports(resource, event, trigger, **kwargs):
     """List neutron ports that are missing the NSX backend port
     And ports with wrong switch profiles or bindings
@@ -102,6 +103,7 @@ def get_vm_network_device(vm_mng, vm_moref, mac_address):
                 return device
 
 
+@admin_utils.unpack_payload
 def migrate_compute_ports_vms(resource, event, trigger, **kwargs):
     """Update the VMs ports on the backend after migrating nsx-v -> nsx-v3
 
@@ -192,6 +194,7 @@ def migrate_compute_ports_vms(resource, event, trigger, **kwargs):
         LOG.info("Instance %s successfully migrated!", device_id)
 
 
+@admin_utils.unpack_payload
 def migrate_exclude_ports(resource, event, trigger, **kwargs):
     _nsx_client = v3_utils.get_nsxv3_client()
 
@@ -241,6 +244,7 @@ def migrate_exclude_ports(resource, event, trigger, **kwargs):
             LOG.info("Port %s successfully updated", port_id)
 
 
+@admin_utils.unpack_payload
 def tag_default_ports(resource, event, trigger, **kwargs):
     nsxlib = v3_utils.get_connected_nsxlib()
     admin_cxt = neutron_context.get_admin_context()

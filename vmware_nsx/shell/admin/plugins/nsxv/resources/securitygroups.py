@@ -239,6 +239,7 @@ def _log_info(resource, data, attrs=['name', 'id']):
 
 @admin_utils.list_handler(constants.SECURITY_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def neutron_list_security_groups_mappings(resource, event, trigger, **kwargs):
     sg_mappings = neutron_sg.get_security_groups_mappings()
     _log_info(constants.SECURITY_GROUPS,
@@ -249,6 +250,7 @@ def neutron_list_security_groups_mappings(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.FIREWALL_SECTIONS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_dfw_sections(resource, event, trigger, **kwargs):
     fw_sections = nsxv_firewall.list_fw_sections()
     _log_info(constants.FIREWALL_SECTIONS, fw_sections)
@@ -257,6 +259,7 @@ def nsx_list_dfw_sections(resource, event, trigger, **kwargs):
 
 @admin_utils.list_handler(constants.FIREWALL_NSX_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_security_groups(resource, event, trigger, **kwargs):
     nsx_secgroups = nsxv_firewall.list_security_groups()
     _log_info(constants.FIREWALL_NSX_GROUPS, nsx_secgroups)
@@ -278,6 +281,7 @@ def _find_missing_security_groups():
 
 @admin_utils.list_mismatches_handler(constants.FIREWALL_NSX_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_security_groups(resource, event, trigger, **kwargs):
     sgs_with_missing_nsx_group = _find_missing_security_groups()
     missing_securitgroups_info = [
@@ -307,6 +311,7 @@ def _find_missing_sections():
 
 @admin_utils.list_mismatches_handler(constants.FIREWALL_SECTIONS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_firewall_sections(resource, event, trigger, **kwargs):
     sgs_with_missing_section = _find_missing_sections()
     missing_sections_info = [{'securitygroup-name': sg['name'],
@@ -334,6 +339,7 @@ def _get_unused_firewall_sections():
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_unused_firewall_sections(resource, event, trigger, **kwargs):
     unused_sections = _get_unused_firewall_sections()
     _log_info(constants.FIREWALL_SECTIONS, unused_sections,
@@ -342,6 +348,7 @@ def list_unused_firewall_sections(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def clean_unused_firewall_sections(resource, event, trigger, **kwargs):
     unused_sections = _get_unused_firewall_sections()
     for fw_section in unused_sections:
@@ -376,6 +383,7 @@ def _find_orphaned_section_rules():
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_orphaned_firewall_section_rules(resource, event, trigger, **kwargs):
     orphaned_rules = _find_orphaned_section_rules()
     _log_info(constants.FIREWALL_SECTIONS, orphaned_rules,
@@ -385,6 +393,7 @@ def list_orphaned_firewall_section_rules(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def clean_orphaned_firewall_section_rules(resource, event, trigger, **kwargs):
     orphaned_rules = _find_orphaned_section_rules()
     for rule in orphaned_rules:
@@ -400,12 +409,14 @@ def clean_orphaned_firewall_section_rules(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def reorder_firewall_sections(resource, event, trigger, **kwargs):
     nsxv_firewall.reorder_fw_sections()
 
 
 @admin_utils.fix_mismatches_handler(constants.SECURITY_GROUPS)
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def fix_security_groups(resource, event, trigger, **kwargs):
     context_ = n_context.get_admin_context()
     sgs_with_missing_section = _find_missing_sections()
@@ -444,6 +455,7 @@ def fix_security_groups(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_policies(resource, event, trigger, **kwargs):
     """List nsx service composer policies"""
     context = n_context.get_admin_context()
@@ -456,6 +468,7 @@ def list_policies(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def migrate_sg_to_policy(resource, event, trigger, **kwargs):
     """Change the mode of a security group from rules to NSX policy"""
     if not kwargs.get('property'):
@@ -537,6 +550,7 @@ def migrate_sg_to_policy(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def firewall_update_cluster_default_fw_section(resource, event, trigger,
                                                **kwargs):
     with utils.NsxVPluginWrapper() as plugin:
@@ -545,6 +559,7 @@ def firewall_update_cluster_default_fw_section(resource, event, trigger,
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_security_groups_logging(resource, event, trigger, **kwargs):
     """Update allowed traffic logging for all neutron security group rules"""
     errmsg = ("Need to specify log-allowed-traffic property. Add --property "

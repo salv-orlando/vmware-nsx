@@ -40,6 +40,7 @@ class RoutersPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_routers(resource, event, trigger, **kwargs):
     """List neutron routers that are missing the NSX backend router
     """
@@ -76,6 +77,7 @@ def list_missing_routers(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_nat_rules(resource, event, trigger, **kwargs):
     """Update all routers NAT rules to not bypass the firewall"""
     # This feature is supported only since nsx version 2
@@ -113,6 +115,7 @@ def update_nat_rules(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_enable_standby_relocation(resource, event, trigger, **kwargs):
     """Enable standby relocation on all routers """
     # This feature is supported only since nsx version 2.4
@@ -148,6 +151,7 @@ def update_enable_standby_relocation(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_orphaned_routers(resource, event, trigger, **kwargs):
     nsxlib = utils.get_connected_nsxlib()
     admin_cxt = neutron_context.get_admin_context()
@@ -158,6 +162,7 @@ def list_orphaned_routers(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def delete_backend_router(resource, event, trigger, **kwargs):
     nsxlib = utils.get_connected_nsxlib()
     errmsg = ("Need to specify nsx-id property. Add --property nsx-id=<id>")
@@ -195,6 +200,7 @@ def delete_backend_router(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_dhcp_relay(resource, event, trigger, **kwargs):
     """Update all routers dhcp relay service by the current configuration"""
     nsxlib = utils.get_connected_nsxlib()
@@ -243,6 +249,7 @@ def update_dhcp_relay(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_tier0(resource, event, trigger, **kwargs):
     """Replace old tier0 with a new one on the neutron DB and NSX backend"""
     errmsg = ("Need to specify old and new tier0 ID. Add --property "

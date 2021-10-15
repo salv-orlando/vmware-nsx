@@ -217,6 +217,7 @@ def _handle_edge(context, plugin, az_name, edge_id, edge_internal_ips):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_redo_metadata_cfg(resource, event, trigger, **kwargs):
     properties = admin_utils.parse_multi_keyval_opt(kwargs.get('property'))
     edgeapi = utils.NeutronDbClient()
@@ -337,6 +338,7 @@ def nsx_redo_metadata_cfg_for_az(context, plugin, az_name, check_az=True):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_shared_secret(resource, event, trigger, **kwargs):
     edgeapi = utils.NeutronDbClient()
     edge_list = nsxv_db.get_nsxv_internal_edges_by_purpose(
@@ -392,6 +394,7 @@ def _md_member_status(title, edge_ids):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def get_metadata_status(resource, event, trigger, **kwargs):
     if kwargs.get('property'):
         properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])

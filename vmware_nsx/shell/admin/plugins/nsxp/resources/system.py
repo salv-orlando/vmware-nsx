@@ -28,6 +28,7 @@ MIN_REALIZATION_INTERVAL = 1
 MAX_REALIZATION_INTERVAL = 10
 
 
+@admin_utils.unpack_payload
 def set_system_parameters(resource, event, trigger, **kwargs):
     """Set interval that controls realization and purge frequency
 

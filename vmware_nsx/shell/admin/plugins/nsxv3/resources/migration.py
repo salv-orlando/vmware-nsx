@@ -1625,6 +1625,7 @@ def pre_migration_checks(nsxlib, plugin):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def MP2Policy_pre_migration_check(resource, event, trigger, **kwargs):
     """Verify if the current configuration can be migrated to Policy"""
     nsxlib = utils.get_connected_nsxlib()
@@ -1699,6 +1700,7 @@ def _get_nsxlib_from_config(verbose, for_end_api=False):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def MP2Policy_migration(resource, event, trigger, **kwargs):
     """Migrate NSX resources and neutron DB from NSX-T (MP) to Policy"""
 
@@ -1776,6 +1778,7 @@ def MP2Policy_migration(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def MP2Policy_cleanup_db_mappings(resource, event, trigger, **kwargs):
     """Delete all entries from nsx-t mapping tables in DB.
     This cleanup does not have to run, as all those tables have delete-cascade

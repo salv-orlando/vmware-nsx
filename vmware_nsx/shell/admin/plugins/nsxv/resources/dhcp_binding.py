@@ -74,6 +74,7 @@ def neutron_get_static_bindings_by_edge(edge_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_missing_dhcp_bindings(resource, event, trigger, **kwargs):
     """List missing DHCP bindings from NSXv backend.
 
@@ -103,6 +104,7 @@ def list_missing_dhcp_bindings(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_update_dhcp_edge_binding(resource, event, trigger, **kwargs):
     """Resync DHCP bindings on NSXv Edge"""
     if not kwargs.get('property'):
@@ -199,6 +201,7 @@ def recreate_network_dhcp(context, plugin, edge_manager, old_edge_id, net_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_recreate_dhcp_edge(resource, event, trigger, **kwargs):
     """Recreate a dhcp edge with all the networks on a new NSXv edge"""
     usage_msg = ("Need to specify edge-id or net-id parameter")
@@ -301,6 +304,7 @@ def nsx_recreate_dhcp_edge_by_net_id(net_id):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_redistribute_dhcp_edges(resource, event, trigger, **kwargs):
     """If any of the DHCP networks are on a conflicting edge move them"""
     context = n_context.get_admin_context()

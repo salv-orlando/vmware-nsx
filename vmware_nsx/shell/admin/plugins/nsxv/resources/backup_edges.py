@@ -73,6 +73,7 @@ def extend_edge_info(edge):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_backup_edges(resource, event, trigger, **kwargs):
     """List backup edges"""
     backup_edges = get_nsxv_backup_edges()
@@ -123,6 +124,7 @@ def _nsx_delete_backup_edge(edge_id, all_backup_edges):
             return _delete_edge_from_nsx_and_neutron(edge_id, edge['name'])
 
 
+@admin_utils.unpack_payload
 def nsx_clean_backup_edge(resource, event, trigger, **kwargs):
     """Delete backup edge"""
     errmsg = ("Need to specify edge-id property. Add --property "
@@ -146,6 +148,7 @@ def nsx_clean_backup_edge(resource, event, trigger, **kwargs):
     _nsx_delete_backup_edge(edge_id, get_nsxv_backup_edges())
 
 
+@admin_utils.unpack_payload
 def nsx_clean_all_backup_edges(resource, event, trigger, **kwargs):
     """Delete all backup edges"""
     scope = "all"
@@ -177,6 +180,7 @@ def nsx_clean_all_backup_edges(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def neutron_clean_backup_edge(resource, event, trigger, **kwargs):
     """Delete a backup edge from the neutron, and backend by it's name
 
@@ -212,6 +216,7 @@ def neutron_clean_backup_edge(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_name_mismatches(resource, event, trigger, **kwargs):
     edges = utils.get_nsxv_backend_edges()
     plugin_nsx_mismatch = []
@@ -255,6 +260,7 @@ def nsx_list_name_mismatches(resource, event, trigger, **kwargs):
             ['edge_id', 'router_id', 'db_status']))
 
 
+@admin_utils.unpack_payload
 def nsx_fix_name_mismatch(resource, event, trigger, **kwargs):
     errmsg = ("Need to specify edge-id property. Add --property "
               "edge-id=<edge-id>")

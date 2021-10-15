@@ -29,6 +29,7 @@ neutron_client = utils.NeutronDbClient()
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def list_dhcp_bindings(resource, event, trigger, **kwargs):
     """List DHCP bindings in Neutron."""
 
@@ -39,6 +40,7 @@ def list_dhcp_bindings(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_recreate_dhcp_server(resource, event, trigger, **kwargs):
     """Recreate DHCP server & binding for a neutron network"""
     if not cfg.CONF.nsx_v3.native_dhcp_metadata:

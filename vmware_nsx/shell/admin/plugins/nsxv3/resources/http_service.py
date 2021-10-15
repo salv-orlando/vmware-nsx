@@ -25,6 +25,7 @@ neutron_client = utils.NeutronDbClient()
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_rate_limit_show(resource, event, trigger, **kwargs):
     """Show the current NSX rate limit."""
 
@@ -34,6 +35,7 @@ def nsx_rate_limit_show(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_rate_limit_update(resource, event, trigger, **kwargs):
     """Set the NSX rate limit
 

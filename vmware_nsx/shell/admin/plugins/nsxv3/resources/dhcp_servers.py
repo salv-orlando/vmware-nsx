@@ -43,6 +43,7 @@ def _get_dhcp_profile_uuid(**kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_list_orphaned_dhcp_servers(resource, event, trigger, **kwargs):
     """List logical DHCP servers without associated DHCP-enabled subnet."""
 
@@ -68,6 +69,7 @@ def nsx_list_orphaned_dhcp_servers(resource, event, trigger, **kwargs):
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def nsx_clean_orphaned_dhcp_servers(resource, event, trigger, **kwargs):
     """Remove logical DHCP servers without associated DHCP-enabled subnet."""
 

@@ -26,6 +26,7 @@ LOG = logging.getLogger(__name__)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def update_lb_service_tags(resource, event, trigger, **kwargs):
     """Update the LB id tag on existing LB services"""
     nsxpolicy = p_utils.get_connected_nsxpolicy()

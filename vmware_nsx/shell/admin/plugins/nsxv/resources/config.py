@@ -30,6 +30,7 @@ LOG = logging.getLogger(__name__)
 
 
 @admin_utils.output_header
+@admin_utils.unpack_payload
 def validate_configuration(resource, event, trigger, **kwargs):
     """Validate the nsxv configuration"""
     try:
@@ -43,6 +44,7 @@ def validate_configuration(resource, event, trigger, **kwargs):
         LOG.info("Configuration validation succeeded")
 
 
+@admin_utils.unpack_payload
 def check_clusters(resource, event, trigger, **kwargs):
     clusters_str = ""
     if kwargs.get('property'):
