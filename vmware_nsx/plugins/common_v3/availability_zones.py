@@ -60,6 +60,10 @@ class NsxV3AvailabilityZone(common_az.ConfiguredAvailabilityZone):
             native_metadata_route = az_info.get('native_metadata_route')
             if native_metadata_route:
                 self.native_metadata_route = native_metadata_route
+            windows_metadata_route = az_info.get('windows_metadata_route')
+            # Careful - this is a boolean
+            if windows_metadata_route is not None:
+                self.windows_metadata_route = windows_metadata_route
         else:
             self.metadata_proxy = None
             self.dhcp_profile = None
