@@ -1141,12 +1141,11 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return bool(dhcp_port)
 
     def _get_segment_subnets_versions(self, context, net_id):
-        # Find networks DHCP enabled subnets
-        versions = set()
+        versions = {4: [], 6: []}
         with db_api.CONTEXT_READER.using(context):
             network = self._get_network(context, net_id)
         for subnet in network.subnets:
-            versions.add(subnet.ip_version)
+            versions[subnet.ip_version].append(subnet)
         return versions
 
     def _get_segment_multicast_setting(self, context, net_id):
@@ -1154,8 +1153,16 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         seg_subnets_ip_ver = self._get_segment_subnets_versions(
             context, net_id)
         # Multicast cannot be enabled on segments with v6 subnets only
-        if len(seg_subnets_ip_ver) == 1 and seg_subnets_ip_ver.pop() == 6:
+        if not seg_subnets_ip_ver[4]:
             return False
+        if seg_subnets_ip_ver[6]:
+            for subnet in seg_subnets_ip_ver[6]:
+                if subnet.enable_dhcp:
+                    break
+            else:
+                # There are no v4 subnets stored in NSX, must
+                # disable multicast
+                return False
         # Ignore value of multicast setting (go with defaults)
         return core_resources.IGNORE
 
