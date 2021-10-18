@@ -50,6 +50,7 @@ class NsxV3AvailabilityZone(v3_az.NsxV3AvailabilityZone):
         self.metadata_proxy = cfg.CONF.nsx_v3.metadata_proxy
         self.dhcp_profile = cfg.CONF.nsx_v3.dhcp_profile
         self.native_metadata_route = cfg.CONF.nsx_v3.native_metadata_route
+        self.windows_metadata_route = cfg.CONF.nsx_v3.windows_metadata_route
         self.dns_domain = cfg.CONF.nsx_v3.dns_domain
         self.nameservers = cfg.CONF.nsx_v3.nameservers
         self.default_overlay_tz = cfg.CONF.nsx_v3.default_overlay_tz

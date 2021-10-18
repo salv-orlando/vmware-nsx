@@ -2677,11 +2677,15 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                           subnet):
         # Always add option121.
         net_az = self.get_network_az_by_net_id(context, net_id)
-        options = {'option121': {'static_routes': [
+        static_routes = []
+        options = {'option121': {'static_routes': static_routes}}
+        if net_az.windows_metadata_route:
+            static_routes.append(
+                {'network': '%s' % net_az.native_metadata_route,
+                 'next_hop': '0.0.0.0'})
+        static_routes.append(
             {'network': '%s' % net_az.native_metadata_route,
-             'next_hop': '0.0.0.0'},
-            {'network': '%s' % net_az.native_metadata_route,
-             'next_hop': ip}]}}
+             'next_hop': ip})
         if subnet:
             sr, gateway_ip = self._build_static_routes(
                 subnet.get('gateway_ip'), subnet.get('cidr'),
