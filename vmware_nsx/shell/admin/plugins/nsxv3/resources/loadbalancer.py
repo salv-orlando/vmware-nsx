@@ -19,6 +19,7 @@ from neutron_lib import context as neutron_context
 
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.services.lbaas.nsx_v3.implementation import lb_utils
+from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.shell.admin.plugins.common import constants
 from vmware_nsx.shell.admin.plugins.common import formatters
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
@@ -124,6 +125,75 @@ def nsx_update_router_lb_advertisement(resource, event, trigger, **kwargs):
     LOG.info("Done.")
 
 
+def _orphaned_loadbalancer_handler(handler_callback):
+    # Retrieve Octavia loadbalancers
+    client = octavia_listener.get_octavia_rpc_client()
+    o_endpoint = octavia_listener.NSXOctaviaListenerEndpoint(client=client)
+    octavia_lb_ids = o_endpoint.get_active_loadbalancers()
+
+    nsxlib = utils.get_connected_nsxlib()
+    nsxlib_lb = nsxlib.load_balancer
+    lb_services = nsxlib_lb.service.list()
+    vs_client = nsxlib_lb.virtual_server
+
+    for lb_service in lb_services.get('results', []):
+        is_orphan = True
+        for vs_id in lb_service.get('virtual_server_ids', []):
+            vs = vs_client.get(vs_id)
+            for tag in vs.get('tags', []):
+                if tag['scope'] == 'os-lbaas-lb-id':
+                    lb_id = tag['tag']
+
+                    if lb_id in octavia_lb_ids:
+                        is_orphan = False
+                        break
+        if is_orphan:
+            handler_callback(lb_service)
+
+
+@admin_utils.output_header
+@admin_utils.unpack_payload
+def list_orphaned_loadbalancers(resource, event, trigger, **kwargs):
+    def _orphan_handler(lb_service):
+        LOG.warning('NSX loadbalancer service %s has no valid Octavia '
+                    'loadbalancers', lb_service['id'])
+
+    _orphaned_loadbalancer_handler(_orphan_handler)
+
+
+@admin_utils.output_header
+@admin_utils.unpack_payload
+def clean_orphaned_loadbalancers(resource, event, trigger, **kwargs):
+    def _orphan_handler(lb_service):
+        nsxlib = utils.get_connected_nsxlib()
+        nsxlib_lb = nsxlib.load_balancer
+        if lb_service.get('attachment'):
+            try:
+                nsxlib_lb.service.update(lb_service['id'], attachment=None)
+            except Exception as e:
+                LOG.error('Failed to detach NSX loadbalancer service %s with '
+                          'error %s', lb_service['id'], e)
+
+        try:
+            nsxlib_lb.service.delete(lb_service['id'])
+            LOG.info('Cleaned up NSX loadbalancer service %s',
+                     lb_service['id'])
+        except Exception as e:
+            LOG.error('Failed to cleanup NSX loadbalancer service %s with '
+                      'error %s', lb_service['id'], e)
+
+    _orphaned_loadbalancer_handler(_orphan_handler)
+
+
 registry.subscribe(nsx_update_router_lb_advertisement,
                    constants.LB_ADVERTISEMENT,
                    shell.Operations.NSX_UPDATE.value)
+
+
+registry.subscribe(list_orphaned_loadbalancers,
+                   constants.LB_SERVICES,
+                   shell.Operations.LIST_ORPHANED.value)
+
+registry.subscribe(clean_orphaned_loadbalancers,
+                   constants.LB_SERVICES,
+                   shell.Operations.CLEAN_ORPHANED.value)
