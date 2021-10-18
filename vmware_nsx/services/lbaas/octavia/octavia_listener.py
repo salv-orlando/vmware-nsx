@@ -37,6 +37,18 @@ LOG = logging.getLogger(__name__)
 STATUS_CHECKER_COUNT = 10
 
 
+def get_octavia_rpc_client():
+    if cfg.CONF.api_replay_mode:
+        topic = constants.DRIVER_TO_OCTAVIA_MIGRATION_TOPIC
+    else:
+        topic = constants.DRIVER_TO_OCTAVIA_TOPIC
+    transport = messaging.get_rpc_transport(cfg.CONF)
+    target = messaging.Target(topic=topic, exchange="common",
+                              namespace='control', fanout=False,
+                              version='1.0')
+    return messaging.RPCClient(transport, target)
+
+
 class NSXOctaviaListener(object):
     @log_helpers.log_method_call
     def __init__(self, loadbalancer=None, listener=None, pool=None,
@@ -46,15 +58,7 @@ class NSXOctaviaListener(object):
                                 loadbalancer, member, pool)
 
     def _init_rpc_messaging(self):
-        if cfg.CONF.api_replay_mode:
-            topic = constants.DRIVER_TO_OCTAVIA_MIGRATION_TOPIC
-        else:
-            topic = constants.DRIVER_TO_OCTAVIA_TOPIC
-        transport = messaging.get_rpc_transport(cfg.CONF)
-        target = messaging.Target(topic=topic, exchange="common",
-                                  namespace='control', fanout=False,
-                                  version='1.0')
-        self.client = messaging.RPCClient(transport, target)
+        self.client = get_octavia_rpc_client()
 
     def _init_rpc_listener(self, healthmonitor, l7policy, l7rule, listener,
                            loadbalancer, member, pool):
