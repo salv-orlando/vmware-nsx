@@ -318,6 +318,10 @@ nsx_v3_and_p = [
                default="169.254.169.254/31",
                help=_("The metadata route used for native metadata proxy "
                       "service.")),
+    cfg.BoolOpt('windows_metadata_route',
+                default=True,
+                help=_("Inject a route for allowing windows guest access NSX "
+                       "native metadata proxy service")),
     cfg.StrOpt('dns_domain',
                default='openstacklocal',
                help=_("Domain to use for building the hostnames.")),
