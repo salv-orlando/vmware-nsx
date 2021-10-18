@@ -40,6 +40,7 @@ class NsxPAvailabilityZone(v3_az.NsxV3AvailabilityZone):
         self.metadata_proxy = cfg.CONF.nsx_p.metadata_proxy
         self.dhcp_profile = cfg.CONF.nsx_p.dhcp_profile
         self.native_metadata_route = cfg.CONF.nsx_p.native_metadata_route
+        self.windows_metadata_route = cfg.CONF.nsx_p.windows_metadata_route
         self.default_overlay_tz = cfg.CONF.nsx_p.default_overlay_tz
         self.default_vlan_tz = cfg.CONF.nsx_p.default_vlan_tz
         self.default_tier0_router = cfg.CONF.nsx_p.default_tier0_router
