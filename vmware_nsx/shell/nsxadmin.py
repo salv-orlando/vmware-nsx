@@ -165,7 +165,6 @@ def main(argv=sys.argv[1:]):
 
     # build event payload - no context
     payload = admin_utils.MetadataEventPayload(
-        None,
         {'force': cfg.CONF.force,
          'property': cfg.CONF.property,
          'verbose': cfg.CONF.verbose})
