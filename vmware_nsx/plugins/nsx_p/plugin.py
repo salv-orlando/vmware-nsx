@@ -4142,6 +4142,8 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         sg = self.get_security_group(context, sg_id)
         self._prevent_non_admin_edit_provider_sg(context, sg_id)
 
+        # The DB process adds attributed that need to be used for creating
+        # NSX resources. Keep DB update before NSX operation
         with db_api.CONTEXT_WRITER.using(context):
             rules_db = (super(NsxPolicyPlugin,
                               self).create_security_group_rule_bulk_native(
@@ -4152,8 +4154,6 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
 
         is_provider_sg = sg.get(provider_sg.PROVIDER)
         secgroup_logging = self._is_security_group_logged(context, sg_id)
-        category = (NSX_P_PROVIDER_SECTION_CATEGORY if is_provider_sg
-                    else NSX_P_REGULAR_SECTION_CATEGORY)
         # Create the NSX backend rules in a single transaction
 
         def _do_update_rules():
@@ -4164,20 +4164,23 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     context, sg_id, rule_data, secgroup_logging,
                     is_provider_sg=is_provider_sg)
                 backend_rules.append(rule_entry)
-            # Add the old rules
-            for rule in sg['security_group_rules']:
-                rule_entry = self._create_security_group_backend_rule(
-                    context, sg_id, rule, secgroup_logging,
-                    is_provider_sg=is_provider_sg,
-                    create_related_resource=True)
-                backend_rules.append(rule_entry)
+            # Update the policy with the new rules only
+            self.nsxpolicy.comm_map.patch_entries(
+                NSX_P_GLOBAL_DOMAIN_ID, sg_id, entries=backend_rules)
 
-            # Update the policy with all the rules.
-            self.nsxpolicy.comm_map.update_with_entries(
-                NSX_P_GLOBAL_DOMAIN_ID, sg_id, entries=backend_rules,
-                category=category, use_child_rules=False)
-
-        self._run_under_transaction(_do_update_rules)
+        try:
+            self._run_under_transaction(_do_update_rules)
+        except Exception as e:
+            LOG.error("Unable to create securiy group rules on backend: %s", e)
+            # Rollback DB operation
+            with excutils.save_and_reraise_exception():
+                rule_ids = []
+                for rule_data in rules_db:
+                    super(NsxPolicyPlugin, self).delete_security_group_rule(
+                        context, rule_data['id'])
+                    rule_ids.append(rule_data['id'])
+                LOG.info("Security group rules %s removed from Neutron DB "
+                         "due to failed NSX transaction", ",".join(rule_ids))
 
         return rules_db
 
