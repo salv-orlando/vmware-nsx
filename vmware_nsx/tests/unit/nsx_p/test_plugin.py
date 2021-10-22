@@ -1738,7 +1738,7 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
         with self.security_group(name, description) as sg:
             sg_id = sg['security_group']['id']
             with mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                            "NsxPolicyCommunicationMapApi.update_with_entries"
+                            "NsxPolicyCommunicationMapApi.patch_entries"
                             ) as update_policy,\
                 self.security_group_rule(sg_id, direction,
                                          protocol, port_range_min,
