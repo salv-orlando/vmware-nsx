@@ -404,7 +404,7 @@ class TestNSXpProviderSecurityGrp(test_nsxp_plugin.NsxPPluginTestCaseMixin,
         sg_id = provider_secgroup['security_group']['id']
 
         with mock.patch("vmware_nsxlib.v3.policy.core_resources."
-                        "NsxPolicyCommunicationMapApi.update_with_entries"
+                        "NsxPolicyCommunicationMapApi.patch_entries"
                         ) as entry_create,\
             self.security_group_rule(security_group_id=sg_id):
             entry_create.assert_called_once()
