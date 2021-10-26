@@ -60,7 +60,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                  octavia_os_tenant_name, octavia_os_tenant_domain_id,
                  octavia_os_password, octavia_os_auth_url,
                  neutron_conf, ext_net_map, net_vni_map, int_vni_map,
-                 vif_ids_map, logfile, max_retry, cert_file):
+                 vif_ids_map, logfile, max_retry, cert_file, ignore_errors):
 
         # Init config and logging
         if neutron_conf:
@@ -170,6 +170,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
 
         self.n_errors = 0
         self.errors = []
+        self.ignore_errors = ignore_errors
 
         LOG.info("Starting NSX migration to %s.", self.dest_plugin)
         # Migrate all the objects
@@ -279,8 +280,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         return False
 
     def add_error(self, msg):
-        self.n_errors = self.n_errors + 1
         LOG.error(msg)
+        if not self.ignore_errors:
+            LOG.error("Error occurred during API replay: exiting")
+            sys.exit(1)
+        self.n_errors = self.n_errors + 1
         self.errors.append(msg)
 
     def migrate_quotas(self):

@@ -64,7 +64,8 @@ class ApiReplayCli(object):
             vif_ids_map=args.vif_ids_map,
             logfile=args.logfile,
             max_retry=args.max_retry,
-            cert_file=args.cert_file)
+            cert_file=args.cert_file,
+            ignore_errors=args.ignore_errors)
 
     def _setup_argparse(self):
         parser = argparse.ArgumentParser()
@@ -206,7 +207,12 @@ class ApiReplayCli(object):
             "--enable-barbican",
             default=False,
             action='store_true',
-            help="Meh")
+            help="Enable barbican connection for Octavia certificates")
+        parser.add_argument(
+            "--ignore-errors",
+            action='store_true',
+            default=False,
+            help="Continuing executing API replay even upon errors")
 
         # NOTE: this will return an error message if any of the
         # require options are missing.
