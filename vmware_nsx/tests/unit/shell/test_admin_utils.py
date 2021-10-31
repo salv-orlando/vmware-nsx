@@ -33,6 +33,8 @@ from vmware_nsx._i18n import _
 from vmware_nsx.common import config  # noqa
 from vmware_nsx.db import nsxv_db
 from vmware_nsx.dvs import dvs_utils
+
+from vmware_nsx.services.lbaas.octavia import octavia_listener
 from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as nsxp_utils
 from vmware_nsx.shell.admin.plugins.nsxv.resources import migration
 from vmware_nsx.shell.admin.plugins.nsxv.resources import utils as nsxv_utils
@@ -76,6 +78,7 @@ class AbstractTestAdminUtils(base.BaseTestCase):
         mock_query = mock.patch(
             "vmware_nsx.shell.admin.plugins.common.utils.query_yes_no")
         mock_query.start()
+        octavia_listener.get_octavia_rpc_client = mock.Mock()
 
     @abc.abstractmethod
     def _get_plugin_name(self):

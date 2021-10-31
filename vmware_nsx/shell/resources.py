@@ -40,6 +40,8 @@ class Operations(enum.Enum):
     LIST_MISMATCHES = 'list-mismatches'
     FIX_MISMATCH = 'fix-mismatch'
     LIST_UNUSED = 'list-unused'
+    LIST_ORPHANED = 'list-orphaned'
+    CLEAN_ORPHANED = 'clean-orphaned'
 
     NEUTRON_LIST = 'neutron-list'
     NEUTRON_CLEAN = 'neutron-clean'
@@ -146,7 +148,9 @@ nsxv3_resources = {
                                 [Operations.LIST.value,
                                  Operations.NSX_CLEAN.value]),
     constants.LB_SERVICES: Resource(constants.LB_SERVICES,
-                                    [Operations.LIST.value]),
+                                    [Operations.LIST.value,
+                                     Operations.LIST_ORPHANED.value,
+                                     Operations.CLEAN_ORPHANED.value]),
     constants.LB_VIRTUAL_SERVERS: Resource(constants.LB_VIRTUAL_SERVERS,
                                            [Operations.LIST.value]),
     constants.LB_POOLS: Resource(constants.LB_POOLS,
@@ -288,7 +292,9 @@ nsxp_resources = {
                                  Operations.UPDATE_TIER0.value,
                                  Operations.UPDATE_FIREWALL_MATCH.value]),
     constants.LB_SERVICES: Resource(constants.LB_SERVICES,
-                                [Operations.NSX_UPDATE_TAGS.value]),
+                                    [Operations.NSX_UPDATE_TAGS.value,
+                                     Operations.LIST_ORPHANED.value,
+                                     Operations.CLEAN_ORPHANED.value]),
     constants.CERTIFICATE: Resource(constants.CERTIFICATE,
                                     [Operations.GENERATE.value,
                                      Operations.SHOW.value,
