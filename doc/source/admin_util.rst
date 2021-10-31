@@ -344,6 +344,7 @@ V2T migration
 - Get compute ports vif ids mapping for the migration::
 
     nsxadmin -r ports -o list (--property map-file=<filename>)
+
 Config
 ~~~~~~
 
@@ -591,6 +592,14 @@ LBaaS
 
     nsxadmin -r lb-services -o list
 
+- List orphaned NSX LB services::
+
+    nsxadmin -r lb-services -o list-orphaned
+
+- Clean orphaned NSX LB services::
+
+    nsxadmin -r lb-services -o clean-orphaned
+
 - List NSX LB virtual servers::
 
     nsxadmin -r lb-virtual-servers -o list
@@ -616,7 +625,7 @@ Rate Limit
 
 - Update the NSX rate limit::
 
-nsxadmin -r rate-limit -o nsx-update --property value=<>
+    nsxadmin -r rate-limit -o nsx-update --property value=<>
 
 Cluster
 ~~~~~~~
@@ -700,10 +709,20 @@ NSX Policy Plugin
     nsxadmin -r routers -o  update-nat-firewall-match --property firewall-match=external/internal
 
 - Migrate networks DHCP from MP to Policy (for NSX 3.0 upgrades)::
+
     nsxadmin -r dhcp-binding -o migrate-to-policy --property dhcp-config=<id>
 
 - Update tags on a loadbalancer service
+
     nsxadmin -r lb-services -o nsx-update-tags
+
+- List orphaned NSX LB services::
+
+    nsxadmin -r lb-services -o list-orphaned
+
+- Clean orphaned NSX LB services::
+
+    nsxadmin -r lb-services -o clean-orphaned
 
 - Delete DB tables related to the MP plugin after migration from MP plugin to policy::
 
@@ -714,6 +733,7 @@ NSX Policy Plugin
     nsxadmin -r nsx-migrate-v2t -o clean-all
 
 - Disable/Restore Tier0 redistribution of tier1 routes during the V2T migration::
+
     nsxadmin -r nsx-migrate-v2t -o nsx-redistribute --property action=disable/restore --property tier0s=a,b,c
 
 - Validate external subnets cidrs before V2T migration::
