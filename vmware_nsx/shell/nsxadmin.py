@@ -23,6 +23,7 @@ delete-security-groups, nsx neutron nsxv3 can be options
 TODO: Autocomplete command line args
 """
 
+from os import path
 import sys
 
 from neutron.common import config as neutron_config
@@ -58,12 +59,15 @@ def _init_cfg():
 
     # Make sure the default config files are used if not specified in args
     default_config_files = [constants.NEUTRON_CONF,
-                            constants.NSX_INI]
+                            constants.NSX_INI,
+                            constants.FWAAS_CONF]
+
     config_args = sys.argv[1:]
     if '--config-file' not in config_args:
         # Add default config files
         for file in default_config_files:
-            config_args.extend(['--config-file', file])
+            if path.exists(file):
+                config_args.extend(['--config-file', file])
 
     # Init the CONF and neutron config (Used by the core plugin)
     neutron_config.init(args=config_args)
