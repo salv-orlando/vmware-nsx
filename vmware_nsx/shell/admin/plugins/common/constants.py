@@ -14,6 +14,7 @@
 
 # Default conf file locations
 NEUTRON_CONF = '/etc/neutron/neutron.conf'
+FWAAS_CONF = '/etc/neutron/fwaas.conf'
 NSX_INI = '/etc/neutron/plugins/vmware/nsx.ini'
 
 # NSX Plugin Constants
