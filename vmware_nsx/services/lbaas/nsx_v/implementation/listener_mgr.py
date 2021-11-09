@@ -151,7 +151,8 @@ class EdgeListenerManagerFromDict(base_mgr.EdgeLoadbalancerBaseManager):
                     'Using first signed certificate of the bundle')
             edge_cert_id = None
             for cert in cert_list:
-                if cert['certificateType'] == 'certificate_signed':
+                if cert['certificateType'] in ['certificate_signed',
+                                               'certificate_self_signed']:
                     edge_cert_id = cert['objectId']
                     break
             if not edge_cert_id:
