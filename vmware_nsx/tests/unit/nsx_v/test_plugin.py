@@ -4222,6 +4222,9 @@ class NsxVTestSecurityGroup(ext_sg.TestSecurityGroups,
     def test_create_security_group_rule_multiple_remotes(self):
         self.skipTest('No support for SG address groups')
 
+    def test_list_security_groups_with_shared_filter_false(self):
+        self.skipTest('No support for SG shared field')
+
 
 class TestVdrTestCase(L3NatTest, L3NatTestCaseBase,
                       test_l3_plugin.L3NatDBIntTestCase,

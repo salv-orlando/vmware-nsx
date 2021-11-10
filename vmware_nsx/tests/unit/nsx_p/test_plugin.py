@@ -1799,6 +1799,9 @@ class NsxPTestSecurityGroup(common_v3.FixExternalNetBaseTest,
     def test_create_security_group_rule_multiple_remotes(self):
         self.skipTest('No support for SG address groups')
 
+    def test_list_security_groups_with_shared_filter_false(self):
+        self.skipTest('No support for SG shared field')
+
 
 class NsxPTestL3ExtensionManager(object):
 
